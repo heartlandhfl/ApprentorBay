@@ -5,9 +5,17 @@
     "moduleResolution": "NodeNext",
     "strict": true,
     "skipLibCheck": true,
-    "noEmit": true,
     "declaration": true,
+    "outDir": "dist",
+    "rootDir": ".",
     "isolatedModules": true
   },
-  "include": ["index.ts", "types.ts", "learningContractMachine.ts"]
+  "include": [
+    "index.ts",
+    "types.ts",
+    "learningContractMachine.ts",
+    "legal.ts",
+    "legal/**/*.ts"
+  ],
+  "exclude": ["**/*.test.ts"]
 }

@@ -12,7 +12,21 @@ import { contractsRouter } from './routes/contracts.js';
 import { healthRouter } from './routes/health.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const repoRoot = path.resolve(here, '..');
+
+function resolveRepoRoot(startDir: string): string {
+  for (const candidate of [
+    path.resolve(startDir, '..'),
+    path.resolve(startDir, '../..'),
+  ]) {
+    if (existsSync(path.join(candidate, 'client/dist'))) {
+      return candidate;
+    }
+  }
+
+  return path.resolve(startDir, '..');
+}
+
+const repoRoot = resolveRepoRoot(here);
 
 dotenv.config({ path: path.join(repoRoot, '.env') });
 
