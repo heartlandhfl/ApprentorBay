@@ -18,6 +18,7 @@ import {
   COLLECTIONS,
   emptyLearnerProfile,
   emptyMentorProfile,
+  isAccountActive,
   type SignupRole,
   type User,
 } from '@apprentorbay/shared';
@@ -35,6 +36,7 @@ type AuthContextValue = {
     jobStatus?: string;
     careerAspirations?: string;
     recentRole?: string;
+    expertise?: string;
   }) => Promise<User>;
   logIn: (email: string, password: string) => Promise<void>;
   logOut: () => Promise<void>;
@@ -73,7 +75,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       unsubUser = onSnapshot(
         ref,
         (snap) => {
-          setAccount((snap.data() as User | undefined) ?? null);
+          const nextAccount = (snap.data() as User | undefined) ?? null;
+          if (nextAccount && !isAccountActive(nextAccount)) {
+            void signOut(auth);
+            setAccount(null);
+            setLoading(false);
+            return;
+          }
+          setAccount(nextAccount);
           setLoading(false);
         },
         () => {
@@ -117,6 +126,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           role: input.role,
           email: input.email.trim(),
           displayName,
+          active: true,
           createdAt,
         };
 
@@ -142,8 +152,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             } else {
               const profile = emptyMentorProfile(uid, displayName);
               const recentRole = input.recentRole?.trim();
+              const expertise = input.expertise?.trim() || recentRole || '';
               tx.set(profileRef, {
                 ...profile,
+                expertise,
                 experience: recentRole
                   ? [
                       {
@@ -168,12 +180,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       },
       async logIn(email, password) {
         const auth = getFirebaseAuth();
-        if (!auth) throw new Error('Firebase is not initialized');
-        await signInWithEmailAndPassword(auth, email.trim(), password).catch(
-          (error: unknown) => {
-            throw new Error(authMessage(error));
-          },
-        );
+        const db = getFirebaseDb();
+        if (!auth || !db) throw new Error('Firebase is not initialized');
+        const credential = await signInWithEmailAndPassword(
+          auth,
+          email.trim(),
+          password,
+        ).catch((error: unknown) => {
+          throw new Error(authMessage(error));
+        });
+        const snap = await getDoc(doc(db, COLLECTIONS.users, credential.user.uid));
+        const stored = snap.data() as User | undefined;
+        if (!isAccountActive(stored)) {
+          await signOut(auth);
+          throw new Error('This account has been suspended.');
+        }
       },
       async logOut() {
         const auth = getFirebaseAuth();
@@ -211,5 +232,5 @@ function authMessage(error: unknown): string {
 export function profilePath(account: User): string {
   if (account.role === 'learner') return `/learners/${account.uid}`;
   if (account.role === 'mentor') return `/mentors/${account.uid}`;
-  return '/admin/verification';
+  return '/admin';
 }

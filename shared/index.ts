@@ -21,11 +21,14 @@ export {
   COLLECTIONS,
   emptyLearnerProfile,
   emptyMentorProfile,
+  isAccountActive,
 } from './types.js';
 
 export type {
+  AccountRow,
   ApiError,
   ApplicationStatus,
+  HarborCounts,
   CompetencyGoal,
   DeliverableRef,
   EducationEntry,

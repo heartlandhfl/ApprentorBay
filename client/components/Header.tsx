@@ -20,11 +20,19 @@ export function Header() {
           </Cluster>
         </Link>
         <Cluster gap={8}>
+          <Button variant="ghost" size="sm" to="/mentors">
+            Mentors
+          </Button>
           <Button variant="ghost" size="sm" to="/system">
             System health
           </Button>
           {loading ? null : account ? (
             <>
+              {account.role === 'admin' ? (
+                <Button variant="ghost" size="sm" to="/admin">
+                  Harbor desk
+                </Button>
+              ) : null}
               {account.role === 'mentor' ? (
                 <Button variant="ghost" size="sm" to="/dashboard/applications">
                   Applications
@@ -35,16 +43,18 @@ export function Header() {
                   Messages
                 </Button>
               ) : null}
-              <Button variant="ghost" size="sm" to={profilePath(account)}>
-                {account.role === 'admin' ? 'Verification' : 'My profile'}
-              </Button>
+              {account.role !== 'admin' ? (
+                <Button variant="ghost" size="sm" to={profilePath(account)}>
+                  My profile
+                </Button>
+              ) : null}
               <Button variant="secondary" size="sm" onClick={() => void logOut()}>
                 Log out
               </Button>
             </>
           ) : (
             <>
-              <Button variant="ghost" size="sm" to="/login">
+              <Button variant="secondary" size="sm" to="/login">
                 Log in
               </Button>
               <Button size="sm" to="/signup">

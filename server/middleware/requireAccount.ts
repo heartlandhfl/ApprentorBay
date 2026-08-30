@@ -1,5 +1,5 @@
 import type { NextFunction, Request, RequestHandler, Response } from 'express';
-import { COLLECTIONS, type ApiError, type User } from '@apprentorbay/shared';
+import { COLLECTIONS, isAccountActive, type ApiError, type User } from '@apprentorbay/shared';
 import { adminAuth, adminDb, getAdminFirebase } from '../lib/firebase.js';
 
 export type AccountRequest = Request & {
@@ -35,6 +35,10 @@ export const requireAccount: RequestHandler = async (
 
     if (!account) {
       sendApiError(res, 403, 'forbidden', 'No user document');
+      return;
+    }
+    if (!isAccountActive(account)) {
+      sendApiError(res, 403, 'suspended', 'This account has been suspended.');
       return;
     }
 

@@ -1,7 +1,9 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { AuthProvider } from './lib/auth';
+import { AdminPage } from './routes/AdminPage';
 import { ApplicationsPage } from './routes/ApplicationsPage';
 import { HomePage } from './routes/HomePage';
+import { MentorsPage } from './routes/MentorsPage';
 import { JourneyPage } from './routes/JourneyPage';
 import { LearnerProfilePage } from './routes/LearnerProfilePage';
 import { LoginPage } from './routes/LoginPage';
@@ -23,7 +25,16 @@ export function App() {
           <Route path="/signup" element={<SignupPage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/learners/:id" element={<LearnerProfilePage />} />
+          <Route path="/mentors" element={<MentorsPage />} />
           <Route path="/mentors/:id" element={<MentorProfilePage />} />
+          <Route
+            path="/admin"
+            element={
+              <RequireAdmin>
+                <AdminPage />
+              </RequireAdmin>
+            }
+          />
           <Route
             path="/admin/verification"
             element={

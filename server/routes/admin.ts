@@ -1,19 +1,123 @@
 import { Router } from 'express';
 import {
   COLLECTIONS,
+  isAccountActive,
+  type AccountRow,
   type ApiError,
+  type HarborCounts,
+  type LearningContract,
   type MentorProfile,
+  type MentorshipRelationship,
   type PendingMentorRow,
   type User,
   type VerificationDecision,
   type VerificationStatus,
 } from '@apprentorbay/shared';
 import { adminDb } from '../lib/firebase.js';
-import { requireAdmin } from '../middleware/requireAdmin.js';
+import { requireAdmin, type AdminRequest } from '../middleware/requireAdmin.js';
 
 export const adminRouter = Router();
 
 adminRouter.use(requireAdmin);
+
+adminRouter.get('/stats', async (_req, res, next) => {
+  try {
+    const [usersSnap, relationshipsSnap, contractsSnap] = await Promise.all([
+      adminDb().collection(COLLECTIONS.users).get(),
+      adminDb().collection(COLLECTIONS.relationships).get(),
+      adminDb().collection(COLLECTIONS.contracts).get(),
+    ]);
+
+    const users = usersSnap.docs.map((doc) => doc.data() as User);
+    const relationships = relationshipsSnap.docs.map(
+      (doc) => doc.data() as MentorshipRelationship,
+    );
+    const contracts = contractsSnap.docs.map((doc) => doc.data() as LearningContract);
+
+    const counts: HarborCounts = {
+      mentors: users.filter((user) => user.role === 'mentor').length,
+      learners: users.filter((user) => user.role === 'learner').length,
+      activeRelationships: relationships.filter((row) => row.status === 'active').length,
+      contractsInProgress: contracts.filter((row) => row.status === 'in_progress').length,
+      completedDeliverables: contracts.filter((row) => row.status === 'completed').length,
+    };
+
+    res.json({ counts });
+  } catch (error) {
+    next(error);
+  }
+});
+
+adminRouter.get('/accounts', async (_req, res, next) => {
+  try {
+    const snap = await adminDb().collection(COLLECTIONS.users).get();
+    const rows: AccountRow[] = snap.docs
+      .map((doc) => ({ user: doc.data() as User }))
+      .sort((a, b) => a.user.displayName.localeCompare(b.user.displayName));
+    res.json({ rows });
+  } catch (error) {
+    next(error);
+  }
+});
+
+adminRouter.post('/accounts/:userId/active', async (req: AdminRequest, res, next) => {
+  try {
+    const userId = String(req.params.userId ?? '');
+    const active = (req.body as { active?: unknown } | undefined)?.active;
+    if (!userId || typeof active !== 'boolean') {
+      const error: ApiError = {
+        code: 'invalid',
+        message: 'active must be true or false',
+      };
+      res.status(400).json({ error });
+      return;
+    }
+
+    if (req.account?.uid === userId) {
+      const error: ApiError = {
+        code: 'forbidden',
+        message: 'You cannot suspend your own admin account',
+      };
+      res.status(403).json({ error });
+      return;
+    }
+
+    const userRef = adminDb().collection(COLLECTIONS.users).doc(userId);
+    const userSnap = await userRef.get();
+    if (!userSnap.exists) {
+      const error: ApiError = { code: 'not_found', message: 'Account not found' };
+      res.status(404).json({ error });
+      return;
+    }
+
+    const user = userSnap.data() as User;
+    if (user.role === 'admin') {
+      const error: ApiError = {
+        code: 'forbidden',
+        message: 'Admin accounts cannot be suspended from this desk',
+      };
+      res.status(403).json({ error });
+      return;
+    }
+
+    const batch = adminDb().batch();
+    batch.update(userRef, { active });
+
+    const profileCollection =
+      user.role === 'mentor' ? COLLECTIONS.mentorProfiles : COLLECTIONS.learnerProfiles;
+    const profileRef = adminDb().collection(profileCollection).doc(userId);
+    const profileSnap = await profileRef.get();
+    if (profileSnap.exists) {
+      batch.update(profileRef, { public: active });
+    }
+
+    await batch.commit();
+    const next: User = { ...user, active };
+    res.json({ user: next });
+  } catch (error) {
+    next(error);
+  }
+});
 
 adminRouter.get('/mentors/pending', async (_req, res, next) => {
   try {
@@ -28,7 +132,7 @@ adminRouter.get('/mentors/pending', async (_req, res, next) => {
       const profile = doc.data() as MentorProfile;
       const userSnap = await adminDb().collection(COLLECTIONS.users).doc(profile.userId).get();
       const user = userSnap.data() as User | undefined;
-      if (!user) continue;
+      if (!user || !isAccountActive(user)) continue;
       rows.push({ user, profile });
     }
 
@@ -40,7 +144,7 @@ adminRouter.get('/mentors/pending', async (_req, res, next) => {
 
 adminRouter.post('/mentors/:userId/verification', async (req, res, next) => {
   try {
-    const userId = req.params.userId;
+    const userId = String(req.params.userId ?? '');
     const status = (req.body as VerificationDecision | undefined)?.status;
     const allowed: VerificationStatus[] = ['approved', 'rejected'];
 

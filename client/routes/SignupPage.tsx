@@ -30,6 +30,7 @@ export function SignupPage() {
   const [jobStatus, setJobStatus] = useState('');
   const [careerAspirations, setCareerAspirations] = useState('');
   const [recentRole, setRecentRole] = useState('');
+  const [expertise, setExpertise] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -61,6 +62,7 @@ export function SignupPage() {
         jobStatus,
         careerAspirations,
         recentRole,
+        expertise,
       });
       navigate(profilePath(created));
     } catch (err) {
@@ -154,12 +156,20 @@ export function SignupPage() {
                     />
                   </>
                 ) : (
-                  <Input
-                    label="Recent role"
-                    value={recentRole}
-                    onChange={(event) => setRecentRole(event.target.value)}
-                    hint="Optional. Skip to arrive with an empty mentor profile."
-                  />
+                  <>
+                    <Input
+                      label="Area of expertise"
+                      value={expertise}
+                      onChange={(event) => setExpertise(event.target.value)}
+                      hint="Optional. Shown on the public mentors directory."
+                    />
+                    <Input
+                      label="Recent role"
+                      value={recentRole}
+                      onChange={(event) => setRecentRole(event.target.value)}
+                      hint="Optional. Skip to arrive with an empty mentor profile."
+                    />
+                  </>
                 )}
                 {error ? <Text variant="danger">{error}</Text> : null}
                 <Cluster gap={12}>
