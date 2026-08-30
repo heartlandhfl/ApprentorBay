@@ -4,7 +4,7 @@
  * Bump TERMS_VERSION whenever the binding text changes. Logged-in users
  * whose stored termsVersion does not match are blocked until they re-accept.
  */
-export const TERMS_VERSION = '2026-08-30';
+export const TERMS_VERSION = '2026-08-31';
 
 export const TERMS_TITLE = 'ApprentorBay Terms of Use';
 

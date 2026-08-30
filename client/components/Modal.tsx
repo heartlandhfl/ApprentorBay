@@ -56,13 +56,17 @@ export function Modal({
             <span id="modal-title">{title}</span>
           </Text>
           {children}
-          {footer ?? (
-            <div className="flex justify-end">
-              <Button variant="secondary" onClick={onClose}>
-                Close
-              </Button>
-            </div>
-          )}
+          {footer !== undefined
+            ? footer
+            : dismissible && onClose
+              ? (
+                <div className="flex justify-end">
+                  <Button variant="secondary" onClick={onClose}>
+                    Close
+                  </Button>
+                </div>
+              )
+              : null}
         </Stack>
       </div>
     </div>

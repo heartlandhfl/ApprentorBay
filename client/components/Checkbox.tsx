@@ -16,7 +16,7 @@ export function Checkbox({ label, hint, id, checked, ...rest }: CheckboxProps) {
           id={inputId}
           type="checkbox"
           checked={checked}
-          className="mt-1 h-4 w-4 shrink-0 accent-accent"
+          className="mt-1 h-5 w-5 shrink-0 accent-accent"
           {...rest}
         />
         <Text variant="small" as="span">

@@ -47,6 +47,7 @@ export function TermsGate({ children }: { children: React.ReactNode }) {
             Read the full Terms of Use
           </Button>
           <Checkbox
+            id="reaccept-terms"
             label="I have read and agree to the Terms of Use"
             checked={agreed}
             onChange={(event) => setAgreed(event.target.checked)}
