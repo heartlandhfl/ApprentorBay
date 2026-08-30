@@ -1,0 +1,48 @@
+rules_version = '2';
+
+// Deny-by-default Firebase Storage rules for ApprentorBay.
+// Only /users/{userId}/** (private) and /portfolios/{userId}/** (public read) are allowed.
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // Shared helpers used by every path-specific rule below.
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    // All creates/updates must stay under 5 MB and use an allowed image MIME type.
+    function isValidImageWrite() {
+      return request.resource.size <= 5 * 1024 * 1024
+        && request.resource.contentType in [
+          'image/jpeg',
+          'image/png',
+          'image/webp',
+        ];
+    }
+
+    // Private user files: only the signed-in owner may read, upload, update, or delete
+    // objects under their own prefix (/users/{userId}/...).
+    match /users/{userId}/{allPaths=**} {
+      allow read: if isOwner(userId);
+      allow create, update: if isOwner(userId) && isValidImageWrite();
+      allow delete: if isOwner(userId);
+    }
+
+    // Public portfolio images: anyone may read; only the owner may write.
+    // Same image size and content-type limits apply to creates/updates.
+    match /portfolios/{userId}/{allPaths=**} {
+      allow read: if true;
+      allow create, update: if isOwner(userId) && isValidImageWrite();
+      allow delete: if isOwner(userId);
+    }
+
+    // Explicit catch-all deny: reject read/write to any path not matched above.
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
