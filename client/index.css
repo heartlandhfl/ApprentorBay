@@ -1,0 +1,67 @@
+@import "tailwindcss";
+
+/*
+  Design system
+  -------------
+  Type scale: 12 / 14 / 16 / 20 / 24 / 32 / 48  (line heights on an 8px grid)
+  Spacing:    Tailwind 4px base (4 / 8 / 12 / 16 / 24 / 32 / 48 / 64)
+  Accent:     copper rust — one brand color, used for primary actions and focus
+*/
+
+@theme {
+  --font-sans: "Instrument Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Instrument Serif", ui-serif, Georgia, "Times New Roman", serif;
+
+  --color-paper: #f4efe6;
+  --color-paper-raised: #fffbf5;
+  --color-ink: #1a1714;
+  --color-ink-muted: #5c564e;
+  --color-line: #d9d1c4;
+  --color-accent: #b4532a;
+  --color-accent-hover: #943f1f;
+  --color-accent-pressed: #7a3419;
+  --color-accent-subtle: #f3e0d4;
+  --color-danger: #9b2c2c;
+  --color-danger-subtle: #f3d6d6;
+  --color-success: #2f6b4f;
+  --color-success-subtle: #d7ebe1;
+
+  --text-caption: 0.75rem;
+  --text-caption--line-height: 1rem;
+  --text-small: 0.875rem;
+  --text-small--line-height: 1.25rem;
+  --text-body: 1rem;
+  --text-body--line-height: 1.5rem;
+  --text-h3: 1.25rem;
+  --text-h3--line-height: 1.75rem;
+  --text-h2: 1.5rem;
+  --text-h2--line-height: 2rem;
+  --text-h1: 2rem;
+  --text-h1--line-height: 2.5rem;
+  --text-display: 3rem;
+  --text-display--line-height: 3.5rem;
+}
+
+html {
+  color-scheme: light;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--color-paper);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-size: var(--text-body);
+  line-height: var(--text-body--line-height);
+  -webkit-font-smoothing: antialiased;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}

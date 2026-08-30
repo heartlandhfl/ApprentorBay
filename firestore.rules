@@ -1,0 +1,62 @@
+rules_version = '2';
+
+// Deny-by-default. Collections open only to signed-in owners or pairing members.
+// Tighten further as features land — never ship `allow read, write: if true`.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isSignedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    function isPairingMember() {
+      return isSignedIn() && (
+        resource.data.apprenticeId == request.auth.uid
+        || resource.data.mentorId == request.auth.uid
+      );
+    }
+
+    match /users/{userId} {
+      allow read: if isSignedIn() && (isOwner(userId) || isAdmin());
+      allow create, update: if isOwner(userId);
+      allow delete: if false;
+    }
+
+    match /profiles/{profileId} {
+      allow read: if isSignedIn();
+      allow create, update: if isOwner(profileId);
+      allow delete: if false;
+    }
+
+    match /mentorships/{mentorshipId} {
+      allow read: if isPairingMember() || isAdmin();
+      allow create: if isSignedIn()
+        && request.resource.data.apprenticeId == request.auth.uid;
+      allow update: if isPairingMember() || isAdmin();
+      allow delete: if false;
+    }
+
+    match /learningContracts/{contractId} {
+      allow read: if isPairingMember() || isAdmin();
+      allow create: if isSignedIn() && (
+        request.resource.data.apprenticeId == request.auth.uid
+        || request.resource.data.mentorId == request.auth.uid
+      );
+      allow update: if isPairingMember() || isAdmin();
+      allow delete: if false;
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
