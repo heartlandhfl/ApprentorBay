@@ -9,5 +9,5 @@
     "declaration": true,
     "isolatedModules": true
   },
-  "include": ["index.ts", "types.ts"]
+  "include": ["index.ts", "types.ts", "learningContractMachine.ts"]
 }

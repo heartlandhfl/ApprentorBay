@@ -1,2 +1,2 @@
-/** Learning contracts feature — implemented in later prompts. */
-export {};
+export { JourneyEntry } from './JourneyEntry';
+export { watchContractForRelationship } from './repository';

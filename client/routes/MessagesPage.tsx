@@ -18,6 +18,7 @@ import {
   watchMessages,
   watchRelationship,
 } from '../features/mentorship';
+import { JourneyEntry } from '../features/learning-contracts';
 import { getPublicDisplayName } from '../features/profiles';
 import { useAuth } from '../lib/auth';
 
@@ -149,6 +150,12 @@ export function MessagesPage() {
             Real-time, and only for the two of you. A third account cannot open this URL.
           </Text>
         </Stack>
+
+        <JourneyEntry
+          relationship={relationship}
+          account={account}
+          otherName={otherName}
+        />
 
         <Card padding="lg">
           <Stack gap={16}>

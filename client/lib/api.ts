@@ -1,4 +1,11 @@
-import type { ApiError, HealthStatus, PendingMentorRow, VerificationStatus } from '@apprentorbay/shared';
+import type {
+  ApiError,
+  ClientContractAction,
+  HealthStatus,
+  LearningContract,
+  PendingMentorRow,
+  VerificationStatus,
+} from '@apprentorbay/shared';
 import { getFirebaseAuth } from './firebase';
 
 async function readJson<T>(response: Response): Promise<T> {
@@ -48,4 +55,27 @@ export async function setMentorVerification(
     body: JSON.stringify({ userId, status }),
   });
   return readJson<{ profile: { verificationStatus: VerificationStatus } }>(response);
+}
+
+export async function startLearningJourney(relationshipId: string): Promise<LearningContract> {
+  const response = await fetch('/api/contracts', {
+    method: 'POST',
+    headers: await authHeaders(),
+    body: JSON.stringify({ relationshipId }),
+  });
+  const body = await readJson<{ contract: LearningContract }>(response);
+  return body.contract;
+}
+
+export async function dispatchContractAction(
+  contractId: string,
+  action: ClientContractAction,
+): Promise<LearningContract> {
+  const response = await fetch(`/api/contracts/${contractId}/action`, {
+    method: 'POST',
+    headers: await authHeaders(),
+    body: JSON.stringify(action),
+  });
+  const body = await readJson<{ contract: LearningContract }>(response);
+  return body.contract;
 }

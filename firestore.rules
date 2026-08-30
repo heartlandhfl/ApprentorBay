@@ -134,12 +134,7 @@ service cloud.firestore {
 
     match /learningContracts/{contractId} {
       allow read: if isPairingMember() || isAdmin();
-      allow create: if isSignedIn() && (
-        request.resource.data.learnerId == request.auth.uid
-        || request.resource.data.mentorId == request.auth.uid
-      );
-      allow update: if isPairingMember() || isAdmin();
-      allow delete: if false;
+      allow create, update, delete: if false;
     }
 
     match /{document=**} {

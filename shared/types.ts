@@ -20,11 +20,22 @@ export type MentorshipStatus =
 
 export type LearningContractStatus =
   | 'draft'
-  | 'proposed'
-  | 'accepted'
+  | 'under_mentor_review'
+  | 'under_learner_review'
+  | 'agreed'
+  | 'in_progress'
+  | 'completed';
+
+export type StepOwner = 'learner' | 'mentor';
+
+export type MilestoneStatus =
+  | 'locked'
   | 'active'
-  | 'completed'
-  | 'archived';
+  | 'submitted'
+  | 'approved'
+  | 'rejected';
+
+export type DeliverableStatus = 'draft' | 'in_progress' | 'completed';
 
 export type ApplicationStatus = 'pending' | 'accepted' | 'declined';
 
@@ -37,6 +48,7 @@ export const COLLECTIONS = {
   applications: 'mentorshipApplications',
   relationships: 'mentorshipRelationships',
   messages: 'messages',
+  contracts: 'learningContracts',
 } as const;
 
 export interface User {
@@ -68,9 +80,12 @@ export interface CompetencyGoal {
   description: string;
 }
 
-/** Reference to a Deliverable document. Populated by later prompts. */
+/** Written onto both public profiles when a contract completes (server-side). */
 export interface DeliverableRef {
   id: string;
+  contractId: string;
+  title: string;
+  description: string;
 }
 
 export interface Review {
@@ -138,24 +153,52 @@ export interface Mentorship {
   updatedAt: IsoDateString;
 }
 
-export interface LearningGoal {
+export interface Goal {
+  id: string;
+  text: string;
+  revisionOf: string | null;
+}
+
+export interface Objective {
+  id: string;
+  text: string;
+}
+
+export interface Milestone {
+  id: string;
+  order: number;
+  title: string;
+  description: string;
+  evidenceRequired: string;
+  status: MilestoneStatus;
+  evidenceText: string;
+  evidenceLink: string;
+  lastFeedback: string | null;
+}
+
+export interface Deliverable {
   id: string;
   title: string;
   description: string;
-  done: boolean;
+  finalEvidenceUrl: string;
+  status: DeliverableStatus;
 }
 
 export interface LearningContract {
   id: string;
-  mentorshipId: string;
+  relationshipId: string;
   learnerId: string;
   mentorId: string;
   status: LearningContractStatus;
-  intent: string;
-  cadence: string;
-  goals: LearningGoal[];
+  currentStepOwner: StepOwner;
   createdAt: IsoDateString;
   updatedAt: IsoDateString;
+  goal: Goal | null;
+  goalHistory: Goal[];
+  objectives: Objective[];
+  milestones: Milestone[];
+  deliverable: Deliverable | null;
+  changeRequestReason: string | null;
 }
 
 export interface PendingMentorRow {
