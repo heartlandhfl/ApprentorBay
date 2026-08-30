@@ -44,9 +44,12 @@ export function HomePage() {
             progress.
           </Text>
           <Cluster gap={12}>
-            <Button to="/system">View system health</Button>
-            <Button variant="secondary" onClick={() => setAboutOpen(true)}>
-              About this scaffold
+            <Button to="/signup">Create an account</Button>
+            <Button variant="secondary" to="/login">
+              Log in
+            </Button>
+            <Button variant="ghost" onClick={() => setAboutOpen(true)}>
+              About this harbor
             </Button>
           </Cluster>
         </Stack>
@@ -68,10 +71,9 @@ export function HomePage() {
         onClose={() => setAboutOpen(false)}
       >
         <Text variant="muted">
-          The shared UI library, Express health route, Firebase bootstrap, and
-          typed data shapes are in place. Profiles, mentorships, learning
-          contracts, and admin arrive next — they will use these same components
-          and the types in /shared.
+          Accounts, public profiles, and admin verification are live. A new
+          mentor is always Pending Approval until an admin writes the change
+          through Express.
         </Text>
       </Modal>
     </Page>

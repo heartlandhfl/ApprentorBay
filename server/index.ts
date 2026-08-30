@@ -5,7 +5,9 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import express from 'express';
 import { getAdminFirebase } from './lib/firebase.js';
+import { seedAdmin } from './lib/seedAdmin.js';
 import { errorHandler, notFound } from './middleware/errorHandler.js';
+import { adminRouter } from './routes/admin.js';
 import { healthRouter } from './routes/health.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -29,6 +31,7 @@ app.use(
 app.use(express.json());
 
 app.use('/api/health', healthRouter);
+app.use('/api/admin', adminRouter);
 app.use('/api', notFound);
 
 if (process.env.NODE_ENV === 'production' && existsSync(clientDist)) {
@@ -45,10 +48,13 @@ app.listen(port, '0.0.0.0', () => {
   console.log(
     `Firebase Admin: ${
       firebase.initialized
-        ? 'initialized'
+        ? firebase.emulator
+          ? 'initialized (emulator)'
+          : 'initialized'
         : firebase.configured
           ? 'configured but not initialized'
           : 'not configured (placeholders only)'
     }`,
   );
+  void seedAdmin();
 });

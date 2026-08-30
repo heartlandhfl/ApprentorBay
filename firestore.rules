@@ -1,7 +1,8 @@
 rules_version = '2';
 
-// Deny-by-default. Collections open only to signed-in owners or pairing members.
-// Tighten further as features land — never ship `allow read, write: if true`.
+// Deny-by-default. Public profiles are readable when `public == true`.
+// Admin is the only role that may change mentor verificationStatus.
+// Never ship `allow read, write: if true`.
 service cloud.firestore {
   match /databases/{database}/documents {
     function isSignedIn() {
@@ -20,27 +21,47 @@ service cloud.firestore {
 
     function isPairingMember() {
       return isSignedIn() && (
-        resource.data.apprenticeId == request.auth.uid
+        resource.data.learnerId == request.auth.uid
         || resource.data.mentorId == request.auth.uid
       );
     }
 
     match /users/{userId} {
-      allow read: if isSignedIn() && (isOwner(userId) || isAdmin());
-      allow create, update: if isOwner(userId);
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isOwner(userId)
+        && request.resource.data.uid == userId
+        && request.resource.data.role in ['learner', 'mentor'];
+      allow update: if (isOwner(userId) || isAdmin())
+        && request.resource.data.uid == resource.data.uid
+        && request.resource.data.role == resource.data.role;
       allow delete: if false;
     }
 
-    match /profiles/{profileId} {
-      allow read: if isSignedIn();
-      allow create, update: if isOwner(profileId);
+    match /learnerProfiles/{profileId} {
+      allow read: if resource.data.public == true || isOwner(profileId) || isAdmin();
+      allow create: if isOwner(profileId)
+        && request.resource.data.userId == request.auth.uid;
+      allow update: if isOwner(profileId) || isAdmin();
+      allow delete: if false;
+    }
+
+    match /mentorProfiles/{profileId} {
+      allow read: if resource.data.public == true || isOwner(profileId) || isAdmin();
+      allow create: if isOwner(profileId)
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.verificationStatus == 'pending';
+      allow update: if isAdmin()
+        || (
+          isOwner(profileId)
+          && request.resource.data.verificationStatus == resource.data.verificationStatus
+        );
       allow delete: if false;
     }
 
     match /mentorships/{mentorshipId} {
       allow read: if isPairingMember() || isAdmin();
       allow create: if isSignedIn()
-        && request.resource.data.apprenticeId == request.auth.uid;
+        && request.resource.data.learnerId == request.auth.uid;
       allow update: if isPairingMember() || isAdmin();
       allow delete: if false;
     }
@@ -48,7 +69,7 @@ service cloud.firestore {
     match /learningContracts/{contractId} {
       allow read: if isPairingMember() || isAdmin();
       allow create: if isSignedIn() && (
-        request.resource.data.apprenticeId == request.auth.uid
+        request.resource.data.learnerId == request.auth.uid
         || request.resource.data.mentorId == request.auth.uid
       );
       allow update: if isPairingMember() || isAdmin();

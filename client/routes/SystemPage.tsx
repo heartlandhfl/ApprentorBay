@@ -86,7 +86,9 @@ export function SystemPage() {
                 Firebase Admin:{' '}
                 {health
                   ? health.firebase.adminInitialized
-                    ? 'initialized'
+                    ? health.firebase.emulator
+                      ? 'initialized (emulator)'
+                      : 'initialized'
                     : health.firebase.adminConfigured
                       ? 'configured'
                       : 'waiting on credentials'
@@ -111,8 +113,9 @@ export function SystemPage() {
               <Text variant="danger">{firebase.error}</Text>
             ) : (
               <Text variant="small">
-                Auth and Firestore are ready to use once real project credentials
-                replace the placeholders in .env.
+                {firebase.emulator
+                  ? 'Talking to the Auth and Firestore emulators.'
+                  : 'Auth and Firestore use the project in .env.'}
               </Text>
             )}
             <Input
