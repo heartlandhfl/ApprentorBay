@@ -1,5 +1,7 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { TermsGate } from './components/TermsGate';
 import { AuthProvider } from './lib/auth';
+import { TermsPage } from './routes/TermsPage';
 import { AdminPage } from './routes/AdminPage';
 import { ApplicationsPage } from './routes/ApplicationsPage';
 import { HomePage } from './routes/HomePage';
@@ -20,10 +22,12 @@ export function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
-        <Routes>
+        <TermsGate>
+          <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/signup" element={<SignupPage />} />
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/legal/terms" element={<TermsPage />} />
           <Route path="/learners/:id" element={<LearnerProfilePage />} />
           <Route path="/mentors" element={<MentorsPage />} />
           <Route path="/mentors/:id" element={<MentorProfilePage />} />
@@ -77,7 +81,8 @@ export function App() {
           />
           <Route path="/system" element={<SystemPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
+          </Routes>
+        </TermsGate>
       </BrowserRouter>
     </AuthProvider>
   );

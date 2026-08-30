@@ -18,6 +18,15 @@ export type {
 } from './learningContractMachine.js';
 
 export {
+  TERMS_SECTIONS,
+  TERMS_SUMMARY,
+  TERMS_TITLE,
+  TERMS_VERSION,
+  needsTermsAcceptance,
+} from './legal.js';
+export type { TermsSection } from './legal.js';
+
+export {
   COLLECTIONS,
   emptyLearnerProfile,
   emptyMentorProfile,

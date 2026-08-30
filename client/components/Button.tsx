@@ -53,8 +53,15 @@ export function Button({
   );
 
   if (to) {
+    if (disabled || loading) {
+      return (
+        <span className={`${className} pointer-events-none`} aria-disabled="true">
+          {content}
+        </span>
+      );
+    }
     return (
-      <Link to={to} className={className} aria-disabled={disabled || loading}>
+      <Link to={to} className={className}>
         {content}
       </Link>
     );
@@ -62,7 +69,7 @@ export function Button({
 
   if (href) {
     return (
-      <a href={href} className={className} rel="noreferrer">
+      <a href={href} className={className} rel="noreferrer" target="_blank">
         {content}
       </a>
     );

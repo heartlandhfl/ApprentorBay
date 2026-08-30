@@ -1,6 +1,7 @@
 export { Badge } from './Badge';
 export { Button } from './Button';
 export { Card } from './Card';
+export { Checkbox } from './Checkbox';
 export { EmptyState } from './EmptyState';
 export { Grid } from './Grid';
 export { Header } from './Header';

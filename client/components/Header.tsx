@@ -23,6 +23,9 @@ export function Header() {
           <Button variant="ghost" size="sm" to="/mentors">
             Mentors
           </Button>
+          <Button variant="ghost" size="sm" to="/legal/terms">
+            Terms
+          </Button>
           <Button variant="ghost" size="sm" to="/system">
             System health
           </Button>

@@ -58,6 +58,8 @@ export interface User {
   displayName: string;
   active: boolean;
   createdAt: IsoDateString;
+  termsAcceptedAt: IsoDateString | null;
+  termsVersion: string | null;
 }
 
 /** Missing `active` on older docs is treated as true. */

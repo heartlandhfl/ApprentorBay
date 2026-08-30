@@ -1,5 +1,4 @@
-import type { User } from '@apprentorbay/shared';
-import { COLLECTIONS } from '@apprentorbay/shared';
+import { COLLECTIONS, TERMS_VERSION, type User } from '@apprentorbay/shared';
 import { adminAuth, adminDb, getAdminFirebase } from './firebase.js';
 
 const RETRY_MS = 1500;
@@ -28,13 +27,18 @@ export async function seedAdmin(attempt = 1): Promise<void> {
       uid = created.uid;
     }
 
+    const existing = await adminDb().collection(COLLECTIONS.users).doc(uid).get();
+    const prior = existing.data() as User | undefined;
+    const now = new Date().toISOString();
     const account: User = {
       uid,
       role: 'admin',
       email,
       displayName,
       active: true,
-      createdAt: new Date().toISOString(),
+      createdAt: prior?.createdAt ?? now,
+      termsAcceptedAt: prior?.termsAcceptedAt ?? now,
+      termsVersion: prior?.termsVersion ?? TERMS_VERSION,
     };
 
     await adminDb().collection(COLLECTIONS.users).doc(uid).set(account, { merge: true });
