@@ -4,6 +4,7 @@ export { Card } from './Card';
 export { EmptyState } from './EmptyState';
 export { Header } from './Header';
 export { Input } from './Input';
+export { MessageBubble } from './MessageBubble';
 export { Modal } from './Modal';
 export { Page } from './Page';
 export { Cluster, Stack } from './Stack';

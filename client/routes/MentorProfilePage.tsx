@@ -11,6 +11,7 @@ import {
   Stack,
   Text,
 } from '../components';
+import { ApplyMentorship } from '../features/mentorship';
 import { watchMentorProfile } from '../features/profiles';
 
 function verificationBadge(status: VerificationStatus) {
@@ -67,6 +68,7 @@ function MentorBody({ profile }: { profile: MentorProfile }) {
           <Badge tone={badge.tone}>{badge.label}</Badge>
         </Cluster>
         <Text variant="h1">{profile.displayName || 'Mentor'}</Text>
+        <ApplyMentorship profile={profile} />
       </Stack>
 
       <Card>
