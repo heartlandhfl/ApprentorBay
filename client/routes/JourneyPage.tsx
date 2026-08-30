@@ -428,7 +428,7 @@ function MentorEditor({
           />
           {objectives.map((text, index) => (
             <Input
-              key={`objective-${index}`}
+              id={`objective-${index}`}
               label={`Objective ${index + 1}`}
               value={text}
               onChange={(event) =>
@@ -452,7 +452,7 @@ function MentorEditor({
             <Stack key={`milestone-${index}`} gap={8}>
               <Text variant="caption">Milestone {index + 1}</Text>
               <Input
-                label="Title"
+                label={`Milestone ${index + 1} title`}
                 value={item.title}
                 onChange={(event) =>
                   setMilestones((current) =>
@@ -464,7 +464,7 @@ function MentorEditor({
                 required
               />
               <TextArea
-                label="Description"
+                label={`Milestone ${index + 1} description`}
                 value={item.description}
                 onChange={(event) =>
                   setMilestones((current) =>
@@ -476,7 +476,7 @@ function MentorEditor({
                 required
               />
               <Input
-                label="Evidence required"
+                label={`Milestone ${index + 1} evidence required`}
                 value={item.evidenceRequired}
                 onChange={(event) =>
                   setMilestones((current) =>
