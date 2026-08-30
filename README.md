@@ -36,6 +36,9 @@ A user has exactly one role, set at signup: `mentor` | `learner` | `admin`.
 | `/users/{uid}` | `uid`, `role`, `email`, `displayName`, `createdAt` |
 | `/learnerProfiles/{uid}` | education, jobStatus, careerAspirations, competencyGoals, deliverables, public |
 | `/mentorProfiles/{uid}` | education, experience, deliverables, reviews, verificationStatus, public |
+| `/mentorshipApplications/{id}` | learnerId, mentorId, message, status (`pending` / `accepted` / `declined`) |
+| `/mentorshipRelationships/{id}` | learnerId, mentorId, status (`active` / `ended`) |
+| `/messages/{id}` | relationshipId, senderId, text, createdAt |
 
 Signup writes the user doc and the matching profile in one Firestore transaction. New mentors always start as `verificationStatus: 'pending'`.
 
@@ -48,6 +51,9 @@ Signup writes the user doc and the matching profile in one Firestore transaction
 | `/learners/:id` | Public learner profile (empty states when fields are blank) |
 | `/mentors/:id` | Public mentor profile + Verified / Pending Approval / Rejected badge |
 | `/admin/verification` | Admin-only pending table. Guarded in React **and** Express **and** Firestore rules |
+| `/dashboard/applications` | Mentor inbox of pending applications (Accept / Decline) |
+| `/dashboard/messages` | Active pairings |
+| `/dashboard/messages/:relationshipId` | Real-time chat. Firestore rules allow only the two members |
 
 ## Setup
 

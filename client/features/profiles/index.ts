@@ -1,1 +1,5 @@
-export { watchLearnerProfile, watchMentorProfile } from './repository';
+export {
+  getPublicDisplayName,
+  watchLearnerProfile,
+  watchMentorProfile,
+} from './repository';

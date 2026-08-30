@@ -6,6 +6,7 @@ export {
 
 export type {
   ApiError,
+  ApplicationStatus,
   CompetencyGoal,
   DeliverableRef,
   EducationEntry,
@@ -19,8 +20,12 @@ export type {
   LearningGoal,
   MentorProfile,
   Mentorship,
+  MentorshipApplication,
+  MentorshipRelationship,
   MentorshipStatus,
+  Message,
   PendingMentorRow,
+  RelationshipStatus,
   Review,
   SignupRole,
   User,

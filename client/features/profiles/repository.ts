@@ -1,4 +1,4 @@
-import { doc, onSnapshot } from 'firebase/firestore';
+import { doc, getDoc, onSnapshot } from 'firebase/firestore';
 import {
   COLLECTIONS,
   type LearnerProfile,
@@ -40,4 +40,21 @@ export function watchMentorProfile(
     (snap) => onNext(snap.exists() ? (snap.data() as MentorProfile) : null),
     (error) => onError?.(error),
   );
+}
+
+export async function getPublicDisplayName(userId: string): Promise<string> {
+  const db = getFirebaseDb();
+  if (!db) return 'Member';
+
+  const learner = await getDoc(doc(db, COLLECTIONS.learnerProfiles, userId));
+  if (learner.exists()) {
+    return (learner.data() as LearnerProfile).displayName || 'Learner';
+  }
+
+  const mentor = await getDoc(doc(db, COLLECTIONS.mentorProfiles, userId));
+  if (mentor.exists()) {
+    return (mentor.data() as MentorProfile).displayName || 'Mentor';
+  }
+
+  return 'Member';
 }

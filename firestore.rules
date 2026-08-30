@@ -1,7 +1,6 @@
 rules_version = '2';
 
-// Deny-by-default. Public profiles are readable when `public == true`.
-// Admin is the only role that may change mentor verificationStatus.
+// Deny-by-default. Messaging is scoped to active relationship members.
 // Never ship `allow read, write: if true`.
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -13,10 +12,34 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == userId;
     }
 
+    function userDoc(uid) {
+      return get(/databases/$(database)/documents/users/$(uid)).data;
+    }
+
     function isAdmin() {
       return isSignedIn()
         && exists(/databases/$(database)/documents/users/$(request.auth.uid))
-        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+        && userDoc(request.auth.uid).role == 'admin';
+    }
+
+    function isLearner() {
+      return isSignedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && userDoc(request.auth.uid).role == 'learner';
+    }
+
+    function relationshipPath(relationshipId) {
+      return /databases/$(database)/documents/mentorshipRelationships/$(relationshipId);
+    }
+
+    function isActiveRelationshipMember(relationshipId) {
+      return isSignedIn()
+        && exists(relationshipPath(relationshipId))
+        && get(relationshipPath(relationshipId)).data.status == 'active'
+        && (
+          get(relationshipPath(relationshipId)).data.learnerId == request.auth.uid
+          || get(relationshipPath(relationshipId)).data.mentorId == request.auth.uid
+        );
     }
 
     function isPairingMember() {
@@ -56,6 +79,49 @@ service cloud.firestore {
           && request.resource.data.verificationStatus == resource.data.verificationStatus
         );
       allow delete: if false;
+    }
+
+    match /mentorshipApplications/{applicationId} {
+      allow read: if isPairingMember() || isAdmin();
+      allow create: if isLearner()
+        && request.resource.data.learnerId == request.auth.uid
+        && request.resource.data.status == 'pending'
+        && request.resource.data.mentorId is string
+        && request.resource.data.message is string
+        && request.resource.data.message.size() > 0
+        && request.resource.data.message.size() <= 1000
+        && exists(/databases/$(database)/documents/mentorProfiles/$(request.resource.data.mentorId));
+      allow update: if resource.data.mentorId == request.auth.uid
+        && resource.data.status == 'pending'
+        && request.resource.data.status in ['accepted', 'declined']
+        && request.resource.data.learnerId == resource.data.learnerId
+        && request.resource.data.mentorId == resource.data.mentorId
+        && request.resource.data.message == resource.data.message;
+      allow delete: if false;
+    }
+
+    match /mentorshipRelationships/{relationshipId} {
+      allow read: if isPairingMember() || isAdmin();
+      allow create: if isSignedIn()
+        && request.resource.data.mentorId == request.auth.uid
+        && request.resource.data.status == 'active'
+        && request.resource.data.learnerId is string
+        && request.resource.data.learnerId != request.auth.uid;
+      allow update: if isPairingMember()
+        && request.resource.data.learnerId == resource.data.learnerId
+        && request.resource.data.mentorId == resource.data.mentorId
+        && request.resource.data.status in ['active', 'ended'];
+      allow delete: if false;
+    }
+
+    match /messages/{messageId} {
+      allow read: if isActiveRelationshipMember(resource.data.relationshipId);
+      allow create: if isActiveRelationshipMember(request.resource.data.relationshipId)
+        && request.resource.data.senderId == request.auth.uid
+        && request.resource.data.text is string
+        && request.resource.data.text.size() > 0
+        && request.resource.data.text.size() <= 2000;
+      allow update, delete: if false;
     }
 
     match /mentorships/{mentorshipId} {

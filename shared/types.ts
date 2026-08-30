@@ -26,10 +26,17 @@ export type LearningContractStatus =
   | 'completed'
   | 'archived';
 
+export type ApplicationStatus = 'pending' | 'accepted' | 'declined';
+
+export type RelationshipStatus = 'active' | 'ended';
+
 export const COLLECTIONS = {
   users: 'users',
   learnerProfiles: 'learnerProfiles',
   mentorProfiles: 'mentorProfiles',
+  applications: 'mentorshipApplications',
+  relationships: 'mentorshipRelationships',
+  messages: 'messages',
 } as const;
 
 export interface User {
@@ -95,6 +102,31 @@ export interface MentorProfile {
   reviews: Review[];
   verificationStatus: VerificationStatus;
   public: boolean;
+}
+
+export interface MentorshipApplication {
+  id: string;
+  learnerId: string;
+  mentorId: string;
+  message: string;
+  status: ApplicationStatus;
+  createdAt: IsoDateString;
+}
+
+export interface MentorshipRelationship {
+  id: string;
+  learnerId: string;
+  mentorId: string;
+  status: RelationshipStatus;
+  createdAt: IsoDateString;
+}
+
+export interface Message {
+  id: string;
+  relationshipId: string;
+  senderId: string;
+  text: string;
+  createdAt: IsoDateString;
 }
 
 export interface Mentorship {

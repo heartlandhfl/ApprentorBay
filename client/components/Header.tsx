@@ -25,6 +25,16 @@ export function Header() {
           </Button>
           {loading ? null : account ? (
             <>
+              {account.role === 'mentor' ? (
+                <Button variant="ghost" size="sm" to="/dashboard/applications">
+                  Applications
+                </Button>
+              ) : null}
+              {account.role === 'learner' || account.role === 'mentor' ? (
+                <Button variant="ghost" size="sm" to="/dashboard/messages">
+                  Messages
+                </Button>
+              ) : null}
               <Button variant="ghost" size="sm" to={profilePath(account)}>
                 {account.role === 'admin' ? 'Verification' : 'My profile'}
               </Button>
