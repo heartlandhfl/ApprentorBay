@@ -127,7 +127,10 @@ function MentorBody({ profile }: { profile: MentorProfile }) {
           ) : (
             <Stack gap={8}>
               {profile.deliverables.map((item) => (
-                <Text key={item.id}>{item.id}</Text>
+                <Stack key={item.id} gap={4}>
+                  <Text variant="h3">{item.title || item.id}</Text>
+                  {item.description ? <Text variant="small">{item.description}</Text> : null}
+                </Stack>
               ))}
             </Stack>
           )}

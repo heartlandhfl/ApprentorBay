@@ -2,6 +2,7 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { AuthProvider } from './lib/auth';
 import { ApplicationsPage } from './routes/ApplicationsPage';
 import { HomePage } from './routes/HomePage';
+import { JourneyPage } from './routes/JourneyPage';
 import { LearnerProfilePage } from './routes/LearnerProfilePage';
 import { LoginPage } from './routes/LoginPage';
 import { MentorProfilePage } from './routes/MentorProfilePage';
@@ -52,6 +53,14 @@ export function App() {
             element={
               <RequireAuth>
                 <MessagesPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/dashboard/journey/:relationshipId"
+            element={
+              <RequireAuth>
+                <JourneyPage />
               </RequireAuth>
             }
           />
