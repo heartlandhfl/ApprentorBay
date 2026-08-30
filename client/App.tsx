@@ -1,15 +1,36 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { AuthProvider } from './lib/auth';
 import { HomePage } from './routes/HomePage';
+import { LearnerProfilePage } from './routes/LearnerProfilePage';
+import { LoginPage } from './routes/LoginPage';
+import { MentorProfilePage } from './routes/MentorProfilePage';
+import { RequireAdmin } from './routes/RequireAdmin';
+import { SignupPage } from './routes/SignupPage';
 import { SystemPage } from './routes/SystemPage';
+import { VerificationPage } from './routes/VerificationPage';
 
 export function App() {
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<HomePage />} />
-        <Route path="/system" element={<SystemPage />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </BrowserRouter>
+    <AuthProvider>
+      <BrowserRouter>
+        <Routes>
+          <Route path="/" element={<HomePage />} />
+          <Route path="/signup" element={<SignupPage />} />
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/learners/:id" element={<LearnerProfilePage />} />
+          <Route path="/mentors/:id" element={<MentorProfilePage />} />
+          <Route
+            path="/admin/verification"
+            element={
+              <RequireAdmin>
+                <VerificationPage />
+              </RequireAdmin>
+            }
+          />
+          <Route path="/system" element={<SystemPage />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </BrowserRouter>
+    </AuthProvider>
   );
 }

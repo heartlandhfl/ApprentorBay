@@ -8,4 +8,6 @@ export { Modal } from './Modal';
 export { Page } from './Page';
 export { Cluster, Stack } from './Stack';
 export { Stepper, type Step } from './Stepper';
+export { Table, type TableColumn } from './Table';
 export { Text } from './Text';
+export { TextArea } from './TextArea';

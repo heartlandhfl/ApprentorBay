@@ -14,6 +14,7 @@ healthRouter.get('/', (_req, res) => {
     firebase: {
       adminConfigured: firebase.configured,
       adminInitialized: firebase.initialized,
+      emulator: firebase.emulator,
     },
   };
 

@@ -1,14 +1,30 @@
+export {
+  COLLECTIONS,
+  emptyLearnerProfile,
+  emptyMentorProfile,
+} from './types.js';
+
 export type {
   ApiError,
+  CompetencyGoal,
+  DeliverableRef,
+  EducationEntry,
+  ExperienceEntry,
   FirebaseClientStatus,
   HealthStatus,
   IsoDateString,
+  LearnerProfile,
   LearningContract,
   LearningContractStatus,
   LearningGoal,
+  MentorProfile,
   Mentorship,
   MentorshipStatus,
-  Profile,
+  PendingMentorRow,
+  Review,
+  SignupRole,
   User,
   UserRole,
+  VerificationDecision,
+  VerificationStatus,
 } from './types.js';

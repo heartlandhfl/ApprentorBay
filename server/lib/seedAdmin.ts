@@ -1,0 +1,49 @@
+import type { User } from '@apprentorbay/shared';
+import { COLLECTIONS } from '@apprentorbay/shared';
+import { adminAuth, adminDb, getAdminFirebase } from './firebase.js';
+
+const RETRY_MS = 1500;
+const MAX_ATTEMPTS = 20;
+
+export async function seedAdmin(attempt = 1): Promise<void> {
+  const firebase = getAdminFirebase();
+  if (!firebase.initialized) {
+    console.warn('Admin seed skipped: Firebase Admin is not initialized');
+    return;
+  }
+
+  const email = process.env.SEED_ADMIN_EMAIL ?? 'admin@apprentorbay.test';
+  const password = process.env.SEED_ADMIN_PASSWORD ?? 'HarborAdmin-2026';
+  const displayName = 'Harbor Admin';
+
+  try {
+    const auth = adminAuth();
+    let uid: string;
+
+    try {
+      const existing = await auth.getUserByEmail(email);
+      uid = existing.uid;
+    } catch {
+      const created = await auth.createUser({ email, password, displayName });
+      uid = created.uid;
+    }
+
+    const account: User = {
+      uid,
+      role: 'admin',
+      email,
+      displayName,
+      createdAt: new Date().toISOString(),
+    };
+
+    await adminDb().collection(COLLECTIONS.users).doc(uid).set(account, { merge: true });
+    console.log(`Admin account ready: ${email}`);
+  } catch (error) {
+    if (attempt < MAX_ATTEMPTS) {
+      console.warn(`Admin seed waiting on emulators (attempt ${attempt}/${MAX_ATTEMPTS})`);
+      await new Promise((resolve) => setTimeout(resolve, RETRY_MS));
+      return seedAdmin(attempt + 1);
+    }
+    console.error('Admin seed failed', error);
+  }
+}

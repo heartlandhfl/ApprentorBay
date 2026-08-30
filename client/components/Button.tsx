@@ -7,6 +7,7 @@ const variants = {
   secondary:
     'bg-paper-raised text-ink border border-line hover:border-ink active:bg-accent-subtle',
   ghost: 'bg-transparent text-ink hover:bg-accent-subtle active:bg-line',
+  danger: 'bg-danger text-paper-raised hover:bg-[#7f2424] active:bg-[#681d1d]',
 } as const;
 
 const sizes = {

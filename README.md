@@ -2,52 +2,54 @@
 
 A mentorship harbor — structured pairings and living learning contracts.
 
-This repository is a clean rebuild. The scaffold below is the only code that exists.
-
 ## Stack
 
 - **Client:** React, TypeScript, Vite, Tailwind CSS, React Router
 - **Server:** Express (Node/TypeScript) — one app, one health route
 - **Data / auth:** Firebase (Firestore + Firebase Auth)
+- **Local data:** Auth + Firestore emulators (`npm run dev` starts them)
 - **Deploy:** static Vite build + Node host (Express serves `client/dist` in production)
 
 ## Folder structure
 
 ```
-/client                 React app
+/client
   /components           Shared UI library only
-  /features             One folder per feature (empty until later prompts)
-    /profiles
-    /mentorship
-    /learning-contracts
-    /admin
-  /routes
-  /lib                  firebase.ts, api.ts
-/server                 Express
-  /src/routes
-  /src/middleware
-  /src/lib
+  /features/profiles    Profile reads
+  /features/admin
+  /routes               Pages (signup, login, profiles, verification)
+  /lib                  firebase.ts, api.ts, auth.tsx
+/server
+  /routes               health.ts, admin.ts
+  /middleware           errorHandler.ts, requireAdmin.ts
+  /lib                  firebase.ts, seedAdmin.ts
 /shared                 TypeScript types — single source of truth
-firestore.rules         Deny-by-default Firestore rules
-.env.example            Placeholder Firebase + server config
+firestore.rules         Deny-by-default + owner/admin/public profile rules
 ```
 
-## Design system
+## Data model (`/shared/types.ts`)
 
-| Token        | Value                                                                 |
-| ------------ | --------------------------------------------------------------------- |
-| Type scale   | 12 / 14 / 16 / 20 / 24 / 32 / 48 (8px line-height grid)               |
-| Spacing      | 4 / 8 / 12 / 16 / 24 / 32 / 48 / 64                                   |
-| Accent       | Copper rust `#B4532A`                                                 |
-| Typefaces    | Instrument Serif (display) + Instrument Sans (UI)                     |
-| Components   | Button, Input, Card, Badge, Modal, Stepper, EmptyState, Text, Page    |
+A user has exactly one role, set at signup: `mentor` | `learner` | `admin`.
 
-Every page composes only the shared library. Multi-step flows must reuse `Stepper` — do not add a second stepper.
+| Collection | Shape |
+| --- | --- |
+| `/users/{uid}` | `uid`, `role`, `email`, `displayName`, `createdAt` |
+| `/learnerProfiles/{uid}` | education, jobStatus, careerAspirations, competencyGoals, deliverables, public |
+| `/mentorProfiles/{uid}` | education, experience, deliverables, reviews, verificationStatus, public |
+
+Signup writes the user doc and the matching profile in one Firestore transaction. New mentors always start as `verificationStatus: 'pending'`.
+
+## Routes
+
+| Path | Who |
+| --- | --- |
+| `/signup` | Role first (Mentor or Learner), then the role-specific form |
+| `/login` | Email / password |
+| `/learners/:id` | Public learner profile (empty states when fields are blank) |
+| `/mentors/:id` | Public mentor profile + Verified / Pending Approval / Rejected badge |
+| `/admin/verification` | Admin-only pending table. Guarded in React **and** Express **and** Firestore rules |
 
 ## Setup
-
-1. Copy `.env.example` to `.env` and fill in a real Firebase project (placeholders boot the SDK without throwing).
-2. Install and run both apps:
 
 ```bash
 npm install
@@ -55,18 +57,21 @@ npm run dev
 ```
 
 - Client: http://localhost:5173
-- API health: http://localhost:3001/api/health (also proxied as `/api/health` from Vite)
+- API: http://localhost:3001/api/health
+- Emulators: Auth `:9099`, Firestore `:8080`, UI `:4000`
+
+A local admin is seeded when emulators are on:
+
+- Email: `admin@apprentorbay.test`
+- Password: `HarborAdmin-2026` (override with `SEED_ADMIN_*` in `.env`)
+
+Set `VITE_USE_FIREBASE_EMULATOR=false` and fill real Firebase Admin credentials to point at a live project.
 
 ## Scripts
 
-| Command          | What it does                          |
-| ---------------- | ------------------------------------- |
-| `npm run dev`    | Client + server together              |
-| `npm run build`  | Typecheck + Vite production build     |
-| `npm start`      | Serve API (and `client/dist` in prod) |
-
-## Firebase
-
-Client config uses `VITE_FIREBASE_*` variables. Server Admin uses `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, and `FIREBASE_PRIVATE_KEY`. The real `.env` is gitignored.
-
-`firestore.rules` denies public read/write. Signed-in users may manage their own `users` / `profiles` documents; pairing members may read and update `mentorships` and `learningContracts`. Everything else is denied.
+| Command | What it does |
+| --- | --- |
+| `npm run dev` | Emulators + client + server |
+| `npm run emulators` | Auth + Firestore emulators only |
+| `npm run build` | Typecheck + Vite production build |
+| `npm start` | Serve API (and `client/dist` in prod) |

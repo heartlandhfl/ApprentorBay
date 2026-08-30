@@ -1,2 +1,1 @@
-/** Profiles feature — implemented in later prompts. */
-export {};
+export { watchLearnerProfile, watchMentorProfile } from './repository';
