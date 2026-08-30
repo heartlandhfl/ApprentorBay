@@ -5,18 +5,20 @@
   "type": "module",
   "exports": {
     ".": {
-      "types": "./index.ts",
-      "import": "./index.ts",
-      "default": "./index.ts"
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
     }
   },
   "scripts": {
-    "build": "tsc --noEmit",
+    "build": "tsc",
     "typecheck": "tsc --noEmit",
     "test": "tsx --test ./learningContractMachine.test.ts ./account.test.ts ./legal.test.ts"
   },
-  "devDependencies": {
-    "tsx": "^4.20.5",
+  "dependencies": {
     "typescript": "^5.9.2"
+  },
+  "devDependencies": {
+    "tsx": "^4.20.5"
   }
 }
