@@ -133,7 +133,8 @@ service cloud.firestore {
     }
 
     match /learningContracts/{contractId} {
-      allow read: if isPairingMember() || isAdmin();
+      allow get: if isPairingMember() || isAdmin();
+      allow list: if isActiveRelationshipMember(resource.data.relationshipId) || isAdmin();
       allow create, update, delete: if false;
     }
 
