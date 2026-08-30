@@ -1,9 +1,10 @@
 import { useState, type FormEvent } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
-import type { SignupRole } from '@apprentorbay/shared';
+import { TERMS_SUMMARY, TERMS_VERSION, type SignupRole } from '@apprentorbay/shared';
 import {
   Button,
   Card,
+  Checkbox,
   Cluster,
   Input,
   Page,
@@ -16,6 +17,11 @@ import { profilePath, useAuth } from '../lib/auth';
 
 const steps = [
   { id: 'role', label: 'Choose your role', description: 'Mentor or learner — one role, set here.' },
+  {
+    id: 'terms',
+    label: 'Terms of Use',
+    description: 'Read the summary and agree before you continue.',
+  },
   { id: 'details', label: 'Your details', description: 'Email, password, and a name to show.' },
 ];
 
@@ -24,6 +30,7 @@ export function SignupPage() {
   const navigate = useNavigate();
   const [step, setStep] = useState(0);
   const [role, setRole] = useState<SignupRole | null>(null);
+  const [termsAgreed, setTermsAgreed] = useState(false);
   const [displayName, setDisplayName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -44,11 +51,23 @@ export function SignupPage() {
     setError(null);
   }
 
+  function goToStep(next: number) {
+    if (next >= 2 && !termsAgreed) return;
+    if (next >= 1 && !role) return;
+    setStep(next);
+    setError(null);
+  }
+
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
     if (!role) {
       setError('Choose a role first');
       setStep(0);
+      return;
+    }
+    if (!termsAgreed) {
+      setError('You must accept the Terms of Use.');
+      setStep(1);
       return;
     }
     setBusy(true);
@@ -63,6 +82,7 @@ export function SignupPage() {
         careerAspirations,
         recentRole,
         expertise,
+        termsAccepted: true,
       });
       navigate(profilePath(created));
     } catch (err) {
@@ -78,12 +98,12 @@ export function SignupPage() {
         <Stack gap={12}>
           <Text variant="h1">Join the harbor</Text>
           <Text variant="muted">
-            Pick one role. We create your account and an empty profile in the same
-            write — nothing is left half-made.
+            Pick one role, accept the Terms, then we create your account and an
+            empty profile in the same write.
           </Text>
         </Stack>
 
-        <Stepper steps={steps} currentStep={step} onStepSelect={setStep} />
+        <Stepper steps={steps} currentStep={step} onStepSelect={goToStep} />
 
         {step === 0 ? (
           <Cluster gap={16}>
@@ -108,7 +128,35 @@ export function SignupPage() {
               </Stack>
             </Card>
           </Cluster>
-        ) : (
+        ) : null}
+
+        {step === 1 ? (
+          <Card>
+            <Stack gap={16}>
+              <Text variant="h3">Terms of Use</Text>
+              <Text variant="small">Version {TERMS_VERSION}</Text>
+              <Text>{TERMS_SUMMARY}</Text>
+              <Button variant="secondary" href="/legal/terms">
+                Read the full Terms of Use
+              </Button>
+              <Checkbox
+                label="I have read and agree to the Terms of Use"
+                checked={termsAgreed}
+                onChange={(event) => setTermsAgreed(event.target.checked)}
+              />
+              <Cluster gap={12}>
+                <Button disabled={!termsAgreed} onClick={() => goToStep(2)}>
+                  Continue
+                </Button>
+                <Button variant="ghost" onClick={() => goToStep(0)}>
+                  Back
+                </Button>
+              </Cluster>
+            </Stack>
+          </Card>
+        ) : null}
+
+        {step === 2 ? (
           <Card>
             <form onSubmit={(event) => void onSubmit(event)}>
               <Stack gap={16}>
@@ -173,17 +221,17 @@ export function SignupPage() {
                 )}
                 {error ? <Text variant="danger">{error}</Text> : null}
                 <Cluster gap={12}>
-                  <Button type="submit" loading={busy}>
+                  <Button type="submit" loading={busy} disabled={!termsAgreed}>
                     Create account
                   </Button>
-                  <Button variant="ghost" to="/login">
-                    I already have an account
+                  <Button variant="ghost" onClick={() => goToStep(1)}>
+                    Back
                   </Button>
                 </Cluster>
               </Stack>
             </form>
           </Card>
-        )}
+        ) : null}
       </Stack>
     </Page>
   );

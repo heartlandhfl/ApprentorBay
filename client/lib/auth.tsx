@@ -13,9 +13,10 @@ import {
   signOut,
   type User as FirebaseUser,
 } from 'firebase/auth';
-import { doc, getDoc, onSnapshot, runTransaction } from 'firebase/firestore';
+import { doc, getDoc, onSnapshot, runTransaction, updateDoc } from 'firebase/firestore';
 import {
   COLLECTIONS,
+  TERMS_VERSION,
   emptyLearnerProfile,
   emptyMentorProfile,
   isAccountActive,
@@ -37,9 +38,11 @@ type AuthContextValue = {
     careerAspirations?: string;
     recentRole?: string;
     expertise?: string;
+    termsAccepted: boolean;
   }) => Promise<User>;
   logIn: (email: string, password: string) => Promise<void>;
   logOut: () => Promise<void>;
+  acceptCurrentTerms: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -109,6 +112,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (!auth || !db) {
           throw new Error('Firebase is not initialized');
         }
+        if (input.termsAccepted !== true) {
+          throw new Error('You must accept the Terms of Use.');
+        }
 
         const credential = await createUserWithEmailAndPassword(
           auth,
@@ -128,6 +134,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           displayName,
           active: true,
           createdAt,
+          termsAcceptedAt: createdAt,
+          termsVersion: TERMS_VERSION,
         };
 
         try {
@@ -200,6 +208,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const auth = getFirebaseAuth();
         if (!auth) return;
         await signOut(auth);
+      },
+      async acceptCurrentTerms() {
+        const db = getFirebaseDb();
+        const uid = firebaseUser?.uid ?? account?.uid;
+        if (!db || !uid) throw new Error('Sign in required');
+        await updateDoc(doc(db, COLLECTIONS.users, uid), {
+          termsAcceptedAt: new Date().toISOString(),
+          termsVersion: TERMS_VERSION,
+        });
       },
     }),
     [account, firebaseUser, loading],

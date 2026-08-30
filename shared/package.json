@@ -13,7 +13,7 @@
   "scripts": {
     "build": "tsc --noEmit",
     "typecheck": "tsc --noEmit",
-    "test": "tsx --test ./learningContractMachine.test.ts ./account.test.ts"
+    "test": "tsx --test ./learningContractMachine.test.ts ./account.test.ts ./legal.test.ts"
   },
   "devDependencies": {
     "tsx": "^4.20.5",

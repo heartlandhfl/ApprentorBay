@@ -54,11 +54,19 @@ service cloud.firestore {
       allow create: if isOwner(userId)
         && request.resource.data.uid == userId
         && request.resource.data.role in ['learner', 'mentor']
-        && request.resource.data.active == true;
+        && request.resource.data.active == true
+        && request.resource.data.termsVersion is string
+        && request.resource.data.termsVersion.size() > 0
+        && request.resource.data.termsAcceptedAt is string
+        && request.resource.data.termsAcceptedAt.size() > 0;
       allow update: if (isOwner(userId) || isAdmin())
         && request.resource.data.uid == resource.data.uid
         && request.resource.data.role == resource.data.role
-        && request.resource.data.active == resource.data.active;
+        && request.resource.data.active == resource.data.active
+        && (
+          request.resource.data.termsVersion == resource.data.termsVersion
+          || request.resource.data.termsVersion is string
+        );
       allow delete: if false;
     }
 
