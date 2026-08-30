@@ -43,7 +43,7 @@ export function Modal({
           onClick={onClose}
         />
       ) : (
-        <div className="absolute inset-0 bg-ink/40" />
+        <div className="absolute inset-0 z-0 bg-ink/40" />
       )}
       <div
         role="dialog"
