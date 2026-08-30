@@ -48,6 +48,14 @@
         { "fieldPath": "relationshipId", "order": "ASCENDING" },
         { "fieldPath": "createdAt", "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "mentorProfiles",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "verificationStatus", "order": "ASCENDING" },
+        { "fieldPath": "public", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

@@ -1,10 +1,11 @@
-import { doc, getDoc, onSnapshot } from 'firebase/firestore';
+import { collection, doc, getDoc, onSnapshot, query, where } from 'firebase/firestore';
 import {
   COLLECTIONS,
   type LearnerProfile,
   type MentorProfile,
 } from '@apprentorbay/shared';
 import { getFirebaseDb } from '../../lib/firebase';
+import { firestoreDenied } from '../mentorship';
 
 export function watchLearnerProfile(
   userId: string,
@@ -20,7 +21,10 @@ export function watchLearnerProfile(
   return onSnapshot(
     doc(db, COLLECTIONS.learnerProfiles, userId),
     (snap) => onNext(snap.exists() ? (snap.data() as LearnerProfile) : null),
-    (error) => onError?.(error),
+    (error) => {
+      if (firestoreDenied(error)) onNext(null);
+      else onError?.(error);
+    },
   );
 }
 
@@ -38,7 +42,10 @@ export function watchMentorProfile(
   return onSnapshot(
     doc(db, COLLECTIONS.mentorProfiles, userId),
     (snap) => onNext(snap.exists() ? (snap.data() as MentorProfile) : null),
-    (error) => onError?.(error),
+    (error) => {
+      if (firestoreDenied(error)) onNext(null);
+      else onError?.(error);
+    },
   );
 }
 
@@ -57,4 +64,30 @@ export async function getPublicDisplayName(userId: string): Promise<string> {
   }
 
   return 'Member';
+}
+
+export function watchApprovedMentors(
+  onNext: (mentors: MentorProfile[]) => void,
+  onError?: (error: Error) => void,
+): () => void {
+  const db = getFirebaseDb();
+  if (!db) {
+    onError?.(new Error('Firebase is not initialized'));
+    return () => undefined;
+  }
+
+  return onSnapshot(
+    query(
+      collection(db, COLLECTIONS.mentorProfiles),
+      where('verificationStatus', '==', 'approved'),
+      where('public', '==', true),
+    ),
+    (snap) => {
+      const rows = snap.docs
+        .map((item) => item.data() as MentorProfile)
+        .sort((a, b) => a.displayName.localeCompare(b.displayName));
+      onNext(rows);
+    },
+    (error) => onError?.(error),
+  );
 }

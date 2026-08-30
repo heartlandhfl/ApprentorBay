@@ -2,6 +2,7 @@ export { Badge } from './Badge';
 export { Button } from './Button';
 export { Card } from './Card';
 export { EmptyState } from './EmptyState';
+export { Grid } from './Grid';
 export { Header } from './Header';
 export { Input } from './Input';
 export { MessageBubble } from './MessageBubble';

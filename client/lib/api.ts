@@ -1,9 +1,12 @@
 import type {
+  AccountRow,
   ApiError,
   ClientContractAction,
+  HarborCounts,
   HealthStatus,
   LearningContract,
   PendingMentorRow,
+  User,
   VerificationStatus,
 } from '@apprentorbay/shared';
 import { getFirebaseAuth } from './firebase';
@@ -55,6 +58,32 @@ export async function setMentorVerification(
     body: JSON.stringify({ userId, status }),
   });
   return readJson<{ profile: { verificationStatus: VerificationStatus } }>(response);
+}
+
+export async function listHarborCounts(): Promise<HarborCounts> {
+  const response = await fetch('/api/admin/stats', {
+    headers: await authHeaders(),
+  });
+  const body = await readJson<{ counts: HarborCounts }>(response);
+  return body.counts;
+}
+
+export async function listAccounts(): Promise<AccountRow[]> {
+  const response = await fetch('/api/admin/accounts', {
+    headers: await authHeaders(),
+  });
+  const body = await readJson<{ rows: AccountRow[] }>(response);
+  return body.rows;
+}
+
+export async function setAccountActive(userId: string, active: boolean): Promise<User> {
+  const response = await fetch(`/api/admin/accounts/${userId}/active`, {
+    method: 'POST',
+    headers: await authHeaders(),
+    body: JSON.stringify({ active }),
+  });
+  const body = await readJson<{ user: User }>(response);
+  return body.user;
 }
 
 export async function startLearningJourney(relationshipId: string): Promise<LearningContract> {

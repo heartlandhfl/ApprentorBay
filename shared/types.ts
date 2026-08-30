@@ -56,7 +56,25 @@ export interface User {
   role: UserRole;
   email: string;
   displayName: string;
+  active: boolean;
   createdAt: IsoDateString;
+}
+
+/** Missing `active` on older docs is treated as true. */
+export function isAccountActive(user: Pick<User, 'active'> | null | undefined): boolean {
+  return user != null && user.active !== false;
+}
+
+export interface HarborCounts {
+  mentors: number;
+  learners: number;
+  activeRelationships: number;
+  contractsInProgress: number;
+  completedDeliverables: number;
+}
+
+export interface AccountRow {
+  user: User;
 }
 
 export interface EducationEntry {
@@ -111,6 +129,7 @@ export interface LearnerProfile {
 export interface MentorProfile {
   userId: string;
   displayName: string;
+  expertise: string;
   education: EducationEntry[];
   experience: ExperienceEntry[];
   deliverables: DeliverableRef[];
@@ -259,6 +278,7 @@ export function emptyMentorProfile(
     displayName,
     education: [],
     experience: [],
+    expertise: '',
     deliverables: [],
     reviews: [],
     verificationStatus: 'pending',

@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import type { UserRole } from '@apprentorbay/shared';
+import { isAccountActive, type UserRole } from '@apprentorbay/shared';
 import { Button, EmptyState, Page, Text } from '../components';
 import { useAuth } from '../lib/auth';
 
@@ -19,7 +19,7 @@ export function RequireAuth({ children, role }: RequireAuthProps) {
     );
   }
 
-  if (!account) {
+  if (!account || !isAccountActive(account)) {
     return (
       <Page>
         <EmptyState

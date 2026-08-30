@@ -33,6 +33,7 @@ export async function seedAdmin(attempt = 1): Promise<void> {
       role: 'admin',
       email,
       displayName,
+      active: true,
       createdAt: new Date().toISOString(),
     };
 

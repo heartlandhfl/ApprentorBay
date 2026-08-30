@@ -53,10 +53,12 @@ service cloud.firestore {
       allow read: if isOwner(userId) || isAdmin();
       allow create: if isOwner(userId)
         && request.resource.data.uid == userId
-        && request.resource.data.role in ['learner', 'mentor'];
+        && request.resource.data.role in ['learner', 'mentor']
+        && request.resource.data.active == true;
       allow update: if (isOwner(userId) || isAdmin())
         && request.resource.data.uid == resource.data.uid
-        && request.resource.data.role == resource.data.role;
+        && request.resource.data.role == resource.data.role
+        && request.resource.data.active == resource.data.active;
       allow delete: if false;
     }
 
