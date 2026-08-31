@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { AccountRow, HarborCounts, PendingMentorRow, User } from '@apprentorbay/shared';
+import type { AccountRow, AdminCounts, PendingMentorRow, User } from '@apprentorbay/shared';
 import { isAccountActive } from '@apprentorbay/shared';
 import {
   Badge,
@@ -15,14 +15,14 @@ import {
 } from '../components';
 import {
   listAccounts,
-  listHarborCounts,
+  listAdminCounts,
   listPendingMentors,
   setAccountActive,
   setMentorVerification,
 } from '../lib/api';
 
 export function AdminPage() {
-  const [counts, setCounts] = useState<HarborCounts | null>(null);
+  const [counts, setCounts] = useState<AdminCounts | null>(null);
   const [pending, setPending] = useState<PendingMentorRow[] | null>(null);
   const [accounts, setAccounts] = useState<AccountRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -31,7 +31,7 @@ export function AdminPage() {
   async function refresh() {
     try {
       const [nextCounts, nextPending, nextAccounts] = await Promise.all([
-        listHarborCounts(),
+        listAdminCounts(),
         listPendingMentors(),
         listAccounts(),
       ]);
@@ -40,7 +40,7 @@ export function AdminPage() {
       setAccounts(nextAccounts);
       setError(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not load the harbor desk');
+      setError(err instanceof Error ? err.message : 'Could not load admin');
     }
   }
 
@@ -76,7 +76,7 @@ export function AdminPage() {
     <Page>
       <Stack gap={32}>
         <Stack gap={12}>
-          <Text variant="h1">Harbor desk</Text>
+          <Text variant="h1">Admin</Text>
           <Text variant="muted">
             Counts, pending mentor approvals, and account suspension. Suspension sets
             active to false, hides the public profile, and blocks login.
@@ -94,7 +94,7 @@ export function AdminPage() {
             <StatCard label="Completed deliverables" value={counts.completedDeliverables} />
           </Grid>
         ) : (
-          <Text variant="muted">Loading harbor counts…</Text>
+          <Text variant="muted">Loading counts…</Text>
         )}
 
         <Stack gap={16}>

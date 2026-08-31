@@ -24,7 +24,7 @@ export function RequireAuth({ children, role }: RequireAuthProps) {
       <Page>
         <EmptyState
           title="Sign in to continue"
-          description="This desk is for people who already have a harbor account."
+          description="This page is for people who already have an ApprentorBay account."
           action={
             <Button to="/login">Log in</Button>
           }
@@ -37,11 +37,11 @@ export function RequireAuth({ children, role }: RequireAuthProps) {
     return (
       <Page>
         <EmptyState
-          title="Wrong desk"
+          title="Wrong role"
           description={`This page is for ${role}s.`}
           action={
             <Button variant="secondary" to="/">
-              Back to harbor
+              Back home
             </Button>
           }
         />

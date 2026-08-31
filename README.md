@@ -1,6 +1,6 @@
 # ApprentorBay
 
-A mentorship harbor — structured pairings and living learning contracts.
+A mentorship and apprenticeship app — structured pairings and living learning contracts.
 
 ## Stack
 
@@ -47,7 +47,8 @@ Signup writes the user doc and the matching profile in one Firestore transaction
 
 | Path | Who |
 | --- | --- |
-| `/signup` | Role first (Mentor or Learner), then the role-specific form |
+| `/how-it-works` | Public explanation of pairing, contract, and deliverable |
+| `/signup` | Role first (Mentor or Learner), then the Terms, then the role-specific form |
 | `/login` | Email / password |
 | `/learners/:id` | Public learner profile (empty states when fields are blank) |
 | `/mentors/:id` | Public mentor profile + Verified / Pending Approval / Rejected badge |
@@ -71,7 +72,7 @@ npm run dev
 A local admin is seeded when emulators are on:
 
 - Email: `admin@apprentorbay.test`
-- Password: `HarborAdmin-2026` (override with `SEED_ADMIN_*` in `.env`)
+- Password: `ApprentorBayAdmin-2026` (override with `SEED_ADMIN_*` in `.env`)
 
 Set `VITE_USE_FIREBASE_EMULATOR=false` and fill real Firebase Admin credentials to point at a live project.
 

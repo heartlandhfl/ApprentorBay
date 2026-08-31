@@ -37,7 +37,7 @@ export function LearnerProfilePage() {
           description="This page is empty on purpose — the profile is missing or not public."
           action={
             <Button variant="secondary" to="/">
-              Back to harbor
+              Back home
             </Button>
           }
         />

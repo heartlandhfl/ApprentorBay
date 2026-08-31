@@ -96,7 +96,7 @@ export function SignupPage() {
     <Page>
       <Stack gap={32}>
         <Stack gap={12}>
-          <Text variant="h1">Join the harbor</Text>
+          <Text variant="h1">Join ApprentorBay</Text>
           <Text variant="muted">
             Pick one role, accept the Terms, then we create your account and an
             empty profile in the same write.
@@ -136,7 +136,7 @@ export function SignupPage() {
               <Text variant="h3">Terms of Use</Text>
               <Text variant="small">Version {TERMS_VERSION}</Text>
               <Text>{TERMS_SUMMARY}</Text>
-              <Button variant="secondary" href="/legal/terms">
+              <Button variant="secondary" to="/legal/terms">
                 Read the full Terms of Use
               </Button>
               <Checkbox

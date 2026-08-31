@@ -2,7 +2,7 @@
   "name": "apprentorbay",
   "private": true,
   "version": "0.1.0",
-  "description": "ApprentorBay — a mentorship harbor for apprentices and mentors.",
+  "description": "ApprentorBay — a mentorship and apprenticeship app for learners and mentors.",
   "workspaces": [
     "client",
     "server",

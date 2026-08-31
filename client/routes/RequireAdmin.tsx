@@ -18,10 +18,10 @@ export function RequireAdmin({ children }: { children: ReactNode }) {
       <Page>
         <EmptyState
           title="Admins only"
-          description="This desk is locked. Your account role is checked here and again on the server."
+          description="This page is locked. Your account role is checked here and again on the server."
           action={
             <Button variant="secondary" to="/">
-              Back to harbor
+              Back home
             </Button>
           }
         />
