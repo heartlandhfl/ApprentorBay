@@ -12,8 +12,8 @@ export async function seedAdmin(attempt = 1): Promise<void> {
   }
 
   const email = process.env.SEED_ADMIN_EMAIL ?? 'admin@apprentorbay.test';
-  const password = process.env.SEED_ADMIN_PASSWORD ?? 'HarborAdmin-2026';
-  const displayName = 'Harbor Admin';
+  const password = process.env.SEED_ADMIN_PASSWORD ?? 'ApprentorBayAdmin-2026';
+  const displayName = 'ApprentorBay Admin';
 
   try {
     const auth = adminAuth();

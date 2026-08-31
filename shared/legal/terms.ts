@@ -4,12 +4,12 @@
  * Bump TERMS_VERSION whenever the binding text changes. Logged-in users
  * whose stored termsVersion does not match are blocked until they re-accept.
  */
-export const TERMS_VERSION = '2026-08-31';
+export const TERMS_VERSION = '2026-08-31b';
 
 export const TERMS_TITLE = 'ApprentorBay Terms of Use';
 
 export const TERMS_SUMMARY =
-  'ApprentorBay is a mentorship harbor. By creating an account you agree to use the service in good faith, keep your pairing private, and accept that learning contracts and public deliverables are records of work — not employment, not a guarantee of outcomes, and not legal advice.';
+  'ApprentorBay is a mentorship and apprenticeship service. By creating an account you agree to use the service in good faith, keep your pairing private, and accept that learning contracts and public deliverables are records of work — not employment, not a guarantee of outcomes, and not legal advice.';
 
 export type TermsSection = {
   heading: string;
@@ -19,7 +19,7 @@ export type TermsSection = {
 /** Placeholder body. Replace these sections with the final counsel-approved text. */
 export const TERMS_SECTIONS: TermsSection[] = [
   {
-    heading: '1. The harbor',
+    heading: '1. The service',
     body: 'ApprentorBay is a place for learners and mentors to form a pairing, write a learning contract, and publish a deliverable. These Terms govern your use of the service. Placeholder text — replace this section with the final Terms of Use.',
   },
   {
@@ -32,7 +32,7 @@ export const TERMS_SECTIONS: TermsSection[] = [
   },
   {
     heading: '4. Conduct',
-    body: 'Do not harass, impersonate, or use the harbor to run a marketplace, a feed, or a scam. We may suspend an account (active: false) and hide its public profile. Placeholder text — replace this section with the final Terms of Use.',
+    body: 'Do not harass, impersonate, or use ApprentorBay to run a marketplace, a feed, or a scam. We may suspend an account (active: false) and hide its public profile. Placeholder text — replace this section with the final Terms of Use.',
   },
   {
     heading: '5. No professional advice',

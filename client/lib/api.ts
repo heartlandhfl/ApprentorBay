@@ -1,9 +1,8 @@
 import type {
   AccountRow,
+  AdminCounts,
   ApiError,
   ClientContractAction,
-  HarborCounts,
-  HealthStatus,
   LearningContract,
   PendingMentorRow,
   User,
@@ -35,11 +34,6 @@ async function authHeaders(): Promise<HeadersInit> {
   };
 }
 
-export async function getHealth(): Promise<HealthStatus> {
-  const response = await fetch('/api/health');
-  return readJson<HealthStatus>(response);
-}
-
 export async function listPendingMentors(): Promise<PendingMentorRow[]> {
   const response = await fetch('/api/admin/mentors/pending', {
     headers: await authHeaders(),
@@ -60,11 +54,11 @@ export async function setMentorVerification(
   return readJson<{ profile: { verificationStatus: VerificationStatus } }>(response);
 }
 
-export async function listHarborCounts(): Promise<HarborCounts> {
+export async function listAdminCounts(): Promise<AdminCounts> {
   const response = await fetch('/api/admin/stats', {
     headers: await authHeaders(),
   });
-  const body = await readJson<{ counts: HarborCounts }>(response);
+  const body = await readJson<{ counts: AdminCounts }>(response);
   return body.counts;
 }
 

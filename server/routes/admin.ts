@@ -4,7 +4,7 @@ import {
   isAccountActive,
   type AccountRow,
   type ApiError,
-  type HarborCounts,
+  type AdminCounts,
   type LearningContract,
   type MentorProfile,
   type MentorshipRelationship,
@@ -34,7 +34,7 @@ adminRouter.get('/stats', async (_req, res, next) => {
     );
     const contracts = contractsSnap.docs.map((doc) => doc.data() as LearningContract);
 
-    const counts: HarborCounts = {
+    const counts: AdminCounts = {
       mentors: users.filter((user) => user.role === 'mentor').length,
       learners: users.filter((user) => user.role === 'learner').length,
       activeRelationships: relationships.filter((row) => row.status === 'active').length,
@@ -94,7 +94,7 @@ adminRouter.post('/accounts/:userId/active', async (req: AdminRequest, res, next
     if (user.role === 'admin') {
       const error: ApiError = {
         code: 'forbidden',
-        message: 'Admin accounts cannot be suspended from this desk',
+        message: 'Admin accounts cannot be suspended from here',
       };
       res.status(403).json({ error });
       return;

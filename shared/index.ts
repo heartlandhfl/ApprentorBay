@@ -37,7 +37,7 @@ export type {
   AccountRow,
   ApiError,
   ApplicationStatus,
-  HarborCounts,
+  AdminCounts,
   CompetencyGoal,
   DeliverableRef,
   EducationEntry,

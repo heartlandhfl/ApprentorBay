@@ -67,7 +67,7 @@ export function isAccountActive(user: Pick<User, 'active'> | null | undefined): 
   return user != null && user.active !== false;
 }
 
-export interface HarborCounts {
+export interface AdminCounts {
   mentors: number;
   learners: number;
   activeRelationships: number;

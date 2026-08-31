@@ -5,6 +5,7 @@ import { TermsPage } from './routes/TermsPage';
 import { AdminPage } from './routes/AdminPage';
 import { ApplicationsPage } from './routes/ApplicationsPage';
 import { HomePage } from './routes/HomePage';
+import { HowItWorksPage } from './routes/HowItWorksPage';
 import { MentorsPage } from './routes/MentorsPage';
 import { JourneyPage } from './routes/JourneyPage';
 import { LearnerProfilePage } from './routes/LearnerProfilePage';
@@ -15,7 +16,6 @@ import { MessagesPage } from './routes/MessagesPage';
 import { RequireAdmin } from './routes/RequireAdmin';
 import { RequireAuth } from './routes/RequireAuth';
 import { SignupPage } from './routes/SignupPage';
-import { SystemPage } from './routes/SystemPage';
 import { VerificationPage } from './routes/VerificationPage';
 
 export function App() {
@@ -25,6 +25,7 @@ export function App() {
         <TermsGate>
           <Routes>
           <Route path="/" element={<HomePage />} />
+          <Route path="/how-it-works" element={<HowItWorksPage />} />
           <Route path="/signup" element={<SignupPage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/legal/terms" element={<TermsPage />} />
@@ -79,7 +80,6 @@ export function App() {
               </RequireAuth>
             }
           />
-          <Route path="/system" element={<SystemPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </TermsGate>

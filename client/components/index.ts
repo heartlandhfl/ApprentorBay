@@ -5,6 +5,7 @@ export { Checkbox } from './Checkbox';
 export { EmptyState } from './EmptyState';
 export { Grid } from './Grid';
 export { Header } from './Header';
+export { HowItWorks, HOW_IT_WORKS_STEPS } from './HowItWorks';
 export { Input } from './Input';
 export { MessageBubble } from './MessageBubble';
 export { MilestoneStatusMark } from './MilestoneStatusMark';
