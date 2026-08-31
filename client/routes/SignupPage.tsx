@@ -136,7 +136,7 @@ export function SignupPage() {
               <Text variant="h3">Terms of Use</Text>
               <Text variant="small">Version {TERMS_VERSION}</Text>
               <Text>{TERMS_SUMMARY}</Text>
-              <Button variant="secondary" to="/legal/terms">
+              <Button variant="secondary" href="/legal/terms">
                 Read the full Terms of Use
               </Button>
               <Checkbox
