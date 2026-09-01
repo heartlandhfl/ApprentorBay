@@ -89,8 +89,8 @@ Set `VITE_USE_FIREBASE_EMULATOR=false` and fill real Firebase Admin credentials 
 | --- | --- |
 | `npm run dev` | Emulators + client + server |
 | `npm run emulators` | Auth + Firestore emulators only |
-| `npm run build` | Shared types + Vite client + Express |
-| `npm start` | `node app.js` — API and `client/dist` |
+| `npm run build` | Vite client + bundled `dist/server.js` (Hostinger) |
+| `npm start` | `node app.js` — loads `dist/server.js` |
 | `npm run create-admin` | Create the live Firebase admin (production credentials only) |
 
 ## Production (Hostinger)
@@ -108,9 +108,13 @@ The site must be a **Node.js web app**, not a static / Vite website.
    | Framework | **Express** or **Other** — not Vite / React / static |
    | Node.js | **20** or **22** |
    | Build command | `npm run build` |
-   | Entry file | `app.js` |
-   | Output directory | leave empty (or `client/dist` only if the panel requires one; Express still serves it) |
+   | Entry file | **`dist/server.js`** (or `app.js`) |
+   | Output directory | **`dist`** |
    | Package manager | npm |
+
+   A 503 with Hostinger’s “temporarily busy” page means Node started and then crashed. Open the website → **Runtime Logs** (or `nodejs/stderr.log`). After this build, `/api/health` should return JSON even on a bad boot so you can see the error.
+
+   Do **not** leave Output directory as `client/dist` or Entry as a Vite file. That is the static-site setup and will 404 or 503.
 
 4. Set environment variables **before** the first build (`VITE_*` are compiled into the client):
 
@@ -138,7 +142,9 @@ The site must be a **Node.js web app**, not a static / Vite website.
    { "ok": true, "service": "apprentorbay-api", ... }
    ```
 
-   If you still get Hostinger’s HTML “This Page Does Not Exist”, the domain is still on the static site. Runtime logs should show `ApprentorBay API listening` and `Serving client from .../client/dist`.
+   If you still get Hostinger’s HTML “This Page Does Not Exist”, the domain is still on the static site. Runtime logs should show `ApprentorBay API listening` and `Serving client from .../dist/public`.
+
+   If you get **503 Service Unavailable**, the Node process is crashing. Redeploy with Entry `dist/server.js` and Output `dist`, then check Runtime Logs. Common causes: build never produced `dist/server.js`, a bad `FIREBASE_PRIVATE_KEY`, or the panel still using the Vite preset.
 
 6. Create the production admin **once**, on your machine (not on Hostinger), with the live Admin SDK key and a unique password — never `ApprentorBayAdmin-2026`:
 
