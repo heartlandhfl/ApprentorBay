@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { Navigate, useParams } from 'react-router-dom';
-import type { MentorshipRelationship, Message } from '@apprentorbay/shared';
+import { RELATIONSHIP_STATUS, type MentorshipRelationship, type Message } from '@apprentorbay/shared';
 import {
   Button,
   Card,
@@ -136,7 +136,7 @@ export function MessagesPage() {
     }
   }
 
-  const ended = relationship.status !== 'active';
+  const ended = relationship.status !== RELATIONSHIP_STATUS.active;
 
   return (
     <Page>

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { AccountRow, AdminCounts, PendingMentorRow, User } from '@apprentorbay/shared';
-import { isAccountActive } from '@apprentorbay/shared';
+import { USER_ROLE, VERIFICATION_STATUS, isAccountActive } from '@apprentorbay/shared';
 import {
   Badge,
   Button,
@@ -48,7 +48,10 @@ export function AdminPage() {
     void refresh();
   }, []);
 
-  async function decide(userId: string, status: 'approved' | 'rejected') {
+  async function decide(
+    userId: string,
+    status: typeof VERIFICATION_STATUS.approved | typeof VERIFICATION_STATUS.rejected,
+  ) {
     setBusyId(userId);
     try {
       await setMentorVerification(userId, status);
@@ -126,7 +129,7 @@ export function AdminPage() {
                       <Button
                         size="sm"
                         loading={busyId === row.user.uid}
-                        onClick={() => void decide(row.user.uid, 'approved')}
+                        onClick={() => void decide(row.user.uid, VERIFICATION_STATUS.approved)}
                       >
                         Approve
                       </Button>
@@ -134,7 +137,7 @@ export function AdminPage() {
                         size="sm"
                         variant="danger"
                         disabled={busyId === row.user.uid}
-                        onClick={() => void decide(row.user.uid, 'rejected')}
+                        onClick={() => void decide(row.user.uid, VERIFICATION_STATUS.rejected)}
                       >
                         Reject
                       </Button>
@@ -189,7 +192,7 @@ export function AdminPage() {
                   key: 'actions',
                   header: 'Action',
                   render: (row) =>
-                    row.user.role === 'admin' ? (
+                    row.user.role === USER_ROLE.admin ? (
                       <Text variant="small">Admin</Text>
                     ) : isAccountActive(row.user) ? (
                       <Button

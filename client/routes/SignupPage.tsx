@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
-import { TERMS_SUMMARY, TERMS_VERSION, type SignupRole } from '@apprentorbay/shared';
+import { TERMS_SUMMARY, TERMS_VERSION, USER_ROLE, type SignupRole } from '@apprentorbay/shared';
 import {
   Button,
   Card,
@@ -114,7 +114,7 @@ export function SignupPage() {
                   Apprentice a craft. Your public page starts empty until you add
                   education, goals, and deliverables.
                 </Text>
-                <Button onClick={() => chooseRole('learner')}>I am a learner</Button>
+                <Button onClick={() => chooseRole(USER_ROLE.learner)}>I am a learner</Button>
               </Stack>
             </Card>
             <Card>
@@ -124,7 +124,7 @@ export function SignupPage() {
                   Guide someone through the work. New mentors start as Pending
                   Approval — never silently verified.
                 </Text>
-                <Button onClick={() => chooseRole('mentor')}>I am a mentor</Button>
+                <Button onClick={() => chooseRole(USER_ROLE.mentor)}>I am a mentor</Button>
               </Stack>
             </Card>
           </Cluster>
@@ -161,7 +161,7 @@ export function SignupPage() {
             <form onSubmit={(event) => void onSubmit(event)}>
               <Stack gap={16}>
                 <Text variant="h3">
-                  {role === 'mentor' ? 'Mentor account' : 'Learner account'}
+                  {role === USER_ROLE.mentor ? 'Mentor account' : 'Learner account'}
                 </Text>
                 <Input
                   label="Display name"
@@ -188,7 +188,7 @@ export function SignupPage() {
                   hint="At least 6 characters."
                   autoComplete="new-password"
                 />
-                {role === 'learner' ? (
+                {role === USER_ROLE.learner ? (
                   <>
                     <Input
                       label="Job status"

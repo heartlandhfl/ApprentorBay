@@ -1,5 +1,5 @@
 import type { NextFunction, Request, RequestHandler, Response } from 'express';
-import { COLLECTIONS, isAccountActive, type ApiError, type User } from '@apprentorbay/shared';
+import { COLLECTIONS, USER_ROLE, isAccountActive, type ApiError, type User } from '@apprentorbay/shared';
 import { adminAuth, adminDb, getAdminFirebase } from '../lib/firebase.js';
 
 export type AdminRequest = Request & {
@@ -33,7 +33,7 @@ export const requireAdmin: RequestHandler = async (
     const snap = await adminDb().collection(COLLECTIONS.users).doc(decoded.uid).get();
     const account = snap.data() as User | undefined;
 
-    if (!account || account.role !== 'admin' || !isAccountActive(account)) {
+    if (!account || account.role !== USER_ROLE.admin || !isAccountActive(account)) {
       sendError(res, 403, 'forbidden', 'Admin role required');
       return;
     }

@@ -2,7 +2,10 @@ import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { useParams } from 'react-router-dom';
 import {
   LEARNING_JOURNEY_STEPS,
+  MILESTONE_STATUS,
+  USER_ROLE,
   availableActions,
+  isContractCompleted,
   isStepActor,
   journeyStepIndex,
   waitingOn,
@@ -132,7 +135,7 @@ function JourneyBody({
   onError: (message: string | null) => void;
 }) {
   const actor =
-    account.role === 'learner' || account.role === 'mentor'
+    account.role === USER_ROLE.learner || account.role === USER_ROLE.mentor
       ? { uid: account.uid, role: account.role }
       : null;
   const actions = actor ? availableActions(contract, actor) : [];
@@ -161,7 +164,7 @@ function JourneyBody({
           />
         </Card>
 
-        {contract.status !== 'completed' && !ownsStep ? (
+        {!isContractCompleted(contract) && !ownsStep ? (
           <Card>
             <Text variant="h3">Waiting on {ownerName}</Text>
           </Card>
@@ -183,7 +186,7 @@ function JourneyBody({
           <DcmActions contract={contract} actions={actions} onError={onError} />
         ) : null}
 
-        {contract.status === 'completed' ? (
+        {isContractCompleted(contract) ? (
           <Card>
             <Stack gap={8}>
               <Badge tone="success">Completed</Badge>
@@ -622,8 +625,8 @@ function DcmActions({
     () =>
       contract.milestones.find((item) =>
         actions.includes('SUBMIT_EVIDENCE')
-          ? item.status === 'active' || item.status === 'rejected'
-          : item.status === 'submitted',
+          ? item.status === MILESTONE_STATUS.active || item.status === MILESTONE_STATUS.rejected
+          : item.status === MILESTONE_STATUS.submitted,
       ),
     [actions, contract.milestones],
   );

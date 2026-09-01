@@ -15,7 +15,8 @@
     "types.ts",
     "learningContractMachine.ts",
     "legal.ts",
-    "legal/**/*.ts"
+    "legal/**/*.ts",
+    "domain/**/*.ts"
   ],
   "exclude": ["**/*.test.ts"]
 }

@@ -2,6 +2,9 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   LEARNING_JOURNEY_STEPS,
+  RELATIONSHIP_STATUS,
+  USER_ROLE,
+  isContractCompleted,
   journeyStepIndex,
   waitingOn,
   type LearningContract,
@@ -56,13 +59,14 @@ export function JourneyEntry({ relationship, account, otherName }: JourneyEntryP
       <Card>
         <Stack gap={16}>
           <Text variant="h3">Learning journey</Text>
-          {account.role === 'learner' && relationship.status === 'active' ? (
+          {account.role === USER_ROLE.learner &&
+          relationship.status === RELATIONSHIP_STATUS.active ? (
             <Button onClick={() => void start()} loading={busy}>
               Start Learning Journey
             </Button>
           ) : (
             <Text variant="muted">
-              Waiting on {account.role === 'mentor' ? otherName : 'the learner'} to start the
+              Waiting on {account.role === USER_ROLE.mentor ? otherName : 'the learner'} to start the
               learning journey.
             </Text>
           )}
@@ -80,11 +84,11 @@ export function JourneyEntry({ relationship, account, otherName }: JourneyEntryP
       <Stack gap={16}>
         <Cluster gap={12}>
           <Text variant="h3">Learning journey</Text>
-          <Badge tone={contract.status === 'completed' ? 'success' : 'accent'}>
+          <Badge tone={isContractCompleted(contract) ? 'success' : 'accent'}>
             {step?.label ?? contract.status}
           </Badge>
         </Cluster>
-        {contract.status === 'completed' ? (
+        {isContractCompleted(contract) ? (
           <Text variant="small">This deliverable is complete.</Text>
         ) : (
           <Text variant="small">

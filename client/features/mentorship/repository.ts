@@ -12,7 +12,10 @@ import {
   where,
 } from 'firebase/firestore';
 import {
+  APPLICATION_STATUS,
   COLLECTIONS,
+  RELATIONSHIP_STATUS,
+  pairingIdFieldForRole,
   type MentorshipApplication,
   type MentorshipRelationship,
   type Message,
@@ -50,7 +53,7 @@ export async function createApplication(input: {
     learnerId: input.learnerId,
     mentorId: input.mentorId,
     message: input.message.trim(),
-    status: 'pending',
+    status: APPLICATION_STATUS.pending,
     createdAt: new Date().toISOString(),
   };
   await setDoc(ref, application);
@@ -86,7 +89,7 @@ export function watchPairing(
     (snap) => {
       const rows = snap.docs.map((item) => item.data() as MentorshipApplication);
       application =
-        rows.find((row) => row.status === 'pending') ??
+        rows.find((row) => row.status === APPLICATION_STATUS.pending) ??
         rows.sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0] ??
         null;
       emit();
@@ -99,7 +102,7 @@ export function watchPairing(
       collection(db, COLLECTIONS.relationships),
       where('learnerId', '==', learnerId),
       where('mentorId', '==', mentorId),
-      where('status', '==', 'active'),
+      where('status', '==', RELATIONSHIP_STATUS.active),
       limit(1),
     ),
     (snap) => {
@@ -130,7 +133,7 @@ export function watchPendingApplications(
     query(
       collection(db, COLLECTIONS.applications),
       where('mentorId', '==', mentorId),
-      where('status', '==', 'pending'),
+      where('status', '==', APPLICATION_STATUS.pending),
     ),
     (snap) => onNext(snap.docs.map((item) => item.data() as MentorshipApplication)),
     (error) => onError?.(error),
@@ -148,13 +151,13 @@ export function watchActiveRelationships(
     return () => undefined;
   }
 
-  const field = account.role === 'mentor' ? 'mentorId' : 'learnerId';
+  const field = pairingIdFieldForRole(account.role);
 
   return onSnapshot(
     query(
       collection(db, COLLECTIONS.relationships),
       where(field, '==', account.uid),
-      where('status', '==', 'active'),
+      where('status', '==', RELATIONSHIP_STATUS.active),
     ),
     (snap) => onNext(snap.docs.map((item) => item.data() as MentorshipRelationship)),
     (error) => onError?.(error),
@@ -204,7 +207,7 @@ export function watchMessages(
 export async function declineApplication(applicationId: string): Promise<void> {
   const db = dbOrThrow();
   await updateDoc(doc(db, COLLECTIONS.applications, applicationId), {
-    status: 'declined',
+    status: APPLICATION_STATUS.declined,
   });
 }
 
@@ -218,13 +221,13 @@ export async function acceptApplication(
       collection(db, COLLECTIONS.relationships),
       where('learnerId', '==', application.learnerId),
       where('mentorId', '==', application.mentorId),
-      where('status', '==', 'active'),
+      where('status', '==', RELATIONSHIP_STATUS.active),
       limit(1),
     ),
   );
   if (!existing.empty) {
     await updateDoc(doc(db, COLLECTIONS.applications, application.id), {
-      status: 'accepted',
+      status: APPLICATION_STATUS.accepted,
     });
     return existing.docs[0].id;
   }
@@ -235,16 +238,16 @@ export async function acceptApplication(
     const appSnap = await tx.get(appRef);
     if (!appSnap.exists()) throw new Error('Application is gone');
     const current = appSnap.data() as MentorshipApplication;
-    if (current.status !== 'pending') {
+    if (current.status !== APPLICATION_STATUS.pending) {
       throw new Error('This application is no longer pending');
     }
 
-    tx.update(appRef, { status: 'accepted' });
+    tx.update(appRef, { status: APPLICATION_STATUS.accepted });
     const relationship: MentorshipRelationship = {
       id: relRef.id,
       learnerId: current.learnerId,
       mentorId: current.mentorId,
-      status: 'active',
+      status: RELATIONSHIP_STATUS.active,
       createdAt: new Date().toISOString(),
     };
     tx.set(relRef, relationship);

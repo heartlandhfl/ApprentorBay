@@ -1,4 +1,5 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { USER_ROLE } from '@apprentorbay/shared';
 import { TermsGate } from './components/TermsGate';
 import { AuthProvider } from './lib/auth';
 import { TermsPage } from './routes/TermsPage';
@@ -51,7 +52,7 @@ export function App() {
           <Route
             path="/dashboard/applications"
             element={
-              <RequireAuth role="mentor">
+              <RequireAuth role={USER_ROLE.mentor}>
                 <ApplicationsPage />
               </RequireAuth>
             }

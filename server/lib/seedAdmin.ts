@@ -1,4 +1,4 @@
-import { COLLECTIONS, TERMS_VERSION, type User } from '@apprentorbay/shared';
+import { COLLECTIONS, TERMS_VERSION, USER_ROLE, type User } from '@apprentorbay/shared';
 import { adminAuth, adminDb, getAdminFirebase } from './firebase.js';
 
 const RETRY_MS = 1500;
@@ -32,7 +32,7 @@ export async function seedAdmin(attempt = 1): Promise<void> {
     const now = new Date().toISOString();
     const account: User = {
       uid,
-      role: 'admin',
+      role: USER_ROLE.admin,
       email,
       displayName,
       active: true,

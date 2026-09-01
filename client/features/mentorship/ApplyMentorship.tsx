@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import type { MentorProfile } from '@apprentorbay/shared';
+import { APPLICATION_STATUS, USER_ROLE, VERIFICATION_STATUS, type MentorProfile } from '@apprentorbay/shared';
 import {
   Badge,
   Button,
@@ -25,7 +25,7 @@ export function ApplyMentorship({ profile }: ApplyMentorshipProps) {
   const [relationshipId, setRelationshipId] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!account || account.role !== 'learner' || account.uid === profile.userId) {
+    if (!account || account.role !== USER_ROLE.learner || account.uid === profile.userId) {
       return;
     }
     return watchPairing(account.uid, profile.userId, (state) => {
@@ -35,7 +35,7 @@ export function ApplyMentorship({ profile }: ApplyMentorshipProps) {
   }, [account, profile.userId]);
 
   if (loading) return null;
-  if (profile.verificationStatus !== 'approved') return null;
+  if (profile.verificationStatus !== VERIFICATION_STATUS.approved) return null;
   if (!account) {
     return (
       <Button variant="secondary" to="/login">
@@ -43,7 +43,7 @@ export function ApplyMentorship({ profile }: ApplyMentorshipProps) {
       </Button>
     );
   }
-  if (account.role !== 'learner') return null;
+  if (account.role !== USER_ROLE.learner) return null;
   if (account.uid === profile.userId) return null;
 
   if (relationshipId) {
@@ -52,7 +52,7 @@ export function ApplyMentorship({ profile }: ApplyMentorshipProps) {
     );
   }
 
-  if (applicationStatus === 'pending') {
+  if (applicationStatus === APPLICATION_STATUS.pending) {
     return <Badge tone="accent">Application pending</Badge>;
   }
 

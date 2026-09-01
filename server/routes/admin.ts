@@ -1,6 +1,10 @@
 import { Router } from 'express';
 import {
   COLLECTIONS,
+  LEARNING_CONTRACT_STATUS,
+  RELATIONSHIP_STATUS,
+  USER_ROLE,
+  VERIFICATION_STATUS,
   isAccountActive,
   type AccountRow,
   type ApiError,
@@ -35,11 +39,16 @@ adminRouter.get('/stats', async (_req, res, next) => {
     const contracts = contractsSnap.docs.map((doc) => doc.data() as LearningContract);
 
     const counts: AdminCounts = {
-      mentors: users.filter((user) => user.role === 'mentor').length,
-      learners: users.filter((user) => user.role === 'learner').length,
-      activeRelationships: relationships.filter((row) => row.status === 'active').length,
-      contractsInProgress: contracts.filter((row) => row.status === 'in_progress').length,
-      completedDeliverables: contracts.filter((row) => row.status === 'completed').length,
+      mentors: users.filter((user) => user.role === USER_ROLE.mentor).length,
+      learners: users.filter((user) => user.role === USER_ROLE.learner).length,
+      activeRelationships: relationships.filter((row) => row.status === RELATIONSHIP_STATUS.active)
+        .length,
+      contractsInProgress: contracts.filter(
+        (row) => row.status === LEARNING_CONTRACT_STATUS.inProgress,
+      ).length,
+      completedDeliverables: contracts.filter(
+        (row) => row.status === LEARNING_CONTRACT_STATUS.completed,
+      ).length,
     };
 
     res.json({ counts });
@@ -91,7 +100,7 @@ adminRouter.post('/accounts/:userId/active', async (req: AdminRequest, res, next
     }
 
     const user = userSnap.data() as User;
-    if (user.role === 'admin') {
+    if (user.role === USER_ROLE.admin) {
       const error: ApiError = {
         code: 'forbidden',
         message: 'Admin accounts cannot be suspended from here',
@@ -104,7 +113,7 @@ adminRouter.post('/accounts/:userId/active', async (req: AdminRequest, res, next
     batch.update(userRef, { active });
 
     const profileCollection =
-      user.role === 'mentor' ? COLLECTIONS.mentorProfiles : COLLECTIONS.learnerProfiles;
+      user.role === USER_ROLE.mentor ? COLLECTIONS.mentorProfiles : COLLECTIONS.learnerProfiles;
     const profileRef = adminDb().collection(profileCollection).doc(userId);
     const profileSnap = await profileRef.get();
     if (profileSnap.exists) {
@@ -123,7 +132,7 @@ adminRouter.get('/mentors/pending', async (_req, res, next) => {
   try {
     const snaps = await adminDb()
       .collection(COLLECTIONS.mentorProfiles)
-      .where('verificationStatus', '==', 'pending')
+      .where('verificationStatus', '==', VERIFICATION_STATUS.pending)
       .get();
 
     const rows: PendingMentorRow[] = [];
@@ -146,7 +155,10 @@ adminRouter.post('/mentors/:userId/verification', async (req, res, next) => {
   try {
     const userId = String(req.params.userId ?? '');
     const status = (req.body as VerificationDecision | undefined)?.status;
-    const allowed: VerificationStatus[] = ['approved', 'rejected'];
+    const allowed: VerificationStatus[] = [
+      VERIFICATION_STATUS.approved,
+      VERIFICATION_STATUS.rejected,
+    ];
 
     if (!userId || !status || !allowed.includes(status)) {
       const error: ApiError = {

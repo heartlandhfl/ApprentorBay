@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import type { MentorProfile, VerificationStatus } from '@apprentorbay/shared';
+import { VERIFICATION_STATUS, type MentorProfile, type VerificationStatus } from '@apprentorbay/shared';
 import {
   Badge,
   Button,
@@ -15,8 +15,8 @@ import { ApplyMentorship } from '../features/mentorship';
 import { watchMentorProfile } from '../features/profiles';
 
 function verificationBadge(status: VerificationStatus) {
-  if (status === 'approved') return { tone: 'success' as const, label: 'Verified' };
-  if (status === 'rejected') return { tone: 'danger' as const, label: 'Rejected' };
+  if (status === VERIFICATION_STATUS.approved) return { tone: 'success' as const, label: 'Verified' };
+  if (status === VERIFICATION_STATUS.rejected) return { tone: 'danger' as const, label: 'Rejected' };
   return { tone: 'accent' as const, label: 'Pending Approval' };
 }
 

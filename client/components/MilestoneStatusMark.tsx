@@ -1,4 +1,4 @@
-import type { MilestoneStatus } from '@apprentorbay/shared';
+import { MILESTONE_STATUS, type MilestoneStatus } from '@apprentorbay/shared';
 import { Badge } from './Badge';
 import { Cluster } from './Stack';
 import { Text } from './Text';
@@ -7,11 +7,11 @@ const marks: Record<
   MilestoneStatus,
   { glyph: string; tone: 'neutral' | 'accent' | 'success' | 'danger'; label: string }
 > = {
-  locked: { glyph: '○', tone: 'neutral', label: 'Locked' },
-  active: { glyph: '●', tone: 'accent', label: 'Active' },
-  submitted: { glyph: '◐', tone: 'accent', label: 'Submitted' },
-  approved: { glyph: '✓', tone: 'success', label: 'Approved' },
-  rejected: { glyph: '✕', tone: 'danger', label: 'Rejected' },
+  [MILESTONE_STATUS.locked]: { glyph: '○', tone: 'neutral', label: 'Locked' },
+  [MILESTONE_STATUS.active]: { glyph: '●', tone: 'accent', label: 'Active' },
+  [MILESTONE_STATUS.submitted]: { glyph: '◐', tone: 'accent', label: 'Submitted' },
+  [MILESTONE_STATUS.approved]: { glyph: '✓', tone: 'success', label: 'Approved' },
+  [MILESTONE_STATUS.rejected]: { glyph: '✕', tone: 'danger', label: 'Rejected' },
 };
 
 export function MilestoneStatusMark({ status }: { status: MilestoneStatus }) {
