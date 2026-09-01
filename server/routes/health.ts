@@ -16,6 +16,9 @@ healthRouter.get('/', (_req, res) => {
       adminInitialized: firebase.initialized,
       emulator: firebase.emulator,
       error: firebase.error,
+      keySource: firebase.keySource,
+      keyBodyPrefix: firebase.keyBodyPrefix,
+      keyBodyLength: firebase.keyBodyLength,
     },
   };
 

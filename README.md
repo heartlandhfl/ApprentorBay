@@ -131,8 +131,9 @@ The site must be a **Node.js web app**, not a static / Vite website.
    | `VITE_FIREBASE_MESSAGING_SENDER_ID` | from Firebase |
    | `VITE_FIREBASE_APP_ID` | from Firebase |
    | `FIREBASE_PROJECT_ID` | `apprentorbay` |
-   | `FIREBASE_CLIENT_EMAIL` | Admin SDK service account email |
-   | `FIREBASE_PRIVATE_KEY` | full private key, with `\n` for newlines |
+   | `FIREBASE_CLIENT_EMAIL` | Admin SDK service account email (optional if using the JSON base64 var) |
+   | `FIREBASE_SERVICE_ACCOUNT_BASE64` | **preferred on Hostinger** — one-line base64 of the downloaded service-account JSON (`node scripts/encode-firebase-key.mjs ./file.json`) |
+   | `FIREBASE_PRIVATE_KEY` | avoid on Hostinger — the panel often turns PEM newlines into the letter `n` and OpenSSL then reports `DECODER routines::unsupported` |
 
    Hostinger assigns `PORT`. The app already listens on `process.env.PORT` and `0.0.0.0`.
 
@@ -159,7 +160,13 @@ The site must be a **Node.js web app**, not a static / Vite website.
 
    A console document at `admins/{uid}` (email + uid) is not enough by itself. Express copies it into `users/{uid}` with `role: admin` on boot and when you POST `/api/account/session`. You still need a Firebase Auth user for that email. Use **Reset password** on `/login` if you do not know the Auth password. To create the Auth user automatically, set `SEED_ADMIN_PASSWORD` and restart.
 
-   `https://apprentorbay.com/api/health` must show `"adminInitialized": true`. If `firebase.error` mentions DECODER / parse private key, Hostinger mangled the PEM. Paste `private_key` from the service-account JSON as **one line** (literal `\n` is fine), or set `FIREBASE_SERVICE_ACCOUNT` to the entire JSON. Then restart — do not rebuild just to change runtime secrets.
+   `https://apprentorbay.com/api/health` must show `"adminInitialized": true`. If `firebase.error` mentions `DECODER routines::unsupported`, Hostinger stored a corrupted PEM. Do not paste `FIREBASE_PRIVATE_KEY` again. On your laptop:
+
+   ```bash
+   node scripts/encode-firebase-key.mjs ./your-service-account.json
+   ```
+
+   Set `FIREBASE_SERVICE_ACCOUNT_BASE64` to the printed one-line value (no quotes). You can leave `FIREBASE_PROJECT_ID` / `FIREBASE_CLIENT_EMAIL` or let the JSON supply them. **Redeploy** (not only Restart) so this parser is live, then confirm health shows `"adminInitialized": true` and `"keySource": "service-account-base64"`.
 
    You can also run `npm run create-admin` on your machine with the same vars. After the first admin exists, later boots skip bootstrap.
 

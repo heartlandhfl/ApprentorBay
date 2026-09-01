@@ -1,8 +1,7 @@
 import assert from 'node:assert/strict';
-import { generateKeyPairSync } from 'node:crypto';
+import { createPrivateKey, generateKeyPairSync } from 'node:crypto';
 import { describe, it } from 'node:test';
-import { createPrivateKey } from 'node:crypto';
-import { normalizePrivateKey } from './privateKey.js';
+import { normalizePrivateKey, resolveServiceAccount } from './privateKey.js';
 
 function samplePem(): string {
   const { privateKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
@@ -17,10 +16,13 @@ describe('normalizePrivateKey', () => {
   it('rebuilds a one-line Hostinger-style key', () => {
     const pem = samplePem();
     const smashed = pem.replace(/\n/g, '');
-    const normalized = normalizePrivateKey(smashed);
-    assert.match(normalized, /BEGIN PRIVATE KEY/);
-    assert.notEqual(normalized, smashed);
-    assertParses(normalized);
+    assertParses(normalizePrivateKey(smashed));
+  });
+
+  it('removes leftover n characters from stripped newlines', () => {
+    const pem = samplePem();
+    const nWrapped = pem.replace(/\n/g, 'n');
+    assertParses(normalizePrivateKey(nWrapped));
   });
 
   it('expands escaped newlines and surrounding quotes', () => {
@@ -36,5 +38,49 @@ describe('normalizePrivateKey', () => {
       private_key: pem,
     });
     assertParses(normalizePrivateKey(json));
+  });
+
+  it('normalized n-wrapped bodies start with MII, not nMII', () => {
+    const pem = samplePem();
+    const nWrapped = pem.replace(/\n/g, 'n');
+    const normalized = normalizePrivateKey(nWrapped);
+    const body = normalized
+      .replace(/-----BEGIN [^-]+-----/, '')
+      .replace(/-----END [^-]+-----/, '')
+      .replace(/\s+/g, '');
+    assert.equal(body.slice(0, 3), 'MII');
+    assert.ok(!body.includes('nMII'));
+  });
+});
+
+describe('resolveServiceAccount', () => {
+  const previous = { ...process.env };
+
+  function restoreEnv() {
+    for (const key of Object.keys(process.env)) {
+      if (!(key in previous)) delete process.env[key];
+    }
+    Object.assign(process.env, previous);
+  }
+
+  it('prefers FIREBASE_SERVICE_ACCOUNT_BASE64 over a broken PEM', () => {
+    const pem = samplePem();
+    const json = JSON.stringify({
+      type: 'service_account',
+      project_id: 'apprentorbay',
+      client_email: 'firebase-adminsdk@apprentorbay.iam.gserviceaccount.com',
+      private_key: pem,
+    });
+    process.env.FIREBASE_SERVICE_ACCOUNT_BASE64 = Buffer.from(json, 'utf8').toString('base64');
+    process.env.FIREBASE_PRIVATE_KEY = pem.replace(/\n/g, 'n');
+    try {
+      const account = resolveServiceAccount();
+      assert.equal(account?.source, 'service-account-base64');
+      assert.equal(account?.projectId, 'apprentorbay');
+      assert.match(account?.bodyPrefix ?? '', /^MII/);
+      assertParses(account!.privateKey);
+    } finally {
+      restoreEnv();
+    }
   });
 });

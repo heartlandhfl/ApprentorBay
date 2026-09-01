@@ -69,6 +69,9 @@ export interface HealthStatus {
     adminInitialized: boolean;
     emulator: boolean;
     error?: string | null;
+    keySource?: string | null;
+    keyBodyPrefix?: string | null;
+    keyBodyLength?: number | null;
   };
 }
 

@@ -1,7 +1,7 @@
 import { cert, getApps, initializeApp, type App } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore } from 'firebase-admin/firestore';
-import { normalizePrivateKey, resolvePrivateKeyInput } from './privateKey.js';
+import { configuredKeySource, resolveServiceAccount } from './privateKey.js';
 
 export interface AdminFirebaseState {
   configured: boolean;
@@ -9,9 +9,12 @@ export interface AdminFirebaseState {
   emulator: boolean;
   app: App | null;
   error: string | null;
+  keySource?: string | null;
+  keyBodyPrefix?: string | null;
+  keyBodyLength?: number | null;
 }
 
-function projectId(): string {
+function envProjectId(): string {
   return (
     process.env.FIREBASE_PROJECT_ID ||
     process.env.VITE_FIREBASE_PROJECT_ID ||
@@ -29,15 +32,19 @@ function usingEmulator(): boolean {
 
 function hasAdminCredentials(): boolean {
   return Boolean(
-    process.env.FIREBASE_PROJECT_ID &&
-      process.env.FIREBASE_CLIENT_EMAIL &&
-      resolvePrivateKeyInput(),
+    process.env.FIREBASE_SERVICE_ACCOUNT_BASE64 ||
+      process.env.FIREBASE_PRIVATE_KEY_BASE64 ||
+      process.env.FIREBASE_SERVICE_ACCOUNT ||
+      process.env.FIREBASE_SERVICE_ACCOUNT_JSON ||
+      (process.env.FIREBASE_PROJECT_ID &&
+        process.env.FIREBASE_CLIENT_EMAIL &&
+        process.env.FIREBASE_PRIVATE_KEY),
   );
 }
 
 function publicError(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error);
-  return message.replace(/-----BEGIN[\s\S]+?-----END[^-]+-----/g, '[pem]').slice(0, 240);
+  return message.replace(/-----BEGIN[\s\S]+?-----END[^-]+-----/g, '[pem]').slice(0, 280);
 }
 
 export function getAdminFirebase(): AdminFirebaseState {
@@ -52,7 +59,7 @@ export function getAdminFirebase(): AdminFirebaseState {
     process.env.FIRESTORE_EMULATOR_HOST ??= '127.0.0.1:8080';
     process.env.FIREBASE_AUTH_EMULATOR_HOST ??= '127.0.0.1:9099';
     try {
-      const app = initializeApp({ projectId: projectId() });
+      const app = initializeApp({ projectId: envProjectId() });
       return { configured: true, initialized: true, emulator: true, app, error: null };
     } catch (error) {
       console.error('Firebase Admin emulator failed to initialize', error);
@@ -65,19 +72,43 @@ export function getAdminFirebase(): AdminFirebaseState {
   }
 
   try {
-    const privateKey = normalizePrivateKey(resolvePrivateKeyInput()!);
+    const account = resolveServiceAccount();
+    if (!account) {
+      return { configured: false, initialized: false, emulator: false, app: null, error: null };
+    }
+    const projectId = account.projectId || envProjectId();
+    const clientEmail = account.clientEmail || process.env.FIREBASE_CLIENT_EMAIL?.trim();
+    if (!clientEmail) {
+      throw new Error('Set FIREBASE_CLIENT_EMAIL or include client_email in FIREBASE_SERVICE_ACCOUNT_BASE64');
+    }
     const app = initializeApp({
       credential: cert({
-        projectId: process.env.FIREBASE_PROJECT_ID,
-        clientEmail: process.env.FIREBASE_CLIENT_EMAIL?.trim(),
-        privateKey,
+        projectId,
+        clientEmail,
+        privateKey: account.privateKey,
       }),
-      projectId: process.env.FIREBASE_PROJECT_ID,
+      projectId,
     });
-    return { configured: true, initialized: true, emulator: false, app, error: null };
+    return {
+      configured: true,
+      initialized: true,
+      emulator: false,
+      app,
+      error: null,
+      keySource: account.source,
+      keyBodyPrefix: account.bodyPrefix,
+      keyBodyLength: account.bodyLength,
+    };
   } catch (error) {
     console.error('Firebase Admin failed to initialize', error);
-    return { configured: true, initialized: false, emulator: false, app: null, error: publicError(error) };
+    return {
+      configured: true,
+      initialized: false,
+      emulator: false,
+      app: null,
+      error: publicError(error),
+      keySource: configuredKeySource(),
+    };
   }
 }
 
