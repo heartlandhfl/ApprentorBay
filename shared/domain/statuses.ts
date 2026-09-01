@@ -86,11 +86,26 @@ export const MILESTONE_STATUS = {
   locked: 'locked',
   active: 'active',
   submitted: 'submitted',
+  underReview: 'under_review',
   approved: 'approved',
+  /** Learner may resubmit. UI label is REVISION_REQUESTED. */
   rejected: 'rejected',
+  /** Terminal mentor decline. UI label is REJECTED. */
+  declined: 'declined',
 } as const;
 
 export type MilestoneStatus = (typeof MILESTONE_STATUS)[keyof typeof MILESTONE_STATUS];
+
+/** Uppercase operational labels. Persisted values stay snake_case. */
+export const MILESTONE_STATUS_LABEL: Record<MilestoneStatus, string> = {
+  [MILESTONE_STATUS.locked]: 'NOT_STARTED',
+  [MILESTONE_STATUS.active]: 'IN_PROGRESS',
+  [MILESTONE_STATUS.submitted]: 'EVIDENCE_SUBMITTED',
+  [MILESTONE_STATUS.underReview]: 'UNDER_REVIEW',
+  [MILESTONE_STATUS.approved]: 'APPROVED',
+  [MILESTONE_STATUS.rejected]: 'REVISION_REQUESTED',
+  [MILESTONE_STATUS.declined]: 'REJECTED',
+};
 
 export const DELIVERABLE_STATUS = {
   draft: 'draft',
@@ -195,13 +210,15 @@ export function isNegotiationOpen(status: LearningContractStatus): boolean {
 }
 
 export function isMilestoneStatus(value: unknown): value is MilestoneStatus {
-  return (
-    value === MILESTONE_STATUS.locked ||
-    value === MILESTONE_STATUS.active ||
-    value === MILESTONE_STATUS.submitted ||
-    value === MILESTONE_STATUS.approved ||
-    value === MILESTONE_STATUS.rejected
-  );
+  return Object.values(MILESTONE_STATUS).includes(value as MilestoneStatus);
+}
+
+export function isReviewableMilestoneStatus(status: MilestoneStatus): boolean {
+  return status === MILESTONE_STATUS.submitted || status === MILESTONE_STATUS.underReview;
+}
+
+export function isApprovedMilestoneStatus(status: MilestoneStatus): boolean {
+  return status === MILESTONE_STATUS.approved;
 }
 
 export function isDeliverableStatus(value: unknown): value is DeliverableStatus {

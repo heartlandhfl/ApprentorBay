@@ -157,6 +157,18 @@ describe('domain transitions', () => {
       canTransitionMilestone(MILESTONE_STATUS.rejected, MILESTONE_STATUS.submitted),
       true,
     );
+    assert.equal(
+      canTransitionMilestone(MILESTONE_STATUS.submitted, MILESTONE_STATUS.underReview),
+      true,
+    );
+    assert.equal(
+      canTransitionMilestone(MILESTONE_STATUS.approved, MILESTONE_STATUS.submitted),
+      false,
+    );
+    assert.equal(
+      canTransitionMilestone(MILESTONE_STATUS.declined, MILESTONE_STATUS.active),
+      false,
+    );
   });
 });
 

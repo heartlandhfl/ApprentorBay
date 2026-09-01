@@ -9,7 +9,7 @@
     "shared"
   ],
   "scripts": {
-    "emulators": "firebase emulators:start --only auth,firestore --project apprentorbay-demo",
+    "emulators": "firebase emulators:start --only auth,firestore,storage --project apprentorbay-demo",
     "dev": "concurrently -k -n emulators,client,server -c green,cyan,magenta \"npm run emulators\" \"npm run dev -w client\" \"wait-on tcp:127.0.0.1:8080 tcp:127.0.0.1:9099 && npm run dev -w server\"",
     "dev:client": "npm run dev -w client",
     "dev:server": "npm run dev -w server",

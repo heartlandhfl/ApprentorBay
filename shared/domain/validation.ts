@@ -1,5 +1,13 @@
 import { APPLICATION_MESSAGE } from './applications.js';
-import { isEvidenceComplete, type Evidence } from './evidence.js';
+import {
+  EVIDENCE_TYPE,
+  isEvidenceComplete,
+  isEvidenceType,
+  isPrivateEvidencePath,
+  parseEvidenceStoragePath,
+  type Evidence,
+  type EvidenceDraft,
+} from './evidence.js';
 import { MESSAGE_TEXT } from './messages.js';
 
 export type ValidationResult =
@@ -37,6 +45,36 @@ export function validateMessageText(text: string): ValidationResult {
 export function validateEvidenceSubmission(evidence: Pick<Evidence, 'text' | 'link'>): ValidationResult {
   if (!isEvidenceComplete(evidence)) {
     return fail('Evidence text is required');
+  }
+  return ok;
+}
+
+export function validateEvidenceDrafts(
+  drafts: EvidenceDraft[],
+  context: { contractId: string; milestoneId: string; userId: string },
+): ValidationResult {
+  if (drafts.length === 0) return fail('Add at least one piece of evidence');
+  for (const draft of drafts) {
+    if (!isEvidenceType(draft.type)) return fail('Unknown evidence type');
+    if (draft.type === EVIDENCE_TYPE.file) {
+      const path = (draft.storagePath ?? '').trim();
+      if (!path) return fail('A file path is required for FILE evidence');
+      if (!isPrivateEvidencePath(path)) {
+        return fail('File evidence must use the private evidence Storage path');
+      }
+      const parsed = parseEvidenceStoragePath(path);
+      if (
+        !parsed ||
+        parsed.contractId !== context.contractId ||
+        parsed.milestoneId !== context.milestoneId ||
+        parsed.userId !== context.userId
+      ) {
+        return fail('File evidence path does not match this learner and milestone');
+      }
+      if (!draft.content.trim()) return fail('A file name is required');
+    } else if (!draft.content.trim()) {
+      return fail('Evidence content is required');
+    }
   }
   return ok;
 }
@@ -108,6 +146,6 @@ export function validateChangeRequestReason(reason: string): ValidationResult {
 }
 
 export function validateMilestoneFeedback(feedback: string): ValidationResult {
-  if (!feedback.trim()) return fail('Feedback is required to reject a milestone');
+  if (!feedback.trim()) return fail('Feedback is required to request a revision or reject');
   return ok;
 }

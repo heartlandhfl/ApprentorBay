@@ -1,11 +1,10 @@
 rules_version = '2';
 
 // Deny-by-default Firebase Storage rules for ApprentorBay.
-// Only /users/{userId}/** (private) and /portfolios/{userId}/** (public read) are allowed.
+// Evidence objects are private. They never use /portfolios (public read).
 service firebase.storage {
   match /b/{bucket}/o {
 
-    // Shared helpers used by every path-specific rule below.
     function isSignedIn() {
       return request.auth != null;
     }
@@ -14,7 +13,36 @@ service firebase.storage {
       return isSignedIn() && request.auth.uid == userId;
     }
 
-    // All creates/updates must stay under 5 MB and use an allowed image MIME type.
+    function userDoc(uid) {
+      return firestore.get(/databases/(default)/documents/users/$(uid)).data;
+    }
+
+    function isAdmin() {
+      return isSignedIn()
+        && firestore.exists(/databases/(default)/documents/users/$(request.auth.uid))
+        && userDoc(request.auth.uid).role == 'admin';
+    }
+
+    function contractDoc(contractId) {
+      return firestore.get(/databases/(default)/documents/learningContracts/$(contractId));
+    }
+
+    function isContractMember(contractId) {
+      return isSignedIn()
+        && firestore.exists(/databases/(default)/documents/learningContracts/$(contractId))
+        && (
+          contractDoc(contractId).data.learnerId == request.auth.uid
+          || contractDoc(contractId).data.mentorId == request.auth.uid
+          || isAdmin()
+        );
+    }
+
+    function isContractLearner(contractId) {
+      return isSignedIn()
+        && firestore.exists(/databases/(default)/documents/learningContracts/$(contractId))
+        && contractDoc(contractId).data.learnerId == request.auth.uid;
+    }
+
     function isValidImageWrite() {
       return request.resource.size <= 5 * 1024 * 1024
         && request.resource.contentType in [
@@ -24,23 +52,39 @@ service firebase.storage {
         ];
     }
 
-    // Private user files: only the signed-in owner may read, upload, update, or delete
-    // objects under their own prefix (/users/{userId}/...).
+    function isValidEvidenceWrite() {
+      return request.resource.size <= 10 * 1024 * 1024
+        && request.resource.contentType in [
+          'image/jpeg',
+          'image/png',
+          'image/webp',
+          'application/pdf',
+          'text/plain',
+        ];
+    }
+
     match /users/{userId}/{allPaths=**} {
       allow read: if isOwner(userId);
       allow create, update: if isOwner(userId) && isValidImageWrite();
       allow delete: if isOwner(userId);
     }
 
-    // Public portfolio images: anyone may read; only the owner may write.
-    // Same image size and content-type limits apply to creates/updates.
     match /portfolios/{userId}/{allPaths=**} {
       allow read: if true;
       allow create, update: if isOwner(userId) && isValidImageWrite();
       allow delete: if isOwner(userId);
     }
 
-    // Explicit catch-all deny: reject read/write to any path not matched above.
+    // Private evidence: pairing members and admins may read.
+    // Only the contract learner may upload under their own uid segment.
+    match /evidence/{contractId}/{milestoneId}/{userId}/{fileId} {
+      allow read: if isContractMember(contractId);
+      allow create, update: if isContractLearner(contractId)
+        && request.auth.uid == userId
+        && isValidEvidenceWrite();
+      allow delete: if isOwner(userId) || isAdmin();
+    }
+
     match /{allPaths=**} {
       allow read, write: if false;
     }

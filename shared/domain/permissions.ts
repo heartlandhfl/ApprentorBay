@@ -75,6 +75,24 @@ export function canAccessContractWorkspace(
   return actor.uid === contract.learnerId || actor.uid === contract.mentorId;
 }
 
+export function canReadEvidenceObject(
+  actor: PermissionActor | null | undefined,
+  contract: Pick<LearningContract, 'learnerId' | 'mentorId'>,
+): boolean {
+  return canAccessContractWorkspace(actor, contract);
+}
+
+export function canWriteEvidenceObject(
+  actor: PermissionActor | null | undefined,
+  contract: Pick<LearningContract, 'learnerId' | 'mentorId'>,
+  pathUserId: string,
+): boolean {
+  if (!actor || !isAccountActive(actor)) return false;
+  if (actor.role !== USER_ROLE.learner) return false;
+  if (actor.uid !== contract.learnerId) return false;
+  return actor.uid === pathUserId;
+}
+
 export function canStartLearningJourney(
   actor: PermissionActor | null | undefined,
   relationship: MentorshipRelationship,

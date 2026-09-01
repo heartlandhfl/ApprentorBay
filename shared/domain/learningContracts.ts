@@ -1,4 +1,4 @@
-import { MILESTONE_STATUS } from './statuses.js';
+import { MILESTONE_STATUS, isApprovedMilestoneStatus } from './statuses.js';
 import {
   LEARNING_CONTRACT_STATUS,
   STEP_OWNER,
@@ -10,6 +10,13 @@ import type { Deliverable } from './deliverables.js';
 import type { Milestone } from './milestones.js';
 import type { UserRole } from './identities.js';
 import type { IsoDateString } from './users.js';
+import {
+  EVIDENCE_TYPE,
+  evidenceItemsForMilestone,
+  latestMilestoneProjection,
+  normalizeEvidenceItem,
+  type EvidenceItem,
+} from './evidence.js';
 
 /**
  * Learning Goal — persisted on the contract as `goal` / `goalHistory`.
@@ -64,6 +71,8 @@ export interface LearningContract {
   context: string | null;
   mentorComment: string | null;
   revisionHistory: ContractRevision[];
+  /** First-class evidence. Older docs omit this; normalize hydrates from milestone strings. */
+  evidenceItems: EvidenceItem[];
 }
 
 /**
@@ -174,18 +183,80 @@ export function normalizeDeliverable(
   };
 }
 
+export function hydrateEvidenceItems(contract: LearningContract): EvidenceItem[] {
+  const existing = (contract.evidenceItems ?? []).map((item) =>
+    normalizeEvidenceItem({
+      ...item,
+      id: item.id,
+      milestoneId: item.milestoneId,
+      contractId: item.contractId || contract.id,
+    }),
+  );
+  if (existing.length > 0) return existing;
+
+  const migrated: EvidenceItem[] = [];
+  for (const milestone of contract.milestones ?? []) {
+    const text = (milestone.evidenceText ?? '').trim();
+    const link = (milestone.evidenceLink ?? '').trim();
+    if (text) {
+      migrated.push(
+        normalizeEvidenceItem({
+          id: `legacy-text-${milestone.id}`,
+          milestoneId: milestone.id,
+          contractId: contract.id,
+          submittedBy: contract.learnerId,
+          type: EVIDENCE_TYPE.text,
+          content: text,
+          storagePath: null,
+          createdAt: contract.updatedAt,
+          updatedAt: contract.updatedAt,
+        }),
+      );
+    }
+    if (link) {
+      migrated.push(
+        normalizeEvidenceItem({
+          id: `legacy-link-${milestone.id}`,
+          milestoneId: milestone.id,
+          contractId: contract.id,
+          submittedBy: contract.learnerId,
+          type: EVIDENCE_TYPE.link,
+          content: link,
+          storagePath: null,
+          createdAt: contract.updatedAt,
+          updatedAt: contract.updatedAt,
+        }),
+      );
+    }
+  }
+  return migrated;
+}
+
 export function normalizeContract(input: LearningContract): LearningContract {
+  const evidenceItems = hydrateEvidenceItems(input);
+  const milestones = (input.milestones ?? []).map((item, index) => {
+    const normalized = normalizeMilestone(item, index);
+    const projection = latestMilestoneProjection(
+      evidenceItemsForMilestone(evidenceItems, normalized.id),
+    );
+    return {
+      ...normalized,
+      evidenceText: normalized.evidenceText || projection.evidenceText,
+      evidenceLink: normalized.evidenceLink || projection.evidenceLink,
+    };
+  });
   return {
     ...input,
     goal: input.goal ? normalizeGoal(input.goal) : null,
     goalHistory: (input.goalHistory ?? []).map((item) => normalizeGoal(item)),
     objectives: (input.objectives ?? []).map((item, index) => normalizeObjective(item, index)),
-    milestones: (input.milestones ?? []).map((item, index) => normalizeMilestone(item, index)),
+    milestones,
     deliverable: normalizeDeliverable(input.deliverable),
     changeRequestReason: input.changeRequestReason ?? null,
     context: input.context ?? null,
     mentorComment: input.mentorComment ?? null,
     revisionHistory: input.revisionHistory ?? [],
+    evidenceItems,
   };
 }
 
@@ -278,7 +349,11 @@ export function workspacePartyLabel(who: WorkspacePartyNeeded): string {
 export function workspaceFocus(contract: LearningContract): WorkspaceFocus {
   const ordered = [...contract.milestones].sort((a, b) => a.order - b.order);
   const submitted =
-    ordered.find((item) => item.status === MILESTONE_STATUS.submitted) ?? null;
+    ordered.find(
+      (item) =>
+        item.status === MILESTONE_STATUS.submitted ||
+        item.status === MILESTONE_STATUS.underReview,
+    ) ?? null;
   const current =
     ordered.find(
       (item) =>
@@ -362,8 +437,8 @@ export function contractProgress(contract: Pick<LearningContract, 'milestones'>)
   percent: number;
 } {
   const total = contract.milestones.length;
-  const approved = contract.milestones.filter(
-    (item) => item.status === MILESTONE_STATUS.approved,
+  const approved = contract.milestones.filter((item) =>
+    isApprovedMilestoneStatus(item.status),
   ).length;
   return {
     approved,
@@ -373,8 +448,11 @@ export function contractProgress(contract: Pick<LearningContract, 'milestones'>)
 }
 
 export function milestoneEvidenceCount(
-  milestone: Pick<Milestone, 'evidenceText' | 'evidenceLink'>,
+  milestone: Pick<Milestone, 'id' | 'evidenceText' | 'evidenceLink'>,
+  items: readonly EvidenceItem[] = [],
 ): number {
+  const fromItems = evidenceItemsForMilestone(items, milestone.id).length;
+  if (fromItems > 0) return fromItems;
   return milestone.evidenceText.trim() || milestone.evidenceLink.trim() ? 1 : 0;
 }
 
@@ -390,7 +468,7 @@ export type ContractEvidenceItem = {
 export function contractEvidenceItems(contract: LearningContract): ContractEvidenceItem[] {
   return [...contract.milestones]
     .sort((a, b) => a.order - b.order)
-    .filter((item) => milestoneEvidenceCount(item) > 0)
+    .filter((item) => milestoneEvidenceCount(item, contract.evidenceItems) > 0)
     .map((item) => ({
       milestoneId: item.id,
       milestoneTitle: item.title,

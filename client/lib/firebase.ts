@@ -1,6 +1,7 @@
 import { initializeApp, getApps, type FirebaseApp } from 'firebase/app';
 import { connectAuthEmulator, getAuth, type Auth } from 'firebase/auth';
 import { connectFirestoreEmulator, getFirestore, type Firestore } from 'firebase/firestore';
+import { connectStorageEmulator, getStorage, type FirebaseStorage } from 'firebase/storage';
 import type { FirebaseClientStatus } from '@apprentorbay/shared';
 
 const config = {
@@ -35,20 +36,22 @@ function getApp(): FirebaseApp | null {
   }
 }
 
-function bindEmulators(auth: Auth, db: Firestore) {
+function bindEmulators(auth: Auth, db: Firestore, storage: FirebaseStorage) {
   if (emulatorsBound || !useEmulator) return;
   connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true });
   connectFirestoreEmulator(db, '127.0.0.1', 8080);
+  connectStorageEmulator(storage, '127.0.0.1', 9199);
   emulatorsBound = true;
 }
 
-function services(): { auth: Auth; db: Firestore } | null {
+function services(): { auth: Auth; db: Firestore; storage: FirebaseStorage } | null {
   const instance = getApp();
   if (!instance) return null;
   const auth = getAuth(instance);
   const db = getFirestore(instance);
-  bindEmulators(auth, db);
-  return { auth, db };
+  const storage = getStorage(instance);
+  bindEmulators(auth, db, storage);
+  return { auth, db, storage };
 }
 
 export function getFirebaseStatus(): FirebaseClientStatus & { error: string | null } {
@@ -68,4 +71,8 @@ export function getFirebaseAuth(): Auth | null {
 
 export function getFirebaseDb(): Firestore | null {
   return services()?.db ?? null;
+}
+
+export function getFirebaseStorage(): FirebaseStorage | null {
+  return services()?.storage ?? null;
 }

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import {
+  EVIDENCE_TYPE_LABEL,
   LEARNING_CONTRACT_STATUS,
   LEARNING_CONTRACT_STATUS_LABEL,
   MILESTONE_STATUS,
@@ -7,16 +8,21 @@ import {
   USER_ROLE,
   availableActions,
   canSendMessage,
-  contractEvidenceItems,
   contractProgress,
   contractTitle,
+  evidenceItemsForMilestone,
   isContractCompleted,
   milestoneEvidenceCount,
+  milestoneNextAction,
+  milestoneResponsibleParty,
+  nextBeginWorkMilestone,
   sortMilestones,
   workspaceFocus,
   workspacePartyLabel,
   type ContractActionType,
   type ContractActor,
+  type EvidenceDraft,
+  type EvidenceItem,
   type LearningContract,
   type MentorshipRelationship,
   type Message,
@@ -39,6 +45,7 @@ import {
 } from '../../components';
 import { sendMessage, watchMessages } from '../mentorship';
 import { dispatchContractAction } from '../../lib/api';
+import { evidenceDownloadUrl, uploadEvidenceFile } from './evidenceStorage';
 
 type ContractWorkspaceProps = {
   account: User;
@@ -159,6 +166,9 @@ export function ContractWorkspace({
       <MilestonesSection
         contract={contract}
         actions={actions}
+        account={account}
+        learnerName={learnerName}
+        mentorName={mentorName}
         onError={onError}
       />
       <EvidenceSection contract={contract} />
@@ -289,16 +299,37 @@ function Overview({ contract }: { contract: LearningContract }) {
   );
 }
 
+function partyName(
+  party: ReturnType<typeof milestoneResponsibleParty>,
+  account: User,
+  contract: LearningContract,
+  learnerName: string,
+  mentorName: string,
+): string {
+  if (party === 'nobody') return 'Nobody';
+  if (party === 'learner') {
+    return account.uid === contract.learnerId ? `Learner (${learnerName === account.displayName ? 'you' : learnerName})` : `Learner (${learnerName})`;
+  }
+  return account.uid === contract.mentorId ? `Mentor (${mentorName === account.displayName ? 'you' : mentorName})` : `Mentor (${mentorName})`;
+}
+
 function MilestonesSection({
   contract,
   actions,
+  account,
+  learnerName,
+  mentorName,
   onError,
 }: {
   contract: LearningContract;
   actions: ContractActionType[];
+  account: User;
+  learnerName: string;
+  mentorName: string;
   onError: (message: string | null) => void;
 }) {
   const rows = sortMilestones(contract.milestones);
+  const beginTarget = nextBeginWorkMilestone(contract.milestones);
   return (
     <Stack gap={16}>
       <Text variant="h2">2. Milestones</Text>
@@ -306,36 +337,59 @@ function MilestonesSection({
         <EmptyState title="No milestones" />
       ) : (
         <Stack gap={16}>
-          {rows.map((item) => (
-            <Card key={item.id}>
-              <Stack gap={12}>
-                <Cluster gap={12}>
-                  <MilestoneStatusMark status={item.status} />
+          {rows.map((item) => {
+            const who = milestoneResponsibleParty(item);
+            return (
+              <Card key={item.id}>
+                <Stack gap={12}>
                   <Text variant="h3">
                     {item.order + 1}. {item.title}
                   </Text>
-                </Cluster>
-                <Text>{item.description}</Text>
-                <Text variant="small">
-                  Success criteria: {item.successCriteria || item.evidenceRequired || 'None listed'}
-                </Text>
-                <Text variant="small">
-                  Evidence: {milestoneEvidenceCount(item)} submitted
-                </Text>
-                {item.lastFeedback ? (
-                  <Text variant="danger">Mentor feedback: {item.lastFeedback}</Text>
-                ) : (
-                  <Text variant="small">Mentor feedback: none yet</Text>
-                )}
-                <MilestoneWork
-                  contract={contract}
-                  milestone={item}
-                  actions={actions}
-                  onError={onError}
-                />
-              </Stack>
-            </Card>
-          ))}
+                  <Text>{item.description}</Text>
+                  <Text variant="small">
+                    Success criteria: {item.successCriteria || item.evidenceRequired || 'None listed'}
+                  </Text>
+                  <Stack gap={4}>
+                    <Text variant="caption">Status</Text>
+                    <MilestoneStatusMark status={item.status} />
+                  </Stack>
+                  <Stack gap={4}>
+                    <Text variant="caption">Next action</Text>
+                    <Text>{milestoneNextAction(item)}</Text>
+                  </Stack>
+                  <Stack gap={4}>
+                    <Text variant="caption">Who is responsible</Text>
+                    <Text>{partyName(who, account, contract, learnerName, mentorName)}</Text>
+                  </Stack>
+                  <Stack gap={4}>
+                    <Text variant="caption">Evidence</Text>
+                    <EvidenceList
+                      items={evidenceItemsForMilestone(contract.evidenceItems, item.id)}
+                      emptyLabel={`${milestoneEvidenceCount(item, contract.evidenceItems)} submitted`}
+                    />
+                  </Stack>
+                  <Stack gap={4}>
+                    <Text variant="caption">Mentor feedback</Text>
+                    {item.lastFeedback ? (
+                      <Text variant="danger">{item.lastFeedback}</Text>
+                    ) : (
+                      <Text variant="small">None yet</Text>
+                    )}
+                  </Stack>
+                  <MilestoneWork
+                    contract={contract}
+                    milestone={item}
+                    actions={actions}
+                    account={account}
+                    canBegin={
+                      actions.includes('BEGIN_WORK') && beginTarget?.id === item.id
+                    }
+                    onError={onError}
+                  />
+                </Stack>
+              </Card>
+            );
+          })}
         </Stack>
       )}
     </Stack>
@@ -346,27 +400,37 @@ function MilestoneWork({
   contract,
   milestone,
   actions,
+  account,
+  canBegin,
   onError,
 }: {
   contract: LearningContract;
   milestone: Milestone;
   actions: ContractActionType[];
+  account: User;
+  canBegin: boolean;
   onError: (message: string | null) => void;
 }) {
   const canSubmit =
     actions.includes('SUBMIT_EVIDENCE') &&
     (milestone.status === MILESTONE_STATUS.active ||
       milestone.status === MILESTONE_STATUS.rejected);
-  const canReview =
-    actions.includes('APPROVE_MILESTONE') &&
-    milestone.status === MILESTONE_STATUS.submitted;
-  if (!canSubmit && !canReview) return null;
+  const canStartReview =
+    actions.includes('START_REVIEW') && milestone.status === MILESTONE_STATUS.submitted;
+  const canDecide =
+    (actions.includes('APPROVE_MILESTONE') || actions.includes('REQUEST_REVISION')) &&
+    (milestone.status === MILESTONE_STATUS.submitted ||
+      milestone.status === MILESTONE_STATUS.underReview);
+  if (!canSubmit && !canStartReview && !canDecide && !canBegin) return null;
   return (
     <MilestoneActions
       contract={contract}
       milestone={milestone}
+      account={account}
+      canBegin={canBegin}
       canSubmit={canSubmit}
-      canReview={canReview}
+      canStartReview={canStartReview}
+      canDecide={canDecide}
       onError={onError}
     />
   );
@@ -375,29 +439,68 @@ function MilestoneWork({
 function MilestoneActions({
   contract,
   milestone,
+  account,
+  canBegin,
   canSubmit,
-  canReview,
+  canStartReview,
+  canDecide,
   onError,
 }: {
   contract: LearningContract;
   milestone: Milestone;
+  account: User;
+  canBegin: boolean;
   canSubmit: boolean;
-  canReview: boolean;
+  canStartReview: boolean;
+  canDecide: boolean;
   onError: (message: string | null) => void;
 }) {
-  const [text, setText] = useState(canSubmit ? '' : milestone.evidenceText);
-  const [link, setLink] = useState(canSubmit ? '' : milestone.evidenceLink);
+  const [text, setText] = useState('');
+  const [reflection, setReflection] = useState('');
+  const [link, setLink] = useState('');
+  const [file, setFile] = useState<File | null>(null);
   const [feedback, setFeedback] = useState('');
   const [busy, setBusy] = useState(false);
+
+  async function begin() {
+    setBusy(true);
+    onError(null);
+    try {
+      await dispatchContractAction(contract.id, { type: 'BEGIN_WORK' });
+    } catch (err) {
+      onError(err instanceof Error ? err.message : 'Could not begin this milestone');
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function submit(event: FormEvent) {
     event.preventDefault();
     setBusy(true);
     onError(null);
     try {
-      await dispatchContractAction(contract.id, { type: 'SUBMIT_EVIDENCE', text, link });
+      const items: EvidenceDraft[] = [];
+      if (text.trim()) items.push({ type: 'text', content: text.trim() });
+      if (reflection.trim()) items.push({ type: 'reflection', content: reflection.trim() });
+      if (link.trim()) items.push({ type: 'link', content: link.trim() });
+      if (file) {
+        const uploaded = await uploadEvidenceFile({
+          contractId: contract.id,
+          milestoneId: milestone.id,
+          userId: account.uid,
+          file,
+        });
+        items.push({
+          type: 'file',
+          content: uploaded.fileName,
+          storagePath: uploaded.storagePath,
+        });
+      }
+      await dispatchContractAction(contract.id, { type: 'SUBMIT_EVIDENCE', items });
       setText('');
+      setReflection('');
       setLink('');
+      setFile(null);
     } catch (err) {
       onError(err instanceof Error ? err.message : 'Could not submit evidence');
     } finally {
@@ -405,14 +508,26 @@ function MilestoneActions({
     }
   }
 
-  async function decide(type: 'APPROVE_MILESTONE' | 'REJECT_MILESTONE') {
+  async function startReview() {
     setBusy(true);
     onError(null);
     try {
-      if (type === 'REJECT_MILESTONE') {
-        await dispatchContractAction(contract.id, { type, feedback });
-      } else {
+      await dispatchContractAction(contract.id, { type: 'START_REVIEW' });
+    } catch (err) {
+      onError(err instanceof Error ? err.message : 'Could not start the review');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function decide(type: 'APPROVE_MILESTONE' | 'REQUEST_REVISION' | 'DECLINE_MILESTONE') {
+    setBusy(true);
+    onError(null);
+    try {
+      if (type === 'APPROVE_MILESTONE') {
         await dispatchContractAction(contract.id, { type });
+      } else {
+        await dispatchContractAction(contract.id, { type, feedback });
       }
       setFeedback('');
     } catch (err) {
@@ -424,79 +539,188 @@ function MilestoneActions({
 
   return (
     <Stack gap={12}>
+      {canBegin ? (
+        <Button loading={busy} onClick={() => void begin()}>
+          Begin work
+        </Button>
+      ) : null}
       {canSubmit ? (
         <form onSubmit={(event) => void submit(event)}>
           <Stack gap={12}>
-            <Text variant="h3">Submit evidence for this milestone</Text>
+            <Text variant="h3">
+              {milestone.status === MILESTONE_STATUS.rejected
+                ? 'Resubmit evidence'
+                : 'Submit evidence'}
+            </Text>
+            <Text variant="small">
+              A checkbox is not enough. Add writing, a link, a reflection, or a private file.
+            </Text>
             <TextArea
-              label="Evidence"
+              label="Written explanation"
               value={text}
               onChange={(event) => setText(event.target.value)}
-              required
+            />
+            <TextArea
+              label="Reflection"
+              value={reflection}
+              onChange={(event) => setReflection(event.target.value)}
+              hint="Optional. What did you learn while doing this?"
             />
             <Input
-              label="Link or file URL"
+              label="Link"
               value={link}
               onChange={(event) => setLink(event.target.value)}
-              hint="Optional."
+              hint="Optional public URL. Files go through private Storage, not here."
             />
-            <Button type="submit" loading={busy}>
+            <label>
+              <Text variant="small" as="span">
+                File
+              </Text>
+              <input
+                type="file"
+                className="mt-2 block w-full text-small"
+                onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+              />
+            </label>
+            <Button
+              type="submit"
+              loading={busy}
+              disabled={!text.trim() && !reflection.trim() && !link.trim() && !file}
+            >
               Submit evidence
             </Button>
           </Stack>
         </form>
       ) : null}
-      {canReview ? (
+      {canStartReview || canDecide ? (
         <Stack gap={12}>
           <Text variant="h3">Review this evidence</Text>
-          <Text>{milestone.evidenceText}</Text>
-          {milestone.evidenceLink ? <Text variant="small">{milestone.evidenceLink}</Text> : null}
-          <TextArea
-            label="Feedback if rejecting"
-            value={feedback}
-            onChange={(event) => setFeedback(event.target.value)}
-          />
-          <Cluster gap={8}>
-            <Button loading={busy} onClick={() => void decide('APPROVE_MILESTONE')}>
-              Approve milestone
+          {canStartReview ? (
+            <Button variant="secondary" loading={busy} onClick={() => void startReview()}>
+              Start review
             </Button>
-            <Button
-              variant="danger"
-              loading={busy}
-              onClick={() => void decide('REJECT_MILESTONE')}
-            >
-              Reject
-            </Button>
-          </Cluster>
+          ) : null}
+          {canDecide ? (
+            <Stack gap={12}>
+              <TextArea
+                label="Feedback for a revision or rejection"
+                value={feedback}
+                onChange={(event) => setFeedback(event.target.value)}
+              />
+              <Cluster gap={8}>
+                <Button loading={busy} onClick={() => void decide('APPROVE_MILESTONE')}>
+                  Approve milestone
+                </Button>
+                <Button
+                  variant="secondary"
+                  loading={busy}
+                  onClick={() => void decide('REQUEST_REVISION')}
+                >
+                  Request revision
+                </Button>
+                <Button
+                  variant="danger"
+                  loading={busy}
+                  onClick={() => void decide('DECLINE_MILESTONE')}
+                >
+                  Reject
+                </Button>
+              </Cluster>
+            </Stack>
+          ) : null}
         </Stack>
       ) : null}
     </Stack>
   );
 }
 
+function EvidenceList({
+  items,
+  emptyLabel,
+}: {
+  items: EvidenceItem[];
+  emptyLabel?: string;
+}) {
+  if (items.length === 0) {
+    return <Text variant="small">{emptyLabel ?? 'None yet'}</Text>;
+  }
+  return (
+    <Stack gap={8}>
+      {items.map((item) => (
+        <Stack key={item.id} gap={4}>
+          <Cluster gap={8}>
+            <Badge>{EVIDENCE_TYPE_LABEL[item.type]}</Badge>
+            <Text variant="small">{new Date(item.createdAt).toLocaleString()}</Text>
+          </Cluster>
+          {item.type === 'file' && item.storagePath ? (
+            <EvidenceFileLink path={item.storagePath} label={item.content} />
+          ) : item.type === 'link' ? (
+            <Text variant="small">{item.content}</Text>
+          ) : (
+            <Text>{item.content}</Text>
+          )}
+        </Stack>
+      ))}
+    </Stack>
+  );
+}
+
+function EvidenceFileLink({ path, label }: { path: string; label: string }) {
+  const [url, setUrl] = useState<string | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    void evidenceDownloadUrl(path)
+      .then((next) => {
+        if (!cancelled) setUrl(next);
+      })
+      .catch(() => {
+        if (!cancelled) setUrl(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [path]);
+  if (!url) {
+    return <Text variant="small">{label} (private file)</Text>;
+  }
+  return (
+    <a href={url} className="text-small text-accent underline" target="_blank" rel="noreferrer">
+      {label}
+    </a>
+  );
+}
+
 function EvidenceSection({ contract }: { contract: LearningContract }) {
-  const items = contractEvidenceItems(contract);
+  const rows = sortMilestones(contract.milestones).flatMap((milestone) =>
+    evidenceItemsForMilestone(contract.evidenceItems, milestone.id).map((item) => ({
+      milestone,
+      item,
+    })),
+  );
   return (
     <Stack gap={16}>
       <Text variant="h2">3. Evidence</Text>
-      {items.length === 0 ? (
+      {rows.length === 0 ? (
         <EmptyState
           title="No evidence yet"
-          description="Submitted work against milestones will appear here."
+          description="A milestone is not done until the learner demonstrates it and the mentor approves."
         />
       ) : (
         <Stack gap={16}>
-          {items.map((item) => (
-            <Card key={item.milestoneId}>
+          {rows.map(({ milestone, item }) => (
+            <Card key={item.id}>
               <Stack gap={8}>
                 <Text variant="caption">
-                  Milestone {item.order + 1}
+                  Milestone {milestone.order + 1} · {EVIDENCE_TYPE_LABEL[item.type]}
                 </Text>
-                <Text variant="h3">{item.milestoneTitle}</Text>
-                <Text>{item.text}</Text>
-                {item.link ? <Text variant="small">{item.link}</Text> : null}
-                {item.feedback ? (
-                  <Text variant="danger">Mentor feedback: {item.feedback}</Text>
+                <Text variant="h3">{milestone.title}</Text>
+                {item.type === 'file' && item.storagePath ? (
+                  <EvidenceFileLink path={item.storagePath} label={item.content} />
+                ) : (
+                  <Text>{item.content}</Text>
+                )}
+                {milestone.lastFeedback ? (
+                  <Text variant="danger">Mentor feedback: {milestone.lastFeedback}</Text>
                 ) : null}
               </Stack>
             </Card>
