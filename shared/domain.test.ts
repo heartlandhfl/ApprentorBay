@@ -119,6 +119,41 @@ describe('domain transitions', () => {
       true,
     );
     assert.equal(
+      canTransitionContract(
+        LEARNING_CONTRACT_STATUS.inProgress,
+        LEARNING_CONTRACT_STATUS.completed,
+      ),
+      false,
+    );
+    assert.equal(
+      canTransitionContract(
+        LEARNING_CONTRACT_STATUS.inProgress,
+        LEARNING_CONTRACT_STATUS.paused,
+      ),
+      true,
+    );
+    assert.equal(
+      canTransitionContract(
+        LEARNING_CONTRACT_STATUS.inProgress,
+        LEARNING_CONTRACT_STATUS.completionPending,
+      ),
+      true,
+    );
+    assert.equal(
+      canTransitionContract(
+        LEARNING_CONTRACT_STATUS.paused,
+        LEARNING_CONTRACT_STATUS.inProgress,
+      ),
+      true,
+    );
+    assert.equal(
+      canTransitionContract(
+        LEARNING_CONTRACT_STATUS.completionPending,
+        LEARNING_CONTRACT_STATUS.completed,
+      ),
+      true,
+    );
+    assert.equal(
       canTransitionMilestone(MILESTONE_STATUS.rejected, MILESTONE_STATUS.submitted),
       true,
     );

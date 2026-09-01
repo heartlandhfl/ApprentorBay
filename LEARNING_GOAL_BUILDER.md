@@ -4,7 +4,7 @@
 **Machine:** `shared/learningContractMachine.ts` (`reduceContract`)  
 **Entry:** learner starts from an **ACTIVE** mentorship relationship (`POST /api/contracts`)
 
-This is not a second contract system and not a standalone form. It is the negotiation workflow that writes the existing learning contract document. Milestone work (`in_progress` → `completed`) still uses the same machine after the contract is ACTIVE.
+This is not a second contract system and not a standalone form. It is the negotiation workflow that writes the existing learning contract document. After the contract is ACTIVE, the same machine runs the Learning Contract Workspace (`in_progress` → `paused` / `completion_pending` → `completed`).
 
 ---
 
@@ -31,6 +31,7 @@ DRAFT
   → REVISION_REQUESTED  (optional loop)
   → MUTUALLY_APPROVED
   → ACTIVE (`in_progress`)
+  → COMPLETION_PENDING (last milestone approved)
   → COMPLETED
 
 Terminal exits: REJECTED (mentor) · CANCELLED (either member before mutual approval)
@@ -59,6 +60,8 @@ Arbitrary status writes are impossible. Every transition checks current state, a
 | `revision_requested` | REVISION_REQUESTED |
 | `mutually_approved` | MUTUALLY_APPROVED |
 | `in_progress` | **ACTIVE** |
+| `paused` | PAUSED |
+| `completion_pending` | COMPLETION_PENDING |
 | `rejected` | REJECTED |
 | `cancelled` | CANCELLED |
 | `completed` | COMPLETED |
@@ -98,7 +101,7 @@ Goal text revisions still also append to `goalHistory`.
 
 ## UI
 
-`/dashboard/journey/:relationshipId` is the builder.
+`/dashboard/journey/:relationshipId` is the builder until the contract is mutually approved. After that, the same URL is the **Learning Contract Workspace** (see `LEARNING_CONTRACT_WORKSPACE.md`).
 
 Always visible:
 

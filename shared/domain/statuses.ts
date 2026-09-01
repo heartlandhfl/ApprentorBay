@@ -47,6 +47,8 @@ export const LEARNING_CONTRACT_STATUS = {
    * documents and the milestone machine stay valid. UI label is ACTIVE.
    */
   inProgress: 'in_progress',
+  paused: 'paused',
+  completionPending: 'completion_pending',
   rejected: 'rejected',
   cancelled: 'cancelled',
   completed: 'completed',
@@ -66,6 +68,8 @@ export const LEARNING_CONTRACT_STATUS_LABEL: Record<LearningContractStatus, stri
   [LEARNING_CONTRACT_STATUS.mutuallyApproved]: 'MUTUALLY_APPROVED',
   [LEARNING_CONTRACT_STATUS.agreed]: 'MUTUALLY_APPROVED',
   [LEARNING_CONTRACT_STATUS.inProgress]: 'ACTIVE',
+  [LEARNING_CONTRACT_STATUS.paused]: 'PAUSED',
+  [LEARNING_CONTRACT_STATUS.completionPending]: 'COMPLETION_PENDING',
   [LEARNING_CONTRACT_STATUS.rejected]: 'REJECTED',
   [LEARNING_CONTRACT_STATUS.cancelled]: 'CANCELLED',
   [LEARNING_CONTRACT_STATUS.completed]: 'COMPLETED',
@@ -167,6 +171,18 @@ export function isLearnerReviewStatus(status: LearningContractStatus): boolean {
 
 export function isContractActiveStatus(status: LearningContractStatus): boolean {
   return status === LEARNING_CONTRACT_STATUS.inProgress;
+}
+
+/** Mutually approved (or later) — the operational contract workspace. */
+export function isOperationalContractStatus(status: LearningContractStatus): boolean {
+  return (
+    status === LEARNING_CONTRACT_STATUS.mutuallyApproved ||
+    status === LEARNING_CONTRACT_STATUS.agreed ||
+    status === LEARNING_CONTRACT_STATUS.inProgress ||
+    status === LEARNING_CONTRACT_STATUS.paused ||
+    status === LEARNING_CONTRACT_STATUS.completionPending ||
+    status === LEARNING_CONTRACT_STATUS.completed
+  );
 }
 
 export function isNegotiationOpen(status: LearningContractStatus): boolean {

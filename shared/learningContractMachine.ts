@@ -70,6 +70,10 @@ export type ContractAction =
   | { type: 'APPROVE_PLAN'; now: IsoNow }
   | { type: 'REQUEST_CHANGES'; reason: string; now: IsoNow }
   | { type: 'ACTIVATE'; now: IsoNow }
+  | { type: 'PAUSE_CONTRACT'; now: IsoNow }
+  | { type: 'RESUME_CONTRACT'; now: IsoNow }
+  | { type: 'CONFIRM_COMPLETION'; now: IsoNow }
+  | { type: 'REOPEN_COMPLETION'; now: IsoNow }
   | { type: 'REJECT_PROPOSAL'; reason: string; now: IsoNow }
   | { type: 'CANCEL'; reason?: string; now: IsoNow }
   | { type: 'SUBMIT_EVIDENCE'; text: string; link: string; now: IsoNow }
@@ -133,8 +137,18 @@ export function journeyStepIndex(status: LearningContractStatus): number {
   ) {
     return 3;
   }
-  if (status === LEARNING_CONTRACT_STATUS.inProgress) return 4;
-  if (status === LEARNING_CONTRACT_STATUS.completed) return 5;
+  if (
+    status === LEARNING_CONTRACT_STATUS.inProgress ||
+    status === LEARNING_CONTRACT_STATUS.paused
+  ) {
+    return 4;
+  }
+  if (
+    status === LEARNING_CONTRACT_STATUS.completionPending ||
+    status === LEARNING_CONTRACT_STATUS.completed
+  ) {
+    return 5;
+  }
   return 1;
 }
 
@@ -198,6 +212,14 @@ export function reduceContract(
       return requestChanges(current, action, actor);
     case 'ACTIVATE':
       return activateContract(current, action, actor);
+    case 'PAUSE_CONTRACT':
+      return pauseContract(current, action, actor);
+    case 'RESUME_CONTRACT':
+      return resumeContract(current, action, actor);
+    case 'CONFIRM_COMPLETION':
+      return confirmCompletion(current, action, actor);
+    case 'REOPEN_COMPLETION':
+      return reopenCompletion(current, action, actor);
     case 'REJECT_PROPOSAL':
       return rejectProposal(current, action, actor);
     case 'CANCEL':
@@ -216,14 +238,9 @@ export function availableActions(
   actor: ContractActor,
 ): ContractActionType[] {
   const current = normalizeContract(contract);
+  const workspace = workspaceActions(current, actor);
   if (!isStepActor(current, actor)) {
-    if (
-      current.status === LEARNING_CONTRACT_STATUS.mutuallyApproved &&
-      isPairingActor(current, actor)
-    ) {
-      return ['ACTIVATE'];
-    }
-    return [];
+    return workspace;
   }
 
   switch (current.status) {
@@ -239,25 +256,54 @@ export function availableActions(
     case LEARNING_CONTRACT_STATUS.mutuallyApproved:
     case LEARNING_CONTRACT_STATUS.agreed:
       return ['ACTIVATE'];
-    case LEARNING_CONTRACT_STATUS.inProgress:
+    case LEARNING_CONTRACT_STATUS.inProgress: {
+      const actions: ContractActionType[] = [...workspace];
       if (
         actor.role === USER_ROLE.learner &&
         actionableMilestone(current, [MILESTONE_STATUS.active, MILESTONE_STATUS.rejected])
       ) {
-        return ['SUBMIT_EVIDENCE'];
+        actions.push('SUBMIT_EVIDENCE');
       }
       if (
         actor.role === USER_ROLE.mentor &&
         actionableMilestone(current, [MILESTONE_STATUS.submitted])
       ) {
-        return ['APPROVE_MILESTONE', 'REJECT_MILESTONE'];
+        actions.push('APPROVE_MILESTONE', 'REJECT_MILESTONE');
       }
-      return [];
+      return actions;
+    }
+    case LEARNING_CONTRACT_STATUS.paused:
+    case LEARNING_CONTRACT_STATUS.completionPending:
+      return workspace;
     case LEARNING_CONTRACT_STATUS.rejected:
     case LEARNING_CONTRACT_STATUS.cancelled:
     case LEARNING_CONTRACT_STATUS.completed:
       return [];
   }
+}
+
+function workspaceActions(
+  contract: LearningContract,
+  actor: ContractActor,
+): ContractActionType[] {
+  if (!isPairingActor(contract, actor) && actor.role !== USER_ROLE.admin) return [];
+  if (
+    (contract.status === LEARNING_CONTRACT_STATUS.mutuallyApproved ||
+      contract.status === LEARNING_CONTRACT_STATUS.agreed) &&
+    isPairingActor(contract, actor)
+  ) {
+    return ['ACTIVATE'];
+  }
+  if (contract.status === LEARNING_CONTRACT_STATUS.inProgress) {
+    return ['PAUSE_CONTRACT', 'CANCEL'];
+  }
+  if (contract.status === LEARNING_CONTRACT_STATUS.paused) {
+    return ['RESUME_CONTRACT', 'CANCEL'];
+  }
+  if (contract.status === LEARNING_CONTRACT_STATUS.completionPending) {
+    return ['CONFIRM_COMPLETION', 'REOPEN_COMPLETION'];
+  }
+  return [];
 }
 
 export function isStepActor(contract: LearningContract, actor: ContractActor): boolean {
@@ -288,6 +334,7 @@ function ok(contract: LearningContract, effects: ContractEffect[] = []): ReduceR
 }
 
 function isPairingActor(contract: LearningContract, actor: ContractActor): boolean {
+  if (actor.role === USER_ROLE.admin) return true;
   if (actor.role === USER_ROLE.learner) return actor.uid === contract.learnerId;
   if (actor.role === USER_ROLE.mentor) return actor.uid === contract.mentorId;
   return false;
@@ -655,6 +702,136 @@ function activateContract(
   });
 }
 
+function pauseContract(
+  contract: LearningContract,
+  action: Extract<ContractAction, { type: 'PAUSE_CONTRACT' }>,
+  actor: ContractActor,
+): ReduceResult {
+  if (contract.status !== LEARNING_CONTRACT_STATUS.inProgress) {
+    return fail('Only an ACTIVE contract can be paused');
+  }
+  if (!isPairingActor(contract, actor)) {
+    return fail('You cannot act on this step');
+  }
+  const blocked = moveTo(contract, LEARNING_CONTRACT_STATUS.paused);
+  if (blocked) return blocked;
+  return ok({
+    ...contract,
+    status: LEARNING_CONTRACT_STATUS.paused,
+    updatedAt: action.now,
+    revisionHistory: appendRevision(contract, {
+      actor,
+      action: 'PAUSED',
+      now: action.now,
+      summary: 'The contract was paused. Evidence work is locked until resume.',
+    }),
+  });
+}
+
+function resumeContract(
+  contract: LearningContract,
+  action: Extract<ContractAction, { type: 'RESUME_CONTRACT' }>,
+  actor: ContractActor,
+): ReduceResult {
+  if (contract.status !== LEARNING_CONTRACT_STATUS.paused) {
+    return fail('Only a paused contract can be resumed');
+  }
+  if (!isPairingActor(contract, actor)) {
+    return fail('You cannot act on this step');
+  }
+  const blocked = moveTo(contract, LEARNING_CONTRACT_STATUS.inProgress);
+  if (blocked) return blocked;
+  return ok({
+    ...contract,
+    status: LEARNING_CONTRACT_STATUS.inProgress,
+    updatedAt: action.now,
+    revisionHistory: appendRevision(contract, {
+      actor,
+      action: 'RESUMED',
+      now: action.now,
+      summary: 'The contract is ACTIVE again.',
+    }),
+  });
+}
+
+function confirmCompletion(
+  contract: LearningContract,
+  action: Extract<ContractAction, { type: 'CONFIRM_COMPLETION' }>,
+  actor: ContractActor,
+): ReduceResult {
+  if (contract.status !== LEARNING_CONTRACT_STATUS.completionPending) {
+    return fail('Completion can only be confirmed when it is pending');
+  }
+  if (!isPairingActor(contract, actor)) {
+    return fail('You cannot act on this step');
+  }
+  const blocked = moveTo(contract, LEARNING_CONTRACT_STATUS.completed);
+  if (blocked) return blocked;
+
+  const last = [...contract.milestones].sort((a, b) => a.order - b.order).at(-1);
+  const deliverable: Deliverable | null = contract.deliverable
+    ? {
+        ...contract.deliverable,
+        status: DELIVERABLE_STATUS.completed,
+        finalEvidenceUrl: last?.evidenceLink || last?.evidenceText || contract.deliverable.finalEvidenceUrl,
+      }
+    : contract.deliverable;
+
+  return ok(
+    {
+      ...contract,
+      status: LEARNING_CONTRACT_STATUS.completed,
+      currentStepOwner: STEP_OWNER.mentor,
+      updatedAt: action.now,
+      deliverable,
+      revisionHistory: appendRevision(contract, {
+        actor,
+        action: 'COMPLETED',
+        now: action.now,
+        summary: 'Completion confirmed. The deliverable is published on both profiles.',
+      }),
+    },
+    [{ type: 'publish_deliverable_refs' }],
+  );
+}
+
+function reopenCompletion(
+  contract: LearningContract,
+  action: Extract<ContractAction, { type: 'REOPEN_COMPLETION' }>,
+  actor: ContractActor,
+): ReduceResult {
+  if (contract.status !== LEARNING_CONTRACT_STATUS.completionPending) {
+    return fail('Only a pending completion can be reopened');
+  }
+  if (!isPairingActor(contract, actor)) {
+    return fail('You cannot act on this step');
+  }
+  const blocked = moveTo(contract, LEARNING_CONTRACT_STATUS.inProgress);
+  if (blocked) return blocked;
+
+  const ordered = [...contract.milestones].sort((a, b) => a.order - b.order);
+  const last = ordered.at(-1);
+  const milestones = contract.milestones.map((item) =>
+    last && item.id === last.id
+      ? { ...item, status: MILESTONE_STATUS.active }
+      : item,
+  );
+
+  return ok({
+    ...contract,
+    status: LEARNING_CONTRACT_STATUS.inProgress,
+    currentStepOwner: STEP_OWNER.learner,
+    updatedAt: action.now,
+    milestones,
+    revisionHistory: appendRevision(contract, {
+      actor,
+      action: 'REOPENED',
+      now: action.now,
+      summary: 'Completion was reopened. The last milestone is active again.',
+    }),
+  });
+}
+
 function rejectProposal(
   contract: LearningContract,
   action: Extract<ContractAction, { type: 'REJECT_PROPOSAL' }>,
@@ -700,6 +877,8 @@ function cancelContract(
     LEARNING_CONTRACT_STATUS.proposedByMentor,
     LEARNING_CONTRACT_STATUS.underLearnerReview,
     LEARNING_CONTRACT_STATUS.revisionRequested,
+    LEARNING_CONTRACT_STATUS.inProgress,
+    LEARNING_CONTRACT_STATUS.paused,
   ];
   if (!cancellable.includes(contract.status)) {
     return fail('This contract can no longer be cancelled');
@@ -720,7 +899,11 @@ function cancelContract(
       action: 'CANCELLED',
       now: action.now,
       comment: action.reason,
-      summary: `${actor.role} cancelled the Learning Goal Builder.`,
+      summary:
+        contract.status === LEARNING_CONTRACT_STATUS.inProgress ||
+        contract.status === LEARNING_CONTRACT_STATUS.paused
+          ? `${actor.role} cancelled the learning contract.`
+          : `${actor.role} cancelled the Learning Goal Builder.`,
     }),
   });
 }
@@ -788,31 +971,22 @@ function approveMilestone(
         ? { ...item, status: MILESTONE_STATUS.approved, lastFeedback: null }
         : item,
     );
-    const deliverable: Deliverable | null = contract.deliverable
-      ? {
-          ...contract.deliverable,
-          status: DELIVERABLE_STATUS.completed,
-          finalEvidenceUrl: current.evidenceLink || current.evidenceText,
-        }
-      : contract.deliverable;
+    const toPending = moveTo(contract, LEARNING_CONTRACT_STATUS.completionPending);
+    if (toPending) return toPending;
 
-    return ok(
-      {
-        ...contract,
-        status: LEARNING_CONTRACT_STATUS.completed,
-        currentStepOwner: STEP_OWNER.mentor,
-        updatedAt: action.now,
-        milestones: completedMilestones,
-        deliverable,
-        revisionHistory: appendRevision(contract, {
-          actor,
-          action: 'COMPLETED',
-          now: action.now,
-          summary: 'Mentor approved the last milestone. The contract is complete.',
-        }),
-      },
-      [{ type: 'publish_deliverable_refs' }],
-    );
+    return ok({
+      ...contract,
+      status: LEARNING_CONTRACT_STATUS.completionPending,
+      currentStepOwner: STEP_OWNER.mentor,
+      updatedAt: action.now,
+      milestones: completedMilestones,
+      revisionHistory: appendRevision(contract, {
+        actor,
+        action: 'COMPLETION_PENDING',
+        now: action.now,
+        summary: 'Mentor approved the last milestone. Completion is pending confirmation.',
+      }),
+    });
   }
 
   return ok({

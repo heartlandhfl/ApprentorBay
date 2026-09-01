@@ -99,6 +99,14 @@ export function App() {
               </RequireAuth>
             }
           />
+          <Route
+            path="/dashboard/contracts/:relationshipId"
+            element={
+              <RequireAuth>
+                <JourneyPage />
+              </RequireAuth>
+            }
+          />
           <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </TermsGate>

@@ -5,10 +5,15 @@ import {
   LEARNING_JOURNEY_STEPS,
   RELATIONSHIP_STATUS,
   USER_ROLE,
+  contractProgress,
+  contractTitle,
   isContractCompleted,
+  isContractWorkspaceView,
   journeyStepIndex,
   nextActionCopy,
   waitingOn,
+  workspaceFocus,
+  workspacePartyLabel,
   type LearningContract,
   type MentorshipRelationship,
   type User,
@@ -84,6 +89,36 @@ export function JourneyEntry({ relationship, account, otherName }: JourneyEntryP
 
   const step = LEARNING_JOURNEY_STEPS[journeyStepIndex(contract.status)];
   const owner = waitingOn(contract);
+  const workspace = isContractWorkspaceView(contract);
+
+  if (workspace) {
+    const progress = contractProgress(contract);
+    const focus = workspaceFocus(contract);
+    return (
+      <Card>
+        <Stack gap={16}>
+          <Cluster gap={12}>
+            <Text variant="h3">{contractTitle(contract)}</Text>
+            <Badge tone={isContractCompleted(contract) ? 'success' : 'accent'}>
+              {LEARNING_CONTRACT_STATUS_LABEL[contract.status]}
+            </Badge>
+          </Cluster>
+          <Text variant="small">
+            Progress {progress.percent}% · {progress.approved}/{progress.total} milestones
+            approved
+          </Text>
+          <Text variant="small">{focus.next}</Text>
+          <Text variant="small">
+            Who acts: {workspacePartyLabel(focus.who)}
+            {focus.who === 'learner' || focus.who === 'mentor'
+              ? ` (${owner === account.role ? 'you' : otherName})`
+              : null}
+          </Text>
+          <Button to={`/dashboard/journey/${relationship.id}`}>Open contract workspace</Button>
+        </Stack>
+      </Card>
+    );
+  }
 
   return (
     <Card>

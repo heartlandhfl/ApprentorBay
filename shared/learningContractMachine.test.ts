@@ -10,12 +10,20 @@ import {
   waitingOn,
   type ContractActor,
 } from './learningContractMachine.js';
+import {
+  canAccessContractWorkspace,
+  contractProgress,
+  isContractWorkspaceView,
+  normalizeContract,
+  workspaceFocus,
+} from './domain/index.js';
 import type { LearningContract } from './types.js';
 
 const now = '2026-08-30T17:00:00.000Z';
 const learner: ContractActor = { uid: 'learner-1', role: 'learner' };
 const mentor: ContractActor = { uid: 'mentor-1', role: 'mentor' };
 const stranger: ContractActor = { uid: 'other', role: 'learner' };
+const admin: ContractActor = { uid: 'admin-1', role: 'admin' };
 
 function draft(): LearningContract {
   return createDraftContract({
@@ -190,8 +198,12 @@ describe('learning contract machine', () => {
     assert.equal(activeMilestoneCount(contract), 1);
     assert.equal(contract.milestones[0]?.status, 'active');
     assert.equal(contract.milestones[1]?.status, 'locked');
-    assert.deepEqual(availableActions(contract, learner), ['SUBMIT_EVIDENCE']);
-    assert.deepEqual(availableActions(contract, mentor), []);
+    assert.deepEqual(availableActions(contract, learner), [
+      'PAUSE_CONTRACT',
+      'CANCEL',
+      'SUBMIT_EVIDENCE',
+    ]);
+    assert.deepEqual(availableActions(contract, mentor), ['PAUSE_CONTRACT', 'CANCEL']);
     assert.equal(journeyStepIndex('agreed'), 3);
     assert.equal(journeyStepIndex(contract.status), 4);
   });
@@ -210,6 +222,8 @@ describe('learning contract machine', () => {
     assert.equal(contract.milestones[0]?.status, 'submitted');
     assert.equal(contract.currentStepOwner, 'mentor');
     assert.deepEqual(availableActions(contract, mentor), [
+      'PAUSE_CONTRACT',
+      'CANCEL',
       'APPROVE_MILESTONE',
       'REJECT_MILESTONE',
     ]);
@@ -264,8 +278,18 @@ describe('learning contract machine', () => {
     assert.equal(result.ok, true);
     if (!result.ok) throw new Error(result.error);
     contract = result.contract;
-    assert.equal(contract.status, 'completed');
+    assert.equal(contract.status, 'completion_pending');
     assert.equal(contract.milestones[1]?.status, 'approved');
+    assert.deepEqual(availableActions(contract, mentor), [
+      'CONFIRM_COMPLETION',
+      'REOPEN_COMPLETION',
+    ]);
+
+    result = reduceContract(contract, { type: 'CONFIRM_COMPLETION', now }, mentor);
+    assert.equal(result.ok, true);
+    if (!result.ok) throw new Error(result.error);
+    contract = result.contract;
+    assert.equal(contract.status, 'completed');
     assert.equal(contract.deliverable?.status, 'completed');
     assert.deepEqual(result.effects, [{ type: 'publish_deliverable_refs' }]);
     assert.deepEqual(availableActions(contract, learner), []);
@@ -413,5 +437,228 @@ describe('learning goal builder', () => {
     assert.equal(rejected.contract.status, 'rejected');
     const afterReject = reduceContract(rejected.contract, { type: 'SEND_TO_LEARNER', now }, mentor);
     assert.equal(afterReject.ok, false);
+  });
+});
+
+describe('learning contract workspace', () => {
+  it('shows both pairing members the same contract and derived progress', () => {
+    const contract = inProgress();
+    assert.equal(contract.id, 'contract-1');
+    assert.equal(contract.relationshipId, 'rel-1');
+    assert.equal(canAccessContractWorkspace(learner, contract), true);
+    assert.equal(canAccessContractWorkspace(mentor, contract), true);
+    assert.equal(contractProgress(contract).percent, 0);
+    assert.equal(contractProgress({ milestones: contract.milestones }).percent, 0);
+    assert.equal('progress' in contract, false);
+    assert.equal(isContractWorkspaceView(contract), true);
+    assert.equal(workspaceFocus(contract).who, 'learner');
+  });
+
+  it('keeps unauthorized users out of the workspace', () => {
+    const contract = inProgress();
+    assert.equal(
+      canAccessContractWorkspace({ uid: 'other', role: 'learner', active: true }, contract),
+      false,
+    );
+    assert.equal(
+      canAccessContractWorkspace({ uid: 'mentor-2', role: 'mentor', active: true }, contract),
+      false,
+    );
+    assert.equal(
+      canAccessContractWorkspace({ uid: 'admin-1', role: 'admin', active: true }, contract),
+      true,
+    );
+    assert.equal(
+      canAccessContractWorkspace({ uid: 'admin-1', role: 'admin', active: false }, contract),
+      false,
+    );
+    assert.equal(reduceContract(contract, { type: 'PAUSE_CONTRACT', now }, stranger).ok, false);
+  });
+
+  it('derives progress from approved milestones and forbids skipping states', () => {
+    const contract = inProgress();
+    assert.equal(contractProgress(contract).approved, 0);
+    assert.equal(contractProgress(contract).total, 2);
+    assert.equal(contractProgress(contract).percent, 0);
+
+    let result = reduceContract(
+      contract,
+      { type: 'SUBMIT_EVIDENCE', text: 'Stock is milled', link: '', now },
+      learner,
+    );
+    assert.equal(result.ok, true);
+    if (!result.ok) throw new Error(result.error);
+    result = reduceContract(result.contract, { type: 'APPROVE_MILESTONE', now }, mentor);
+    assert.equal(result.ok, true);
+    if (!result.ok) throw new Error(result.error);
+    assert.equal(contractProgress(result.contract).percent, 50);
+    assert.equal(result.contract.status, 'in_progress');
+    assert.equal('progress' in result.contract, false);
+
+    const paused = reduceContract(result.contract, { type: 'PAUSE_CONTRACT', now }, mentor);
+    assert.equal(paused.ok, true);
+    if (!paused.ok) throw new Error(paused.error);
+    assert.equal(paused.contract.status, 'paused');
+    assert.equal(
+      reduceContract(
+        paused.contract,
+        { type: 'SUBMIT_EVIDENCE', text: 'Nope', link: '', now },
+        learner,
+      ).ok,
+      false,
+    );
+
+    const resumed = reduceContract(paused.contract, { type: 'RESUME_CONTRACT', now }, learner);
+    assert.equal(resumed.ok, true);
+    if (!resumed.ok) throw new Error(resumed.error);
+    assert.equal(resumed.contract.status, 'in_progress');
+
+    const adminPause = reduceContract(resumed.contract, { type: 'PAUSE_CONTRACT', now }, admin);
+    assert.equal(adminPause.ok, true);
+    if (!adminPause.ok) throw new Error(adminPause.error);
+    assert.equal(adminPause.contract.status, 'paused');
+  });
+
+  it('moves last-milestone approval to completion pending, then completed on confirm', () => {
+    let contract = inProgress();
+    let result = reduceContract(
+      contract,
+      { type: 'SUBMIT_EVIDENCE', text: 'Stock is milled', link: '', now },
+      learner,
+    );
+    assert.equal(result.ok, true);
+    if (!result.ok) throw new Error(result.error);
+    result = reduceContract(result.contract, { type: 'APPROVE_MILESTONE', now }, mentor);
+    assert.equal(result.ok, true);
+    if (!result.ok) throw new Error(result.error);
+    result = reduceContract(
+      result.contract,
+      { type: 'SUBMIT_EVIDENCE', text: 'Assembled', link: '', now },
+      learner,
+    );
+    assert.equal(result.ok, true);
+    if (!result.ok) throw new Error(result.error);
+    result = reduceContract(result.contract, { type: 'APPROVE_MILESTONE', now }, mentor);
+    assert.equal(result.ok, true);
+    if (!result.ok) throw new Error(result.error);
+    contract = result.contract;
+    assert.equal(contract.status, 'completion_pending');
+    assert.equal(contractProgress(contract).percent, 100);
+    assert.equal(result.effects.length, 0);
+    assert.equal(workspaceFocus(contract).who, 'either');
+
+    const reopen = reduceContract(contract, { type: 'REOPEN_COMPLETION', now }, learner);
+    assert.equal(reopen.ok, true);
+    if (!reopen.ok) throw new Error(reopen.error);
+    assert.equal(reopen.contract.status, 'in_progress');
+    assert.equal(reopen.contract.milestones[1]?.status, 'active');
+    assert.equal(contractProgress(reopen.contract).percent, 50);
+
+    result = reduceContract(
+      reopen.contract,
+      { type: 'SUBMIT_EVIDENCE', text: 'Assembled again', link: '', now },
+      learner,
+    );
+    assert.equal(result.ok, true);
+
+    result = reduceContract(contract, { type: 'CONFIRM_COMPLETION', now }, mentor);
+    assert.equal(result.ok, true);
+    if (!result.ok) throw new Error(result.error);
+    assert.equal(result.contract.status, 'completed');
+    assert.deepEqual(result.effects, [{ type: 'publish_deliverable_refs' }]);
+    assert.equal(isContractWorkspaceView(result.contract), true);
+  });
+
+  it('keeps a cancelled builder in the builder, and a cancelled active contract in the workspace', () => {
+    const builderCancel = reduceContract(filledDraft(), { type: 'CANCEL', now }, learner);
+    assert.equal(builderCancel.ok, true);
+    if (!builderCancel.ok) throw new Error(builderCancel.error);
+    assert.equal(isContractWorkspaceView(builderCancel.contract), false);
+
+    const activeCancel = reduceContract(inProgress(), { type: 'CANCEL', now }, mentor);
+    assert.equal(activeCancel.ok, true);
+    if (!activeCancel.ok) throw new Error(activeCancel.error);
+    assert.equal(activeCancel.contract.status, 'cancelled');
+    assert.equal(isContractWorkspaceView(activeCancel.contract), true);
+  });
+
+  it('keeps older in_progress documents readable after normalize', () => {
+    const legacy = normalizeContract({
+      id: 'old-1',
+      relationshipId: 'rel-1',
+      learnerId: learner.uid,
+      mentorId: mentor.uid,
+      status: 'in_progress',
+      currentStepOwner: 'learner',
+      createdAt: now,
+      updatedAt: now,
+      goal: { id: 'g1', text: 'Learn joinery', revisionOf: null },
+      goalHistory: [],
+      objectives: [{ id: 'o1', text: 'Cut square' }],
+      milestones: [
+        {
+          id: 'm1',
+          order: 0,
+          title: 'Prep',
+          description: 'Mill',
+          evidenceRequired: 'Photo',
+          status: 'approved',
+          evidenceText: 'Done',
+          evidenceLink: '',
+          lastFeedback: null,
+        },
+        {
+          id: 'm2',
+          order: 1,
+          title: 'Assemble',
+          description: 'Join',
+          evidenceRequired: 'Photo',
+          status: 'active',
+          evidenceText: '',
+          evidenceLink: '',
+          lastFeedback: null,
+        },
+      ],
+      deliverable: {
+        id: 'd1',
+        title: 'A sawhorse',
+        description: 'Square',
+        finalEvidenceUrl: '',
+        status: 'in_progress',
+      },
+      changeRequestReason: null,
+    } as never);
+    assert.equal(legacy.goal?.title, 'Learn joinery');
+    assert.equal(legacy.objectives[0]?.title, 'Cut square');
+    assert.equal(legacy.milestones[0]?.successCriteria, 'Photo');
+    assert.equal(legacy.deliverable?.expectedEvidence, '');
+    assert.equal(contractProgress(legacy).percent, 50);
+    const booleanEvidence = normalizeContract({
+      ...legacy,
+      milestones: [
+        {
+          id: 'm1',
+          order: 0,
+          title: 'Prep',
+          description: 'Mill',
+          evidenceRequired: true as never,
+          status: 'approved',
+          evidenceText: 'Done',
+          evidenceLink: '',
+          lastFeedback: null,
+        },
+      ],
+    } as never);
+    assert.equal(booleanEvidence.milestones[0]?.successCriteria, '');
+    assert.equal(booleanEvidence.milestones[0]?.evidenceRequired, '');
+    assert.equal(canAccessContractWorkspace(learner, legacy), true);
+    assert.equal(
+      canAccessContractWorkspace({ uid: 'other', role: 'learner', active: true }, legacy),
+      false,
+    );
+    assert.equal(
+      canAccessContractWorkspace({ uid: 'admin-1', role: 'admin', active: true }, legacy),
+      true,
+    );
   });
 });
