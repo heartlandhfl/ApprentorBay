@@ -87,6 +87,9 @@ function inProgress(): LearningContract {
   result = reduceContract(result.contract, { type: 'APPROVE_PLAN', now }, learner);
   assert.equal(result.ok, true);
   if (!result.ok) throw new Error(result.error);
+  result = reduceContract(result.contract, { type: 'ACTIVATE', now }, learner);
+  assert.equal(result.ok, true);
+  if (!result.ok) throw new Error(result.error);
   return result.contract;
 }
 
@@ -95,10 +98,14 @@ describe('learning contract machine', () => {
     const contract = draft();
     assert.equal(contract.status, 'draft');
     assert.equal(contract.currentStepOwner, 'learner');
-    assert.deepEqual(availableActions(contract, learner), ['SAVE_DRAFT', 'SEND_TO_MENTOR']);
+    assert.deepEqual(availableActions(contract, learner), [
+      'SAVE_DRAFT',
+      'SEND_TO_MENTOR',
+      'CANCEL',
+    ]);
     assert.deepEqual(availableActions(contract, mentor), []);
     assert.equal(journeyStepIndex(contract.status), 0);
-    assert.equal(LEARNING_JOURNEY_STEPS.length, 5);
+    assert.equal(LEARNING_JOURNEY_STEPS.length, 6);
   });
 
   it('blocks send until the learner writes a goal and deliverable', () => {
@@ -118,7 +125,7 @@ describe('learning contract machine', () => {
     const result = reduceContract(filledDraft(), { type: 'SEND_TO_MENTOR', now }, learner);
     assert.equal(result.ok, true);
     if (!result.ok) throw new Error(result.error);
-    assert.equal(result.contract.status, 'under_mentor_review');
+    assert.equal(result.contract.status, 'submitted_by_learner');
     assert.equal(waitingOn(result.contract), 'mentor');
     assert.equal(journeyStepIndex(result.contract.status), 1);
   });
@@ -171,7 +178,7 @@ describe('learning contract machine', () => {
     );
     assert.equal(changed.ok, true);
     if (!changed.ok) throw new Error(changed.error);
-    assert.equal(changed.contract.status, 'under_mentor_review');
+    assert.equal(changed.contract.status, 'revision_requested');
     assert.equal(changed.contract.currentStepOwner, 'mentor');
     assert.equal(changed.contract.changeRequestReason, 'Need a third milestone');
   });
@@ -186,7 +193,7 @@ describe('learning contract machine', () => {
     assert.deepEqual(availableActions(contract, learner), ['SUBMIT_EVIDENCE']);
     assert.deepEqual(availableActions(contract, mentor), []);
     assert.equal(journeyStepIndex('agreed'), 3);
-    assert.equal(journeyStepIndex(contract.status), 3);
+    assert.equal(journeyStepIndex(contract.status), 4);
   });
 
   it('walks two milestones through submit, reject, resubmit, approve, and complete', () => {
@@ -263,6 +270,148 @@ describe('learning contract machine', () => {
     assert.deepEqual(result.effects, [{ type: 'publish_deliverable_refs' }]);
     assert.deepEqual(availableActions(contract, learner), []);
     assert.deepEqual(availableActions(contract, mentor), []);
-    assert.equal(journeyStepIndex(contract.status), 4);
+    assert.equal(journeyStepIndex(contract.status), 5);
+  });
+});
+
+describe('learning goal builder', () => {
+  it('walks proposal, mentor revision, learner revision, mutual approval, then active', () => {
+    let contract = filledDraft();
+    let result = reduceContract(contract, { type: 'SEND_TO_MENTOR', now }, learner);
+    assert.equal(result.ok, true);
+    if (!result.ok) throw new Error(result.error);
+    contract = result.contract;
+    assert.equal(contract.status, 'submitted_by_learner');
+    assert.ok(contract.revisionHistory.some((item) => item.action === 'SUBMITTED_BY_LEARNER'));
+
+    contract = withMentorPlan(contract);
+    assert.equal(contract.status, 'under_mentor_review');
+    assert.equal(contract.goal?.title, 'Learn timber framing with safe joinery');
+    assert.equal(contract.objectives[0]?.title, 'Cut square');
+    assert.equal(contract.milestones[0]?.successCriteria, 'Photo of milled pieces');
+
+    result = reduceContract(contract, { type: 'SEND_TO_LEARNER', now }, mentor);
+    assert.equal(result.ok, true);
+    if (!result.ok) throw new Error(result.error);
+    contract = result.contract;
+    assert.equal(contract.status, 'proposed_by_mentor');
+    assert.equal(waitingOn(contract), 'learner');
+
+    result = reduceContract(
+      contract,
+      { type: 'REQUEST_CHANGES', reason: 'Need a third milestone', now },
+      learner,
+    );
+    assert.equal(result.ok, true);
+    if (!result.ok) throw new Error(result.error);
+    contract = result.contract;
+    assert.equal(contract.status, 'revision_requested');
+
+    const revised = reduceContract(
+      contract,
+      {
+        type: 'SAVE_MENTOR_REVIEW',
+        goalText: 'Learn timber framing with safe joinery',
+        objectives: [
+          { title: 'Cut square', description: 'Square stock' },
+          { title: 'Assemble without racking', description: 'Brace the frame' },
+          { title: 'Finish', description: 'Sand and oil' },
+        ],
+        milestones: [
+          {
+            title: 'Stock prep',
+            description: 'Select and mill the stock',
+            successCriteria: 'Photo of milled pieces',
+          },
+          {
+            title: 'Assembly',
+            description: 'Join and square the frame',
+            successCriteria: 'Photo plus a short note',
+          },
+          {
+            title: 'Finish',
+            description: 'Sand and oil',
+            successCriteria: 'Photo of the finished horse',
+          },
+        ],
+        deliverableTitle: 'A sawhorse',
+        deliverableDescription: 'A square sawhorse that holds 80kg',
+        expectedEvidence: 'Photos of the finished horse under load',
+        comment: 'Added a finish milestone',
+        now,
+      },
+      mentor,
+    );
+    assert.equal(revised.ok, true);
+    if (!revised.ok) throw new Error(revised.error);
+    contract = revised.contract;
+    assert.equal(contract.objectives.length, 3);
+    assert.equal(contract.mentorComment, 'Added a finish milestone');
+
+    result = reduceContract(contract, { type: 'SEND_TO_LEARNER', now }, mentor);
+    assert.equal(result.ok, true);
+    if (!result.ok) throw new Error(result.error);
+    contract = result.contract;
+
+    result = reduceContract(contract, { type: 'APPROVE_PLAN', now }, learner);
+    assert.equal(result.ok, true);
+    if (!result.ok) throw new Error(result.error);
+    contract = result.contract;
+    assert.equal(contract.status, 'mutually_approved');
+    assert.equal(contract.milestones.every((item) => item.status === 'locked'), true);
+
+    const tooSoon = reduceContract(
+      filledDraft(),
+      { type: 'ACTIVATE', now },
+      learner,
+    );
+    assert.equal(tooSoon.ok, false);
+
+    result = reduceContract(contract, { type: 'ACTIVATE', now }, learner);
+    assert.equal(result.ok, true);
+    if (!result.ok) throw new Error(result.error);
+    contract = result.contract;
+    assert.equal(contract.status, 'in_progress');
+    assert.equal(contract.milestones[0]?.status, 'active');
+    assert.ok(contract.revisionHistory.some((item) => item.action === 'MUTUALLY_APPROVED'));
+    assert.ok(contract.revisionHistory.some((item) => item.action === 'ACTIVATED'));
+    assert.ok(contract.revisionHistory.every((item) => item.actorId && item.timestamp));
+  });
+
+  it('rejects unauthorized actors and illegal transitions', () => {
+    const submitted = reduceContract(filledDraft(), { type: 'SEND_TO_MENTOR', now }, learner);
+    assert.equal(submitted.ok, true);
+    if (!submitted.ok) throw new Error(submitted.error);
+
+    const strangerAct = reduceContract(
+      submitted.contract,
+      { type: 'SAVE_MENTOR_REVIEW', goalText: 'x', objectives: [], milestones: [], deliverableTitle: 't', deliverableDescription: 'd', now },
+      stranger,
+    );
+    assert.equal(strangerAct.ok, false);
+
+    const learnerAsMentor = reduceContract(
+      submitted.contract,
+      { type: 'REJECT_PROPOSAL', reason: 'No', now },
+      learner,
+    );
+    assert.equal(learnerAsMentor.ok, false);
+
+    const skipToActive = reduceContract(submitted.contract, { type: 'ACTIVATE', now }, mentor);
+    assert.equal(skipToActive.ok, false);
+
+    const approveEarly = reduceContract(submitted.contract, { type: 'APPROVE_PLAN', now }, learner);
+    assert.equal(approveEarly.ok, false);
+
+    const rejected = reduceContract(
+      submitted.contract,
+      { type: 'REJECT_PROPOSAL', reason: 'Not a fit for this pairing', now },
+      mentor,
+    );
+    assert.equal(rejected.ok, true);
+    if (!rejected.ok) throw new Error(rejected.error);
+    assert.equal(rejected.contract.status, 'rejected');
+    const afterReject = reduceContract(rejected.contract, { type: 'SEND_TO_LEARNER', now }, mentor);
+    assert.equal(afterReject.ok, false);
   });
 });

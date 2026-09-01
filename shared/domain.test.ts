@@ -85,17 +85,31 @@ describe('domain transitions', () => {
     );
   });
 
-  it('documents the live contract path and the unused agreed status', () => {
+  it('documents the Learning Goal Builder path and forbids skipping mutual approval', () => {
     assert.equal(
       canTransitionContract(
         LEARNING_CONTRACT_STATUS.draft,
-        LEARNING_CONTRACT_STATUS.underMentorReview,
+        LEARNING_CONTRACT_STATUS.submittedByLearner,
       ),
       true,
     );
     assert.equal(
       canTransitionContract(
         LEARNING_CONTRACT_STATUS.underLearnerReview,
+        LEARNING_CONTRACT_STATUS.inProgress,
+      ),
+      false,
+    );
+    assert.equal(
+      canTransitionContract(
+        LEARNING_CONTRACT_STATUS.proposedByMentor,
+        LEARNING_CONTRACT_STATUS.mutuallyApproved,
+      ),
+      true,
+    );
+    assert.equal(
+      canTransitionContract(
+        LEARNING_CONTRACT_STATUS.mutuallyApproved,
         LEARNING_CONTRACT_STATUS.inProgress,
       ),
       true,

@@ -52,18 +52,47 @@ export const VERIFICATION_TRANSITIONS: TransitionMap<VerificationStatus> = {
 };
 
 /**
- * Contract statuses the machine actually writes.
- * `agreed` is in the persisted union but is never entered.
+ * Learning Goal Builder + journey path.
+ * A contract cannot enter `in_progress` (ACTIVE) except from mutual approval.
  */
 export const LEARNING_CONTRACT_TRANSITIONS: TransitionMap<LearningContractStatus> = {
-  [LEARNING_CONTRACT_STATUS.draft]: [LEARNING_CONTRACT_STATUS.underMentorReview],
-  [LEARNING_CONTRACT_STATUS.underMentorReview]: [LEARNING_CONTRACT_STATUS.underLearnerReview],
-  [LEARNING_CONTRACT_STATUS.underLearnerReview]: [
-    LEARNING_CONTRACT_STATUS.underMentorReview,
-    LEARNING_CONTRACT_STATUS.inProgress,
+  [LEARNING_CONTRACT_STATUS.draft]: [
+    LEARNING_CONTRACT_STATUS.submittedByLearner,
+    LEARNING_CONTRACT_STATUS.cancelled,
   ],
+  [LEARNING_CONTRACT_STATUS.submittedByLearner]: [
+    LEARNING_CONTRACT_STATUS.underMentorReview,
+    LEARNING_CONTRACT_STATUS.proposedByMentor,
+    LEARNING_CONTRACT_STATUS.rejected,
+    LEARNING_CONTRACT_STATUS.cancelled,
+  ],
+  [LEARNING_CONTRACT_STATUS.underMentorReview]: [
+    LEARNING_CONTRACT_STATUS.proposedByMentor,
+    LEARNING_CONTRACT_STATUS.rejected,
+    LEARNING_CONTRACT_STATUS.cancelled,
+  ],
+  [LEARNING_CONTRACT_STATUS.proposedByMentor]: [
+    LEARNING_CONTRACT_STATUS.underLearnerReview,
+    LEARNING_CONTRACT_STATUS.revisionRequested,
+    LEARNING_CONTRACT_STATUS.mutuallyApproved,
+    LEARNING_CONTRACT_STATUS.cancelled,
+  ],
+  [LEARNING_CONTRACT_STATUS.underLearnerReview]: [
+    LEARNING_CONTRACT_STATUS.revisionRequested,
+    LEARNING_CONTRACT_STATUS.mutuallyApproved,
+    LEARNING_CONTRACT_STATUS.cancelled,
+  ],
+  [LEARNING_CONTRACT_STATUS.revisionRequested]: [
+    LEARNING_CONTRACT_STATUS.underMentorReview,
+    LEARNING_CONTRACT_STATUS.proposedByMentor,
+    LEARNING_CONTRACT_STATUS.rejected,
+    LEARNING_CONTRACT_STATUS.cancelled,
+  ],
+  [LEARNING_CONTRACT_STATUS.mutuallyApproved]: [LEARNING_CONTRACT_STATUS.inProgress],
   [LEARNING_CONTRACT_STATUS.agreed]: [LEARNING_CONTRACT_STATUS.inProgress],
   [LEARNING_CONTRACT_STATUS.inProgress]: [LEARNING_CONTRACT_STATUS.completed],
+  [LEARNING_CONTRACT_STATUS.rejected]: [],
+  [LEARNING_CONTRACT_STATUS.cancelled]: [],
   [LEARNING_CONTRACT_STATUS.completed]: [],
 };
 

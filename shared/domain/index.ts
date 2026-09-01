@@ -17,6 +17,7 @@ export {
   APPLICATION_STATUS,
   DELIVERABLE_STATUS,
   LEARNING_CONTRACT_STATUS,
+  LEARNING_CONTRACT_STATUS_LABEL,
   LEGACY_MENTORSHIP_STATUS,
   MILESTONE_STATUS,
   NOTIFICATION_STATUS,
@@ -24,9 +25,13 @@ export {
   STEP_OWNER,
   VERIFICATION_STATUS,
   isApplicationStatus,
+  isContractActiveStatus,
   isDeliverableStatus,
+  isLearnerReviewStatus,
   isLearningContractStatus,
+  isMentorReviewStatus,
   isMilestoneStatus,
+  isNegotiationOpen,
   isRelationshipStatus,
   isStepOwner,
   isVerificationStatus,
@@ -108,13 +113,28 @@ export { isCompletedDeliverable } from './deliverables.js';
 export type { Deliverable, DeliverableRef } from './deliverables.js';
 
 export {
+  combineGoalText,
+  firstLine,
   isContractCompleted,
   isContractInProgress,
   isLearnerStep,
   isMentorStep,
   learningGoalBuilderFromContract,
+  nextActionCopy,
+  normalizeContract,
+  normalizeDeliverable,
+  normalizeGoal,
+  normalizeMilestone,
+  normalizeObjective,
+  restLines,
 } from './learningContracts.js';
-export type { Goal, LearningContract, LearningGoalBuilder, Objective } from './learningContracts.js';
+export type {
+  ContractRevision,
+  Goal,
+  LearningContract,
+  LearningGoalBuilder,
+  Objective,
+} from './learningContracts.js';
 
 export { SHOWCASE_SOURCE, showcaseFromDeliverableRef, showcasesFromProfile } from './showcases.js';
 export type { ShowcaseItem, ShowcaseSource } from './showcases.js';

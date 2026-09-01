@@ -7,6 +7,8 @@ export interface Milestone {
   title: string;
   description: string;
   evidenceRequired: string;
+  /** Alias of evidenceRequired for the Learning Goal Builder. */
+  successCriteria: string;
   status: MilestoneStatus;
   evidenceText: string;
   evidenceLink: string;

@@ -1,5 +1,5 @@
 import { collection, limit, onSnapshot, query, where } from 'firebase/firestore';
-import { COLLECTIONS, type LearningContract } from '@apprentorbay/shared';
+import { COLLECTIONS, normalizeContract, type LearningContract } from '@apprentorbay/shared';
 import { getFirebaseDb } from '../../lib/firebase';
 
 export function watchContractForRelationship(
@@ -21,7 +21,7 @@ export function watchContractForRelationship(
     ),
     (snap) => {
       const doc = snap.docs[0];
-      onNext(doc ? (doc.data() as LearningContract) : null);
+      onNext(doc ? normalizeContract(doc.data() as LearningContract) : null);
     },
     (error) => onError?.(error),
   );

@@ -34,16 +34,42 @@ export type RelationshipStatus =
 
 export const LEARNING_CONTRACT_STATUS = {
   draft: 'draft',
+  submittedByLearner: 'submitted_by_learner',
   underMentorReview: 'under_mentor_review',
+  proposedByMentor: 'proposed_by_mentor',
   underLearnerReview: 'under_learner_review',
+  revisionRequested: 'revision_requested',
+  mutuallyApproved: 'mutually_approved',
   /** Persisted in the type union; the current machine never writes this value. */
   agreed: 'agreed',
+  /**
+   * Active contract (work underway). Persisted as `in_progress` so existing
+   * documents and the milestone machine stay valid. UI label is ACTIVE.
+   */
   inProgress: 'in_progress',
+  rejected: 'rejected',
+  cancelled: 'cancelled',
   completed: 'completed',
 } as const;
 
 export type LearningContractStatus =
   (typeof LEARNING_CONTRACT_STATUS)[keyof typeof LEARNING_CONTRACT_STATUS];
+
+/** Uppercase LGB / journey labels. Persisted values stay snake_case. */
+export const LEARNING_CONTRACT_STATUS_LABEL: Record<LearningContractStatus, string> = {
+  [LEARNING_CONTRACT_STATUS.draft]: 'DRAFT',
+  [LEARNING_CONTRACT_STATUS.submittedByLearner]: 'SUBMITTED_BY_LEARNER',
+  [LEARNING_CONTRACT_STATUS.underMentorReview]: 'UNDER_MENTOR_REVIEW',
+  [LEARNING_CONTRACT_STATUS.proposedByMentor]: 'PROPOSED_BY_MENTOR',
+  [LEARNING_CONTRACT_STATUS.underLearnerReview]: 'UNDER_LEARNER_REVIEW',
+  [LEARNING_CONTRACT_STATUS.revisionRequested]: 'REVISION_REQUESTED',
+  [LEARNING_CONTRACT_STATUS.mutuallyApproved]: 'MUTUALLY_APPROVED',
+  [LEARNING_CONTRACT_STATUS.agreed]: 'MUTUALLY_APPROVED',
+  [LEARNING_CONTRACT_STATUS.inProgress]: 'ACTIVE',
+  [LEARNING_CONTRACT_STATUS.rejected]: 'REJECTED',
+  [LEARNING_CONTRACT_STATUS.cancelled]: 'CANCELLED',
+  [LEARNING_CONTRACT_STATUS.completed]: 'COMPLETED',
+};
 
 export const STEP_OWNER = {
   learner: 'learner',
@@ -121,13 +147,34 @@ export function isRelationshipStatus(value: unknown): value is RelationshipStatu
 }
 
 export function isLearningContractStatus(value: unknown): value is LearningContractStatus {
+  return Object.values(LEARNING_CONTRACT_STATUS).includes(value as LearningContractStatus);
+}
+
+export function isMentorReviewStatus(status: LearningContractStatus): boolean {
   return (
-    value === LEARNING_CONTRACT_STATUS.draft ||
-    value === LEARNING_CONTRACT_STATUS.underMentorReview ||
-    value === LEARNING_CONTRACT_STATUS.underLearnerReview ||
-    value === LEARNING_CONTRACT_STATUS.agreed ||
-    value === LEARNING_CONTRACT_STATUS.inProgress ||
-    value === LEARNING_CONTRACT_STATUS.completed
+    status === LEARNING_CONTRACT_STATUS.submittedByLearner ||
+    status === LEARNING_CONTRACT_STATUS.underMentorReview ||
+    status === LEARNING_CONTRACT_STATUS.revisionRequested
+  );
+}
+
+export function isLearnerReviewStatus(status: LearningContractStatus): boolean {
+  return (
+    status === LEARNING_CONTRACT_STATUS.proposedByMentor ||
+    status === LEARNING_CONTRACT_STATUS.underLearnerReview
+  );
+}
+
+export function isContractActiveStatus(status: LearningContractStatus): boolean {
+  return status === LEARNING_CONTRACT_STATUS.inProgress;
+}
+
+export function isNegotiationOpen(status: LearningContractStatus): boolean {
+  return (
+    status === LEARNING_CONTRACT_STATUS.draft ||
+    isMentorReviewStatus(status) ||
+    isLearnerReviewStatus(status) ||
+    status === LEARNING_CONTRACT_STATUS.mutuallyApproved
   );
 }
 
