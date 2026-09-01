@@ -5,19 +5,27 @@ import {
   STEP_OWNER,
   USER_ROLE,
   canTransitionContract,
+  canTransitionMilestone,
   combineGoalText,
+  EVIDENCE_TYPE,
   isLearnerReviewStatus,
   isMentorReviewStatus,
+  latestMilestoneProjection,
+  nextBeginWorkMilestone,
   normalizeContract,
   normalizeDeliverable,
+  normalizeEvidenceItem,
   normalizeGoal,
   normalizeMilestone,
   normalizeObjective,
   restLines,
   firstLine,
   validateChangeRequestReason,
+  validateEvidenceDrafts,
   validateGoalDraft,
   validateMentorPlan,
+  type EvidenceDraft,
+  type EvidenceItem,
 } from './domain/index.js';
 import type {
   ContractRevision,
@@ -76,9 +84,19 @@ export type ContractAction =
   | { type: 'REOPEN_COMPLETION'; now: IsoNow }
   | { type: 'REJECT_PROPOSAL'; reason: string; now: IsoNow }
   | { type: 'CANCEL'; reason?: string; now: IsoNow }
-  | { type: 'SUBMIT_EVIDENCE'; text: string; link: string; now: IsoNow }
+  | {
+      type: 'SUBMIT_EVIDENCE';
+      text?: string;
+      link?: string;
+      items?: EvidenceDraft[];
+      now: IsoNow;
+    }
+  | { type: 'BEGIN_WORK'; now: IsoNow }
+  | { type: 'START_REVIEW'; now: IsoNow }
   | { type: 'APPROVE_MILESTONE'; now: IsoNow }
-  | { type: 'REJECT_MILESTONE'; feedback: string; now: IsoNow };
+  | { type: 'REQUEST_REVISION'; feedback: string; now: IsoNow }
+  | { type: 'REJECT_MILESTONE'; feedback: string; now: IsoNow }
+  | { type: 'DECLINE_MILESTONE'; feedback: string; now: IsoNow };
 
 export type ContractActionType = ContractAction['type'];
 
@@ -188,6 +206,7 @@ export function createDraftContract(input: {
         summary: 'Learner opened the Learning Goal Builder.',
       },
     ],
+    evidenceItems: [],
   };
 }
 
@@ -226,10 +245,17 @@ export function reduceContract(
       return cancelContract(current, action, actor);
     case 'SUBMIT_EVIDENCE':
       return submitEvidence(current, action, actor);
+    case 'BEGIN_WORK':
+      return beginWork(current, action, actor);
+    case 'START_REVIEW':
+      return startReview(current, action, actor);
     case 'APPROVE_MILESTONE':
       return approveMilestone(current, action, actor);
+    case 'REQUEST_REVISION':
     case 'REJECT_MILESTONE':
-      return rejectMilestone(current, action, actor);
+      return requestRevision(current, action, actor);
+    case 'DECLINE_MILESTONE':
+      return declineMilestone(current, action, actor);
   }
 }
 
@@ -258,6 +284,9 @@ export function availableActions(
       return ['ACTIVATE'];
     case LEARNING_CONTRACT_STATUS.inProgress: {
       const actions: ContractActionType[] = [...workspace];
+      if (actor.role === USER_ROLE.learner && nextBeginWorkMilestone(current.milestones)) {
+        actions.push('BEGIN_WORK');
+      }
       if (
         actor.role === USER_ROLE.learner &&
         actionableMilestone(current, [MILESTONE_STATUS.active, MILESTONE_STATUS.rejected])
@@ -268,7 +297,13 @@ export function availableActions(
         actor.role === USER_ROLE.mentor &&
         actionableMilestone(current, [MILESTONE_STATUS.submitted])
       ) {
-        actions.push('APPROVE_MILESTONE', 'REJECT_MILESTONE');
+        actions.push('START_REVIEW', 'APPROVE_MILESTONE', 'REQUEST_REVISION', 'REJECT_MILESTONE', 'DECLINE_MILESTONE');
+      }
+      if (
+        actor.role === USER_ROLE.mentor &&
+        actionableMilestone(current, [MILESTONE_STATUS.underReview])
+      ) {
+        actions.push('APPROVE_MILESTONE', 'REQUEST_REVISION', 'REJECT_MILESTONE', 'DECLINE_MILESTONE');
       }
       return actions;
     }
@@ -908,6 +943,71 @@ function cancelContract(
   });
 }
 
+function draftsFromSubmit(
+  action: Extract<ContractAction, { type: 'SUBMIT_EVIDENCE' }>,
+): EvidenceDraft[] {
+  if (action.items && action.items.length > 0) return action.items;
+  const drafts: EvidenceDraft[] = [];
+  if (action.text?.trim()) {
+    drafts.push({ type: EVIDENCE_TYPE.text, content: action.text.trim() });
+  }
+  if (action.link?.trim()) {
+    drafts.push({ type: EVIDENCE_TYPE.link, content: action.link.trim() });
+  }
+  return drafts;
+}
+
+function appendEvidenceItems(
+  contract: LearningContract,
+  milestone: Milestone,
+  actor: ContractActor,
+  drafts: EvidenceDraft[],
+  now: string,
+): EvidenceItem[] {
+  const created = drafts.map((draft) =>
+    normalizeEvidenceItem({
+      id: newId(),
+      milestoneId: milestone.id,
+      contractId: contract.id,
+      submittedBy: actor.uid,
+      type: draft.type,
+      content: draft.content,
+      storagePath: draft.storagePath ?? null,
+      createdAt: now,
+      updatedAt: now,
+    }),
+  );
+  return [...(contract.evidenceItems ?? []), ...created];
+}
+
+function withMilestoneProjection(
+  milestone: Milestone,
+  items: EvidenceItem[],
+  status: Milestone['status'],
+  lastFeedback: string | null,
+): Milestone {
+  const projection = latestMilestoneProjection(
+    items.filter((item) => item.milestoneId === milestone.id),
+  );
+  return {
+    ...milestone,
+    status,
+    lastFeedback,
+    evidenceText: projection.evidenceText,
+    evidenceLink: projection.evidenceLink,
+  };
+}
+
+function moveMilestone(
+  milestone: Milestone,
+  to: Milestone['status'],
+): ReduceResult | null {
+  if (!canTransitionMilestone(milestone.status, to)) {
+    return fail(`A ${milestone.status} milestone cannot move to ${to}`);
+  }
+  return null;
+}
+
 function submitEvidence(
   contract: LearningContract,
   action: Extract<ContractAction, { type: 'SUBMIT_EVIDENCE' }>,
@@ -917,7 +1017,6 @@ function submitEvidence(
     requireStatuses(contract, [LEARNING_CONTRACT_STATUS.inProgress]) ??
     requireActor(contract, actor, STEP_OWNER.learner);
   if (blocked) return blocked;
-  if (!action.text.trim()) return fail('Evidence text is required');
 
   const current = actionableMilestone(contract, [
     MILESTONE_STATUS.active,
@@ -925,27 +1024,108 @@ function submitEvidence(
   ]);
   if (!current) return fail('There is no active milestone to submit');
 
+  const drafts = draftsFromSubmit(action);
+  const valid = validateEvidenceDrafts(drafts, {
+    contractId: contract.id,
+    milestoneId: current.id,
+    userId: actor.uid,
+  });
+  if (!valid.ok) return fail(valid.error);
+
+  const blockedMove = moveMilestone(current, MILESTONE_STATUS.submitted);
+  if (blockedMove) return blockedMove;
+
+  const evidenceItems = appendEvidenceItems(contract, current, actor, drafts, action.now);
+  const revised = current.status === MILESTONE_STATUS.rejected;
+
+  return ok({
+    ...contract,
+    currentStepOwner: STEP_OWNER.mentor,
+    updatedAt: action.now,
+    evidenceItems,
+    milestones: contract.milestones.map((item) =>
+      item.id === current.id
+        ? withMilestoneProjection(item, evidenceItems, MILESTONE_STATUS.submitted, item.lastFeedback)
+        : item,
+    ),
+    revisionHistory: appendRevision(contract, {
+      actor,
+      action: revised ? 'EVIDENCE_REVISED' : 'EVIDENCE_SUBMITTED',
+      now: action.now,
+      summary: revised
+        ? `Learner resubmitted evidence for milestone “${current.title}”.`
+        : `Learner submitted evidence for milestone “${current.title}”.`,
+    }),
+  });
+}
+
+function beginWork(
+  contract: LearningContract,
+  action: Extract<ContractAction, { type: 'BEGIN_WORK' }>,
+  actor: ContractActor,
+): ReduceResult {
+  const blocked =
+    requireStatuses(contract, [LEARNING_CONTRACT_STATUS.inProgress]) ??
+    requireActor(contract, actor, STEP_OWNER.learner);
+  if (blocked) return blocked;
+
+  const current = nextBeginWorkMilestone(contract.milestones);
+  if (!current) return fail('There is no milestone ready to begin');
+  const blockedMove = moveMilestone(current, MILESTONE_STATUS.active);
+  if (blockedMove) return blockedMove;
+
+  return ok({
+    ...contract,
+    currentStepOwner: STEP_OWNER.learner,
+    updatedAt: action.now,
+    milestones: contract.milestones.map((item) =>
+      item.id === current.id ? { ...item, status: MILESTONE_STATUS.active } : item,
+    ),
+    revisionHistory: appendRevision(contract, {
+      actor,
+      action: 'WORK_STARTED',
+      now: action.now,
+      summary: `Learner began work on milestone “${current.title}”.`,
+    }),
+  });
+}
+
+function startReview(
+  contract: LearningContract,
+  action: Extract<ContractAction, { type: 'START_REVIEW' }>,
+  actor: ContractActor,
+): ReduceResult {
+  const blocked =
+    requireStatuses(contract, [LEARNING_CONTRACT_STATUS.inProgress]) ??
+    requireActor(contract, actor, STEP_OWNER.mentor);
+  if (blocked) return blocked;
+
+  const current = actionableMilestone(contract, [MILESTONE_STATUS.submitted]);
+  if (!current) return fail('There is no submitted evidence to review');
+  const blockedMove = moveMilestone(current, MILESTONE_STATUS.underReview);
+  if (blockedMove) return blockedMove;
+
   return ok({
     ...contract,
     currentStepOwner: STEP_OWNER.mentor,
     updatedAt: action.now,
     milestones: contract.milestones.map((item) =>
-      item.id === current.id
-        ? {
-            ...item,
-            status: MILESTONE_STATUS.submitted,
-            evidenceText: action.text.trim(),
-            evidenceLink: action.link.trim(),
-          }
-        : item,
+      item.id === current.id ? { ...item, status: MILESTONE_STATUS.underReview } : item,
     ),
     revisionHistory: appendRevision(contract, {
       actor,
-      action: 'EVIDENCE_SUBMITTED',
+      action: 'REVIEW_STARTED',
       now: action.now,
-      summary: `Learner submitted evidence for milestone “${current.title}”.`,
+      summary: `Mentor started review of milestone “${current.title}”.`,
     }),
   });
+}
+
+function reviewableMilestone(contract: LearningContract): Milestone | null {
+  return actionableMilestone(contract, [
+    MILESTONE_STATUS.submitted,
+    MILESTONE_STATUS.underReview,
+  ]);
 }
 
 function approveMilestone(
@@ -958,19 +1138,21 @@ function approveMilestone(
     requireActor(contract, actor, STEP_OWNER.mentor);
   if (blocked) return blocked;
 
-  const current = actionableMilestone(contract, [MILESTONE_STATUS.submitted]);
+  const current = reviewableMilestone(contract);
   if (!current) return fail('There is no submitted milestone to approve');
+  const blockedMove = moveMilestone(current, MILESTONE_STATUS.approved);
+  if (blockedMove) return blockedMove;
 
   const ordered = [...contract.milestones].sort((a, b) => a.order - b.order);
   const index = ordered.findIndex((item) => item.id === current.id);
   const next = ordered[index + 1];
+  const approvedMilestones = contract.milestones.map((item) =>
+    item.id === current.id
+      ? { ...item, status: MILESTONE_STATUS.approved, lastFeedback: null }
+      : item,
+  );
 
   if (!next) {
-    const completedMilestones = contract.milestones.map((item) =>
-      item.id === current.id
-        ? { ...item, status: MILESTONE_STATUS.approved, lastFeedback: null }
-        : item,
-    );
     const toPending = moveTo(contract, LEARNING_CONTRACT_STATUS.completionPending);
     if (toPending) return toPending;
 
@@ -979,12 +1161,12 @@ function approveMilestone(
       status: LEARNING_CONTRACT_STATUS.completionPending,
       currentStepOwner: STEP_OWNER.mentor,
       updatedAt: action.now,
-      milestones: completedMilestones,
+      milestones: approvedMilestones,
       revisionHistory: appendRevision(contract, {
         actor,
-        action: 'COMPLETION_PENDING',
+        action: 'MILESTONE_APPROVED',
         now: action.now,
-        summary: 'Mentor approved the last milestone. Completion is pending confirmation.',
+        summary: `Mentor approved the last milestone “${current.title}”. Completion is pending confirmation.`,
       }),
     });
   }
@@ -993,15 +1175,7 @@ function approveMilestone(
     ...contract,
     currentStepOwner: STEP_OWNER.learner,
     updatedAt: action.now,
-    milestones: contract.milestones.map((item) => {
-      if (item.id === current.id) {
-        return { ...item, status: MILESTONE_STATUS.approved, lastFeedback: null };
-      }
-      if (item.id === next.id) {
-        return { ...item, status: MILESTONE_STATUS.active };
-      }
-      return item;
-    }),
+    milestones: approvedMilestones,
     revisionHistory: appendRevision(contract, {
       actor,
       action: 'MILESTONE_APPROVED',
@@ -1011,19 +1185,21 @@ function approveMilestone(
   });
 }
 
-function rejectMilestone(
+function requestRevision(
   contract: LearningContract,
-  action: Extract<ContractAction, { type: 'REJECT_MILESTONE' }>,
+  action: Extract<ContractAction, { type: 'REQUEST_REVISION' | 'REJECT_MILESTONE' }>,
   actor: ContractActor,
 ): ReduceResult {
   const blocked =
     requireStatuses(contract, [LEARNING_CONTRACT_STATUS.inProgress]) ??
     requireActor(contract, actor, STEP_OWNER.mentor);
   if (blocked) return blocked;
-  if (!action.feedback.trim()) return fail('Feedback is required to reject a milestone');
+  if (!action.feedback.trim()) return fail('Feedback is required to request a revision');
 
-  const current = actionableMilestone(contract, [MILESTONE_STATUS.submitted]);
-  if (!current) return fail('There is no submitted milestone to reject');
+  const current = reviewableMilestone(contract);
+  if (!current) return fail('There is no submitted milestone to revise');
+  const blockedMove = moveMilestone(current, MILESTONE_STATUS.rejected);
+  if (blockedMove) return blockedMove;
 
   return ok({
     ...contract,
@@ -1034,6 +1210,45 @@ function rejectMilestone(
         ? {
             ...item,
             status: MILESTONE_STATUS.rejected,
+            lastFeedback: action.feedback.trim(),
+          }
+        : item,
+    ),
+    revisionHistory: appendRevision(contract, {
+      actor,
+      action: 'REVISION_REQUESTED',
+      now: action.now,
+      comment: action.feedback,
+      summary: `Mentor requested a revision on milestone “${current.title}”.`,
+    }),
+  });
+}
+
+function declineMilestone(
+  contract: LearningContract,
+  action: Extract<ContractAction, { type: 'DECLINE_MILESTONE' }>,
+  actor: ContractActor,
+): ReduceResult {
+  const blocked =
+    requireStatuses(contract, [LEARNING_CONTRACT_STATUS.inProgress]) ??
+    requireActor(contract, actor, STEP_OWNER.mentor);
+  if (blocked) return blocked;
+  if (!action.feedback.trim()) return fail('Feedback is required to reject a milestone');
+
+  const current = reviewableMilestone(contract);
+  if (!current) return fail('There is no submitted milestone to reject');
+  const blockedMove = moveMilestone(current, MILESTONE_STATUS.declined);
+  if (blockedMove) return blockedMove;
+
+  return ok({
+    ...contract,
+    currentStepOwner: STEP_OWNER.mentor,
+    updatedAt: action.now,
+    milestones: contract.milestones.map((item) =>
+      item.id === current.id
+        ? {
+            ...item,
+            status: MILESTONE_STATUS.declined,
             lastFeedback: action.feedback.trim(),
           }
         : item,

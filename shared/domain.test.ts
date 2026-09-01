@@ -16,11 +16,14 @@ import {
   canApplyForMentorship,
   canEndRelationship,
   canPauseRelationship,
+  canReadEvidenceObject,
   canStartLearningJourney,
+  canWriteEvidenceObject,
   canTransitionApplication,
   canTransitionContract,
   canTransitionMilestone,
   canTransitionRelationship,
+  evidenceStoragePath,
   isAccountActive,
   isLearnerRole,
   isOpenRelationship,
@@ -29,6 +32,7 @@ import {
   relationshipDocId,
   showcaseFromDeliverableRef,
   validateApplicationMessage,
+  validateEvidenceDrafts,
   validateEvidenceSubmission,
 } from './domain/index.js';
 
@@ -157,6 +161,18 @@ describe('domain transitions', () => {
       canTransitionMilestone(MILESTONE_STATUS.rejected, MILESTONE_STATUS.submitted),
       true,
     );
+    assert.equal(
+      canTransitionMilestone(MILESTONE_STATUS.submitted, MILESTONE_STATUS.underReview),
+      true,
+    );
+    assert.equal(
+      canTransitionMilestone(MILESTONE_STATUS.approved, MILESTONE_STATUS.submitted),
+      false,
+    );
+    assert.equal(
+      canTransitionMilestone(MILESTONE_STATUS.declined, MILESTONE_STATUS.active),
+      false,
+    );
   });
 });
 
@@ -211,6 +227,38 @@ describe('domain permissions and validation', () => {
     assert.equal(isAccountActive({ active: true }), true);
     assert.equal(isAccountActive({} as { active: boolean }), true);
     assert.equal(isAccountActive({ active: false }), false);
+  });
+
+  it('keeps evidence files private to the pairing and the owning learner', () => {
+    const contract = { learnerId: 'learner-1', mentorId: 'mentor-1' };
+    const stranger = { uid: 'other', role: USER_ROLE.learner, active: true };
+    assert.equal(canReadEvidenceObject(learner, contract), true);
+    assert.equal(canReadEvidenceObject(mentor, contract), true);
+    assert.equal(canReadEvidenceObject(stranger, contract), false);
+    assert.equal(canWriteEvidenceObject(learner, contract, 'learner-1'), true);
+    assert.equal(canWriteEvidenceObject(mentor, contract, 'learner-1'), false);
+    assert.equal(canWriteEvidenceObject(learner, contract, 'other'), false);
+
+    const owned = evidenceStoragePath({
+      contractId: 'c-1',
+      milestoneId: 'm-1',
+      userId: 'learner-1',
+      fileId: 'shot.jpg',
+    });
+    assert.equal(
+      validateEvidenceDrafts(
+        [{ type: 'file', content: 'shot.jpg', storagePath: owned }],
+        { contractId: 'c-1', milestoneId: 'm-1', userId: 'learner-1' },
+      ).ok,
+      true,
+    );
+    assert.equal(
+      validateEvidenceDrafts(
+        [{ type: 'file', content: 'shot.jpg', storagePath: `portfolios/learner-1/shot.jpg` }],
+        { contractId: 'c-1', milestoneId: 'm-1', userId: 'learner-1' },
+      ).ok,
+      false,
+    );
   });
 });
 

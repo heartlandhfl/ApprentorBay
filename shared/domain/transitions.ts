@@ -111,9 +111,20 @@ export const LEARNING_CONTRACT_TRANSITIONS: TransitionMap<LearningContractStatus
 export const MILESTONE_TRANSITIONS: TransitionMap<MilestoneStatus> = {
   [MILESTONE_STATUS.locked]: [MILESTONE_STATUS.active],
   [MILESTONE_STATUS.active]: [MILESTONE_STATUS.submitted],
-  [MILESTONE_STATUS.submitted]: [MILESTONE_STATUS.approved, MILESTONE_STATUS.rejected],
+  [MILESTONE_STATUS.submitted]: [
+    MILESTONE_STATUS.underReview,
+    MILESTONE_STATUS.approved,
+    MILESTONE_STATUS.rejected,
+    MILESTONE_STATUS.declined,
+  ],
+  [MILESTONE_STATUS.underReview]: [
+    MILESTONE_STATUS.approved,
+    MILESTONE_STATUS.rejected,
+    MILESTONE_STATUS.declined,
+  ],
   [MILESTONE_STATUS.rejected]: [MILESTONE_STATUS.submitted],
   [MILESTONE_STATUS.approved]: [],
+  [MILESTONE_STATUS.declined]: [],
 };
 
 export function canTransitionApplication(from: ApplicationStatus, to: ApplicationStatus): boolean {

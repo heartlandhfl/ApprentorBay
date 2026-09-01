@@ -20,6 +20,7 @@ export {
   LEARNING_CONTRACT_STATUS_LABEL,
   LEGACY_MENTORSHIP_STATUS,
   MILESTONE_STATUS,
+  MILESTONE_STATUS_LABEL,
   NOTIFICATION_STATUS,
   RELATIONSHIP_STATUS,
   STEP_OWNER,
@@ -30,8 +31,10 @@ export {
   isLearnerReviewStatus,
   isLearningContractStatus,
   isMentorReviewStatus,
+  isApprovedMilestoneStatus,
   isMilestoneStatus,
   isNegotiationOpen,
+  isReviewableMilestoneStatus,
   isOperationalContractStatus,
   isRelationshipStatus,
   isStepOwner,
@@ -96,19 +99,34 @@ export type { Message } from './messages.js';
 
 export {
   EVIDENCE,
+  EVIDENCE_TYPE,
+  EVIDENCE_TYPE_LABEL,
   evidenceFromMilestone,
+  evidenceItemsForMilestone,
+  evidenceStoragePath,
   isEvidenceComplete,
+  isEvidenceType,
+  isPrivateEvidencePath,
+  latestMilestoneProjection,
+  normalizeEvidenceItem,
+  parseEvidenceStoragePath,
 } from './evidence.js';
-export type { Evidence } from './evidence.js';
+export type { Evidence, EvidenceDraft, EvidenceItem, EvidenceType } from './evidence.js';
 
 export {
   findMilestoneByStatus,
   isActionableEvidenceMilestone,
+  isReviewableMilestone,
   isSubmittedMilestone,
   milestoneEvidence,
+  milestoneEvidenceItems,
+  milestoneNextAction,
+  milestoneResponsibleParty,
+  milestoneStatusLabel,
+  nextBeginWorkMilestone,
   sortMilestones,
 } from './milestones.js';
-export type { Milestone } from './milestones.js';
+export type { Milestone, MilestoneParty } from './milestones.js';
 
 export { isCompletedDeliverable } from './deliverables.js';
 export type { Deliverable, DeliverableRef } from './deliverables.js';
@@ -119,6 +137,7 @@ export {
   contractProgress,
   contractTitle,
   firstLine,
+  hydrateEvidenceItems,
   isContractCompleted,
   isContractInProgress,
   isContractWorkspaceView,
@@ -148,6 +167,7 @@ export type {
   WorkspacePartyNeeded,
 } from './learningContracts.js';
 
+
 export { SHOWCASE_SOURCE, showcaseFromDeliverableRef, showcasesFromProfile } from './showcases.js';
 export type { ShowcaseItem, ShowcaseSource } from './showcases.js';
 
@@ -161,6 +181,8 @@ export type { Mentorship } from './legacy.js';
 
 export {
   canAccessContractWorkspace,
+  canReadEvidenceObject,
+  canWriteEvidenceObject,
   canAcceptApplication,
   canAdminister,
   canApplyForMentorship,
@@ -180,6 +202,7 @@ export type { PermissionActor } from './permissions.js';
 export {
   validateApplicationMessage,
   validateChangeRequestReason,
+  validateEvidenceDrafts,
   validateEvidenceSubmission,
   validateGoalDraft,
   validateMentorPlan,

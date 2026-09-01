@@ -13,6 +13,7 @@ import {
 import {
   canAccessContractWorkspace,
   contractProgress,
+  evidenceStoragePath,
   isContractWorkspaceView,
   normalizeContract,
   workspaceFocus,
@@ -224,8 +225,11 @@ describe('learning contract machine', () => {
     assert.deepEqual(availableActions(contract, mentor), [
       'PAUSE_CONTRACT',
       'CANCEL',
+      'START_REVIEW',
       'APPROVE_MILESTONE',
+      'REQUEST_REVISION',
       'REJECT_MILESTONE',
+      'DECLINE_MILESTONE',
     ]);
 
     result = reduceContract(
@@ -262,9 +266,16 @@ describe('learning contract machine', () => {
     contract = result.contract;
     assert.equal(contract.status, 'in_progress');
     assert.equal(contract.milestones[0]?.status, 'approved');
+    assert.equal(contract.milestones[1]?.status, 'locked');
+    assert.equal(activeMilestoneCount(contract), 0);
+    assert.equal(result.effects.length, 0);
+
+    result = reduceContract(contract, { type: 'BEGIN_WORK', now }, learner);
+    assert.equal(result.ok, true);
+    if (!result.ok) throw new Error(result.error);
+    contract = result.contract;
     assert.equal(contract.milestones[1]?.status, 'active');
     assert.equal(activeMilestoneCount(contract), 1);
-    assert.equal(result.effects.length, 0);
 
     result = reduceContract(
       contract,
@@ -531,6 +542,9 @@ describe('learning contract workspace', () => {
     result = reduceContract(result.contract, { type: 'APPROVE_MILESTONE', now }, mentor);
     assert.equal(result.ok, true);
     if (!result.ok) throw new Error(result.error);
+    result = reduceContract(result.contract, { type: 'BEGIN_WORK', now }, learner);
+    assert.equal(result.ok, true);
+    if (!result.ok) throw new Error(result.error);
     result = reduceContract(
       result.contract,
       { type: 'SUBMIT_EVIDENCE', text: 'Assembled', link: '', now },
@@ -660,5 +674,165 @@ describe('learning contract workspace', () => {
       canAccessContractWorkspace({ uid: 'admin-1', role: 'admin', active: true }, legacy),
       true,
     );
+    assert.equal(legacy.evidenceItems.length, 1);
+    assert.equal(legacy.evidenceItems[0]?.type, 'text');
+  });
+});
+
+describe('milestone and evidence system', () => {
+  it('walks submit, review, revision, resubmit, approve, and progress', () => {
+    let contract = inProgress();
+    assert.equal(contractProgress(contract).percent, 0);
+
+    let result = reduceContract(
+      contract,
+      {
+        type: 'SUBMIT_EVIDENCE',
+        items: [
+          { type: 'text', content: 'Stock is milled' },
+          { type: 'link', content: 'https://example.com/stock.jpg' },
+          { type: 'reflection', content: 'The grain ran cleaner than I expected.' },
+        ],
+        now,
+      },
+      learner,
+    );
+    assert.equal(result.ok, true);
+    if (!result.ok) throw new Error(result.error);
+    contract = result.contract;
+    assert.equal(contract.milestones[0]?.status, 'submitted');
+    assert.equal(contract.evidenceItems.length, 3);
+    assert.ok(contract.revisionHistory.some((item) => item.action === 'EVIDENCE_SUBMITTED'));
+
+    const strangerSubmit = reduceContract(
+      contract,
+      { type: 'SUBMIT_EVIDENCE', text: 'Nope', link: '', now },
+      stranger,
+    );
+    assert.equal(strangerSubmit.ok, false);
+
+    result = reduceContract(contract, { type: 'START_REVIEW', now }, mentor);
+    assert.equal(result.ok, true);
+    if (!result.ok) throw new Error(result.error);
+    contract = result.contract;
+    assert.equal(contract.milestones[0]?.status, 'under_review');
+    assert.ok(contract.revisionHistory.some((item) => item.action === 'REVIEW_STARTED'));
+
+    result = reduceContract(
+      contract,
+      { type: 'REQUEST_REVISION', feedback: 'Show the grain direction', now },
+      mentor,
+    );
+    assert.equal(result.ok, true);
+    if (!result.ok) throw new Error(result.error);
+    contract = result.contract;
+    assert.equal(contract.milestones[0]?.status, 'rejected');
+    assert.equal(contract.milestones[0]?.lastFeedback, 'Show the grain direction');
+    assert.ok(contract.revisionHistory.some((item) => item.action === 'REVISION_REQUESTED'));
+    assert.equal(contractProgress(contract).percent, 0);
+
+    result = reduceContract(
+      contract,
+      { type: 'SUBMIT_EVIDENCE', text: 'Milled, grain marked', link: 'https://example.com/b.jpg', now },
+      learner,
+    );
+    assert.equal(result.ok, true);
+    if (!result.ok) throw new Error(result.error);
+    contract = result.contract;
+    assert.equal(contract.milestones[0]?.status, 'submitted');
+    assert.ok(contract.revisionHistory.some((item) => item.action === 'EVIDENCE_REVISED'));
+
+    result = reduceContract(contract, { type: 'APPROVE_MILESTONE', now }, mentor);
+    assert.equal(result.ok, true);
+    if (!result.ok) throw new Error(result.error);
+    contract = result.contract;
+    assert.equal(contract.milestones[0]?.status, 'approved');
+    assert.equal(contractProgress(contract).percent, 50);
+    assert.ok(contract.revisionHistory.some((item) => item.action === 'MILESTONE_APPROVED'));
+    assert.equal(contract.milestones[1]?.status, 'locked');
+    assert.equal(workspaceFocus(contract).who, 'learner');
+    assert.match(workspaceFocus(contract).next, /Begin work/);
+  });
+
+  it('records terminal REJECTED and does not count it toward progress', () => {
+    let contract = inProgress();
+    let result = reduceContract(
+      contract,
+      { type: 'SUBMIT_EVIDENCE', text: 'Stock is milled', link: '', now },
+      learner,
+    );
+    assert.equal(result.ok, true);
+    if (!result.ok) throw new Error(result.error);
+    result = reduceContract(
+      result.contract,
+      { type: 'DECLINE_MILESTONE', feedback: 'This is not the work we agreed.', now },
+      mentor,
+    );
+    assert.equal(result.ok, true);
+    if (!result.ok) throw new Error(result.error);
+    contract = result.contract;
+    assert.equal(contract.milestones[0]?.status, 'declined');
+    assert.equal(contractProgress(contract).percent, 0);
+    assert.ok(contract.revisionHistory.some((item) => item.action === 'MILESTONE_REJECTED'));
+    const resubmit = reduceContract(
+      contract,
+      { type: 'SUBMIT_EVIDENCE', text: 'Trying again', link: '', now },
+      learner,
+    );
+    assert.equal(resubmit.ok, false);
+  });
+
+  it('rejects a public storage path and a stranger file path', () => {
+    const contract = inProgress();
+    const publicPath = reduceContract(
+      contract,
+      {
+        type: 'SUBMIT_EVIDENCE',
+        items: [
+          {
+            type: 'file',
+            content: 'photo.jpg',
+            storagePath: `portfolios/${learner.uid}/photo.jpg`,
+          },
+        ],
+        now,
+      },
+      learner,
+    );
+    assert.equal(publicPath.ok, false);
+
+    const owned = evidenceStoragePath({
+      contractId: contract.id,
+      milestoneId: contract.milestones[0]!.id,
+      userId: learner.uid,
+      fileId: 'shot.jpg',
+    });
+    const okFile = reduceContract(
+      contract,
+      {
+        type: 'SUBMIT_EVIDENCE',
+        items: [{ type: 'file', content: 'shot.jpg', storagePath: owned }],
+        now,
+      },
+      learner,
+    );
+    assert.equal(okFile.ok, true);
+
+    const otherPath = evidenceStoragePath({
+      contractId: contract.id,
+      milestoneId: contract.milestones[0]!.id,
+      userId: stranger.uid,
+      fileId: 'shot.jpg',
+    });
+    const stolen = reduceContract(
+      contract,
+      {
+        type: 'SUBMIT_EVIDENCE',
+        items: [{ type: 'file', content: 'shot.jpg', storagePath: otherPath }],
+        now,
+      },
+      learner,
+    );
+    assert.equal(stolen.ok, false);
   });
 });

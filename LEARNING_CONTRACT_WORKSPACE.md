@@ -60,7 +60,7 @@ The page is one operational record, not a generic dashboard.
 
 1. **Overview** — goal, objectives, deliverable.
 2. **Milestones** — in order: title, description, success criteria, status, evidence count, mentor feedback. The current milestone’s submit/review actions sit on that row.
-3. **Evidence** — submissions against milestones (`evidenceText` / `evidenceLink`).
+3. **Evidence** — `evidenceItems[]` on the contract (TEXT / LINK / FILE / REFLECTION). See `MILESTONE_EVIDENCE_SYSTEM.md`.
 4. **Discussion** — the existing relationship `messages` thread. One pair, one contract. New posts require an **ACTIVE** relationship. Admins can read, not post.
 5. **Activity** — append-only `revisionHistory`.
 
@@ -120,7 +120,7 @@ Pause / resume / cancel / confirm / reopen are pairing members **or admin**. Evi
 
 - Same `learningContracts` document the builder wrote.
 - `normalizeContract()` still fills missing `title` / `successCriteria` / `revisionHistory` on older `in_progress` docs.
-- Milestone evidence still lives on the milestone (`evidenceText`, `evidenceLink`, `lastFeedback`).
+- Milestone evidence is `evidenceItems[]` on the contract. `evidenceText` / `evidenceLink` remain as a projection for older readers.
 - Discussion is not a new collection.
 
 ---
