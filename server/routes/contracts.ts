@@ -2,6 +2,8 @@ import { Router } from 'express';
 import { FieldValue } from 'firebase-admin/firestore';
 import {
   COLLECTIONS,
+  RELATIONSHIP_STATUS,
+  USER_ROLE,
   createDraftContract,
   reduceContract,
   type ApiError,
@@ -20,7 +22,7 @@ export const contractsRouter = Router();
 contractsRouter.use(requireAccount);
 
 function asActor(account: User): ContractActor | null {
-  if (account.role !== 'learner' && account.role !== 'mentor') return null;
+  if (account.role !== USER_ROLE.learner && account.role !== USER_ROLE.mentor) return null;
   return { uid: account.uid, role: account.role };
 }
 
@@ -40,7 +42,7 @@ contractsRouter.post('/', async (req: AccountRequest, res, next) => {
       sendApiError(res, 401, 'unauthenticated', 'Sign in required');
       return;
     }
-    if (account.role !== 'learner') {
+    if (account.role !== USER_ROLE.learner) {
       sendApiError(res, 403, 'forbidden', 'Only the learner can start a learning journey');
       return;
     }
@@ -54,7 +56,7 @@ contractsRouter.post('/', async (req: AccountRequest, res, next) => {
 
     const relSnap = await adminDb().collection(COLLECTIONS.relationships).doc(relationshipId).get();
     const relationship = relSnap.data() as MentorshipRelationship | undefined;
-    if (!relationship || relationship.status !== 'active') {
+    if (!relationship || relationship.status !== RELATIONSHIP_STATUS.active) {
       sendApiError(res, 404, 'not_found', 'Active relationship not found');
       return;
     }

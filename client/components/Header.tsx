@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { USER_ROLE } from '@apprentorbay/shared';
 import { profilePath, useAuth } from '../lib/auth';
 import { Button } from './Button';
 import { Cluster } from './Stack';
@@ -24,22 +25,22 @@ export function Header() {
           </Button>
           {loading ? null : account ? (
             <>
-              {account.role === 'admin' ? (
+              {account.role === USER_ROLE.admin ? (
                 <Button variant="ghost" size="sm" to="/admin">
                   Admin
                 </Button>
               ) : null}
-              {account.role === 'mentor' ? (
+              {account.role === USER_ROLE.mentor ? (
                 <Button variant="ghost" size="sm" to="/dashboard/applications">
                   Applications
                 </Button>
               ) : null}
-              {account.role === 'learner' || account.role === 'mentor' ? (
+              {account.role === USER_ROLE.learner || account.role === USER_ROLE.mentor ? (
                 <Button variant="ghost" size="sm" to="/dashboard/messages">
                   Messages
                 </Button>
               ) : null}
-              {account.role !== 'admin' ? (
+              {account.role !== USER_ROLE.admin ? (
                 <Button variant="ghost" size="sm" to={profilePath(account)}>
                   My profile
                 </Button>

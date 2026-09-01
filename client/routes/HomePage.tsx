@@ -7,6 +7,7 @@ import {
   Stack,
   Text,
 } from '../components';
+import { USER_ROLE } from '@apprentorbay/shared';
 import { HowItWorks } from '../components/HowItWorks';
 import { useAuth } from '../lib/auth';
 
@@ -31,8 +32,8 @@ export function HomePage() {
             {account ? (
               <>
                 <Button to="/mentors">Browse mentors</Button>
-                <Button variant="secondary" to={account.role === 'admin' ? '/admin' : '/dashboard/messages'}>
-                  {account.role === 'admin' ? 'Open admin' : 'Go to messages'}
+                <Button variant="secondary" to={account.role === USER_ROLE.admin ? '/admin' : '/dashboard/messages'}>
+                  {account.role === USER_ROLE.admin ? 'Open admin' : 'Go to messages'}
                 </Button>
               </>
             ) : (

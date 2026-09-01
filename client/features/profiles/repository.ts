@@ -1,6 +1,7 @@
 import { collection, doc, getDoc, onSnapshot, query, where } from 'firebase/firestore';
 import {
   COLLECTIONS,
+  VERIFICATION_STATUS,
   type LearnerProfile,
   type MentorProfile,
 } from '@apprentorbay/shared';
@@ -79,7 +80,7 @@ export function watchApprovedMentors(
   return onSnapshot(
     query(
       collection(db, COLLECTIONS.mentorProfiles),
-      where('verificationStatus', '==', 'approved'),
+      where('verificationStatus', '==', VERIFICATION_STATUS.approved),
       where('public', '==', true),
     ),
     (snap) => {

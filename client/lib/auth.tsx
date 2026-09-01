@@ -17,6 +17,7 @@ import { doc, getDoc, onSnapshot, runTransaction, updateDoc } from 'firebase/fir
 import {
   COLLECTIONS,
   TERMS_VERSION,
+  USER_ROLE,
   emptyLearnerProfile,
   emptyMentorProfile,
   isAccountActive,
@@ -143,7 +144,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             const userRef = doc(db, COLLECTIONS.users, uid);
             const profileRef = doc(
               db,
-              input.role === 'learner'
+              input.role === USER_ROLE.learner
                 ? COLLECTIONS.learnerProfiles
                 : COLLECTIONS.mentorProfiles,
               uid,
@@ -151,7 +152,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
             tx.set(userRef, userDoc);
 
-            if (input.role === 'learner') {
+            if (input.role === USER_ROLE.learner) {
               tx.set(profileRef, {
                 ...emptyLearnerProfile(uid, displayName),
                 jobStatus: input.jobStatus?.trim() ?? '',
@@ -247,7 +248,7 @@ function authMessage(error: unknown): string {
 }
 
 export function profilePath(account: User): string {
-  if (account.role === 'learner') return `/learners/${account.uid}`;
-  if (account.role === 'mentor') return `/mentors/${account.uid}`;
+  if (account.role === USER_ROLE.learner) return `/learners/${account.uid}`;
+  if (account.role === USER_ROLE.mentor) return `/mentors/${account.uid}`;
   return '/admin';
 }
