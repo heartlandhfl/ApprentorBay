@@ -141,7 +141,8 @@ Progress stays `approved milestones / total × 100`. It is never edited by hand.
 
 ## Tests that must stay green
 
-1. Learner submits evidence → mentor reviews → requests revision → learner resubmits → mentor approves → progress moves (0 → 50).
+1. Learner submits evidence → mentor reviews → requests revision → learner resubmits → mentor approves → progress moves (0 → 50). The next milestone stays **NOT_STARTED** until `BEGIN_WORK`.
 2. A stranger cannot submit.
 3. A public `/portfolios` path and another user’s file path are rejected.
-4. Older `in_progress` documents still normalize, including boolean `evidenceRequired` and embedded text.
+4. Terminal **REJECTED** (`declined`) does not count toward progress and cannot be resubmitted.
+5. Older `in_progress` documents still normalize, including boolean `evidenceRequired` and embedded text.
