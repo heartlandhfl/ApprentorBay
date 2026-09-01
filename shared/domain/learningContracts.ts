@@ -369,7 +369,7 @@ export function workspaceFocus(contract: LearningContract): WorkspaceFocus {
         next: 'Activate the contract so the first milestone can start.',
         currentMilestoneTitle: null,
       };
-    case LEARNING_CONTRACT_STATUS.inProgress:
+    case LEARNING_CONTRACT_STATUS.inProgress: {
       if (submitted) {
         return {
           who: 'mentor',
@@ -400,6 +400,7 @@ export function workspaceFocus(contract: LearningContract): WorkspaceFocus {
         next: nextActionCopy(contract),
         currentMilestoneTitle: null,
       };
+    }
     case LEARNING_CONTRACT_STATUS.paused:
       return {
         who: 'either',
