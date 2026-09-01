@@ -242,6 +242,14 @@ service cloud.firestore {
       allow create, update, delete: if false;
     }
 
+    // Operator list maintained in the Firebase console. Clients cannot write it.
+    // Express copies these into users/{uid} with role == admin.
+    match /admins/{adminId} {
+      allow read: if isSignedIn()
+        && (request.auth.uid == adminId || request.auth.uid == resource.data.uid);
+      allow create, update, delete: if false;
+    }
+
     match /supportIssues/{issueId} {
       allow read: if isAdmin()
         || (isSignedIn() && resource.data.reporterId == request.auth.uid);

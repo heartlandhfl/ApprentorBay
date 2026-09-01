@@ -16,6 +16,8 @@ export const COLLECTIONS = {
   profileSlugs: 'profileSlugs',
   auditLogs: 'adminAuditLogs',
   supportIssues: 'supportIssues',
+  /** Console / operator list. Not the app user record — sync into `users` with role admin. */
+  operatorAdmins: 'admins',
 } as const;
 
 export type CollectionName = (typeof COLLECTIONS)[keyof typeof COLLECTIONS];

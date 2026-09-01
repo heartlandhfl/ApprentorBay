@@ -27,7 +27,7 @@ import {
   type SignupRole,
   type User,
 } from '@apprentorbay/shared';
-import { recordTermsAcceptance } from './api';
+import { establishAccountSession, recordTermsAcceptance } from './api';
 import { getFirebaseAuth, getFirebaseDb } from './firebase';
 
 type AuthContextValue = {
@@ -66,10 +66,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     let unsubUser: (() => void) | undefined;
+    let sessionRequestedFor: string | null = null;
 
     const unsubAuth = onAuthStateChanged(auth, (next) => {
       unsubUser?.();
       unsubUser = undefined;
+      sessionRequestedFor = null;
       setFirebaseUser(next);
 
       if (!next) {
@@ -89,6 +91,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setAccount(null);
             setLoading(false);
             return;
+          }
+          if (!nextAccount && sessionRequestedFor !== next.uid) {
+            sessionRequestedFor = next.uid;
+            void establishAccountSession().catch(() => undefined);
           }
           if (
             nextAccount &&
@@ -226,11 +232,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         ).catch((error: unknown) => {
           throw new Error(authMessage(error));
         });
-        const snap = await getDoc(doc(db, COLLECTIONS.users, credential.user.uid));
-        const stored = snap.data() as User | undefined;
-        if (!isAccountActive(stored)) {
+        try {
+          const { account } = await establishAccountSession();
+          if (!isAccountActive(account)) {
+            await signOut(auth);
+            throw new Error('This account has been suspended.');
+          }
+        } catch (error) {
+          const snap = await getDoc(doc(db, COLLECTIONS.users, credential.user.uid));
+          const stored = snap.data() as User | undefined;
+          if (isAccountActive(stored)) return;
           await signOut(auth);
-          throw new Error('This account has been suspended.');
+          throw error instanceof Error && error.message !== 'This account has been suspended.'
+            ? new Error(
+                stored
+                  ? error.message
+                  : 'Signed in, but this email is not an app user yet. If you are the operator listed in admins/, wait for the server to sync or check /api/health (adminInitialized must be true).',
+              )
+            : error;
         }
       },
       async logOut() {
