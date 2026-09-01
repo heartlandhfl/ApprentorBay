@@ -1,8 +1,12 @@
 import type { DeliverableRef } from './deliverables.js';
 import { USER_ROLE, type SignupRole, type UserRole } from './identities.js';
 import {
+  ACCOUNT_STATUS,
+  VERIFICATION_CASE_STATUS,
   VERIFICATION_STATUS,
   VERIFIED_CLAIM_TYPE,
+  type AccountStatus,
+  type VerificationCaseStatus,
   type VerificationStatus,
   type VerifiedClaim,
 } from './statuses.js';
@@ -22,6 +26,7 @@ export interface User {
   email: string;
   displayName: string;
   active: boolean;
+  accountStatus?: AccountStatus;
   createdAt: IsoDateString;
   termsAcceptedAt: IsoDateString | null;
   termsVersion: string | null;
@@ -29,9 +34,20 @@ export interface User {
   profileSlug: string | null;
 }
 
-/** Missing `active` on older docs is treated as true. */
-export function isAccountActive(user: Pick<User, 'active'> | null | undefined): boolean {
-  return user != null && user.active !== false;
+function accountStatusFrom(user: Pick<User, 'active'> & { accountStatus?: AccountStatus }): AccountStatus {
+  if (user.accountStatus && Object.values(ACCOUNT_STATUS).includes(user.accountStatus)) {
+    return user.accountStatus;
+  }
+  return user.active === false ? ACCOUNT_STATUS.suspended : ACCOUNT_STATUS.active;
+}
+
+/** Missing `active` on older docs is treated as true. Restricted accounts may still sign in. */
+export function isAccountActive(
+  user: Pick<User, 'active'> & { accountStatus?: AccountStatus } | null | undefined,
+): boolean {
+  if (user == null) return false;
+  const status = accountStatusFrom(user);
+  return status === ACCOUNT_STATUS.active || status === ACCOUNT_STATUS.restricted;
 }
 
 export interface EducationEntry {
@@ -108,22 +124,29 @@ export interface MentorProfile {
   reviews: Review[];
   /** Participation approval. Not a comprehensive background check. */
   verificationStatus: VerificationStatus;
+  previousVerificationStatus: VerificationStatus | null;
+  verificationCaseStatus: VerificationCaseStatus;
   verifiedClaims: VerifiedClaim[];
   public: boolean;
 }
 
 export interface AdminCounts {
-  mentors: number;
+  totalUsers: number;
   learners: number;
+  mentors: number;
+  pendingMentorApprovals: number;
+  pendingVerification: number;
   activeRelationships: number;
-  contractsInProgress: number;
+  activeLearningContracts: number;
   completedDeliverables: number;
+  supportIssues: number;
 }
 
 export interface AccountRow {
   user: User;
   publicSlug?: string | null;
   approvalStatus?: VerificationStatus | null;
+  verificationCaseStatus?: VerificationCaseStatus | null;
   verifiedClaims?: VerifiedClaim[];
 }
 
@@ -270,6 +293,8 @@ export function emptyMentorProfile(userId: string, displayName: string): MentorP
     deliverables: [],
     reviews: [],
     verificationStatus: VERIFICATION_STATUS.pending,
+    previousVerificationStatus: null,
+    verificationCaseStatus: VERIFICATION_CASE_STATUS.notSubmitted,
     verifiedClaims: [],
     public: true,
   };
@@ -328,6 +353,12 @@ export function normalizeMentorProfile(
     deliverables: Array.isArray(input.deliverables) ? input.deliverables : [],
     reviews: Array.isArray(input.reviews) ? input.reviews : [],
     verificationStatus: status,
+    previousVerificationStatus: input.previousVerificationStatus ?? null,
+    verificationCaseStatus: Object.values(VERIFICATION_CASE_STATUS).includes(
+      input.verificationCaseStatus as VerificationCaseStatus,
+    )
+      ? (input.verificationCaseStatus as VerificationCaseStatus)
+      : empty.verificationCaseStatus,
     verifiedClaims: asClaims(input.verifiedClaims),
     public: input.public !== false,
     displayName: asText(input.displayName).trim() || empty.displayName,

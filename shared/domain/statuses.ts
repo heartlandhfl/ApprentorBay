@@ -4,10 +4,12 @@
  * repeating raw literals in UI and services.
  */
 
+/** Mentor participation approval. Persisted as mentorProfiles.verificationStatus. */
 export const VERIFICATION_STATUS = {
   pending: 'pending',
   approved: 'approved',
   rejected: 'rejected',
+  suspended: 'suspended',
 } as const;
 
 export type VerificationStatus =
@@ -27,6 +29,39 @@ export interface VerifiedClaim {
   verified: boolean;
   verifiedAt: string | null;
 }
+
+/** Account-level governance. Separate from mentor participation approval. */
+export const ACCOUNT_STATUS = {
+  active: 'active',
+  restricted: 'restricted',
+  suspended: 'suspended',
+  terminated: 'terminated',
+} as const;
+
+export type AccountStatus = (typeof ACCOUNT_STATUS)[keyof typeof ACCOUNT_STATUS];
+
+/**
+ * Verification case for a mentor. Separate from participation approval.
+ * Persisted as mentorProfiles.verificationCaseStatus.
+ */
+export const VERIFICATION_CASE_STATUS = {
+  notSubmitted: 'not_submitted',
+  submitted: 'submitted',
+  underReview: 'under_review',
+  verified: 'verified',
+  partiallyVerified: 'partially_verified',
+} as const;
+
+export type VerificationCaseStatus =
+  (typeof VERIFICATION_CASE_STATUS)[keyof typeof VERIFICATION_CASE_STATUS];
+
+export const SUPPORT_ISSUE_STATUS = {
+  open: 'open',
+  inProgress: 'in_progress',
+  resolved: 'resolved',
+} as const;
+
+export type SupportIssueStatus = (typeof SUPPORT_ISSUE_STATUS)[keyof typeof SUPPORT_ISSUE_STATUS];
 
 export const APPLICATION_STATUS = {
   pending: 'pending',
@@ -156,11 +191,15 @@ export type MentorshipStatus =
   (typeof LEGACY_MENTORSHIP_STATUS)[keyof typeof LEGACY_MENTORSHIP_STATUS];
 
 export function isVerificationStatus(value: unknown): value is VerificationStatus {
-  return (
-    value === VERIFICATION_STATUS.pending ||
-    value === VERIFICATION_STATUS.approved ||
-    value === VERIFICATION_STATUS.rejected
-  );
+  return Object.values(VERIFICATION_STATUS).includes(value as VerificationStatus);
+}
+
+export function isAccountStatus(value: unknown): value is AccountStatus {
+  return Object.values(ACCOUNT_STATUS).includes(value as AccountStatus);
+}
+
+export function isVerificationCaseStatus(value: unknown): value is VerificationCaseStatus {
+  return Object.values(VERIFICATION_CASE_STATUS).includes(value as VerificationCaseStatus);
 }
 
 export function isApplicationStatus(value: unknown): value is ApplicationStatus {

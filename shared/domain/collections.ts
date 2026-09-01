@@ -15,6 +15,7 @@ export const COLLECTIONS = {
   publicProfiles: 'publicProfiles',
   profileSlugs: 'profileSlugs',
   auditLogs: 'adminAuditLogs',
+  supportIssues: 'supportIssues',
 } as const;
 
 export type CollectionName = (typeof COLLECTIONS)[keyof typeof COLLECTIONS];

@@ -27,9 +27,10 @@ export const APPROVAL_STATUS = VERIFICATION_STATUS;
 export type ApprovalStatus = VerificationStatus;
 
 export const APPROVAL_STATUS_LABEL: Record<ApprovalStatus, string> = {
-  [APPROVAL_STATUS.pending]: 'Pending approval',
+  [APPROVAL_STATUS.pending]: 'Pending',
   [APPROVAL_STATUS.approved]: 'Approved',
-  [APPROVAL_STATUS.rejected]: 'Not approved',
+  [APPROVAL_STATUS.rejected]: 'Rejected',
+  [APPROVAL_STATUS.suspended]: 'Suspended',
 };
 
 export const APPROVAL_DISCLAIMER =

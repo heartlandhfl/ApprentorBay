@@ -1,5 +1,7 @@
 import type {
   AccountRow,
+  AccountStatus,
+  AdminAuditLog,
   AdminCounts,
   ApiError,
   ClientContractAction,
@@ -8,6 +10,7 @@ import type {
   MentorshipRelationship,
   PendingMentorRow,
   RelationshipStatus,
+  SupportIssue,
   User,
   VerificationStatus,
 } from '@apprentorbay/shared';
@@ -45,16 +48,43 @@ export async function listPendingMentors(): Promise<PendingMentorRow[]> {
   return body.rows;
 }
 
+export async function listPendingVerification(): Promise<PendingMentorRow[]> {
+  const response = await fetch('/api/admin/mentors/verification', {
+    headers: await authHeaders(),
+  });
+  const body = await readJson<{ rows: PendingMentorRow[] }>(response);
+  return body.rows;
+}
+
 export async function setMentorVerification(
   userId: string,
   status: Exclude<VerificationStatus, 'pending'>,
+  reason?: string,
 ) {
   const response = await fetch(`/api/admin/mentors/${userId}/verification`, {
     method: 'POST',
     headers: await authHeaders(),
-    body: JSON.stringify({ userId, status }),
+    body: JSON.stringify({ userId, status, reason }),
   });
   return readJson<{ profile: { verificationStatus: VerificationStatus } }>(response);
+}
+
+export async function setMentorVerified(userId: string, verified: boolean, reason?: string) {
+  const response = await fetch(`/api/admin/mentors/${userId}/verify`, {
+    method: 'POST',
+    headers: await authHeaders(),
+    body: JSON.stringify({ verified, reason }),
+  });
+  return readJson<{ profile: unknown }>(response);
+}
+
+export async function setVerificationCase(userId: string, status: 'submitted' | 'under_review') {
+  const response = await fetch(`/api/admin/mentors/${userId}/verification-case`, {
+    method: 'POST',
+    headers: await authHeaders(),
+    body: JSON.stringify({ status }),
+  });
+  return readJson<{ profile: unknown }>(response);
 }
 
 export async function listAdminCounts(): Promise<AdminCounts> {
@@ -94,6 +124,60 @@ export async function setAccountActive(userId: string, active: boolean): Promise
   });
   const body = await readJson<{ user: User }>(response);
   return body.user;
+}
+
+export async function setAccountStatus(userId: string, status: AccountStatus, reason?: string): Promise<User> {
+  const response = await fetch(`/api/admin/accounts/${userId}/status`, {
+    method: 'POST',
+    headers: await authHeaders(),
+    body: JSON.stringify({ status, reason }),
+  });
+  const body = await readJson<{ user: User }>(response);
+  return body.user;
+}
+
+export async function listAdminAudit(): Promise<AdminAuditLog[]> {
+  const response = await fetch('/api/admin/audit', {
+    headers: await authHeaders(),
+  });
+  const body = await readJson<{ rows: AdminAuditLog[] }>(response);
+  return body.rows;
+}
+
+export async function listSupportIssues(): Promise<SupportIssue[]> {
+  const response = await fetch('/api/admin/support', {
+    headers: await authHeaders(),
+  });
+  const body = await readJson<{ rows: SupportIssue[] }>(response);
+  return body.rows;
+}
+
+export async function resolveSupportIssue(issueId: string, reason?: string): Promise<SupportIssue> {
+  const response = await fetch(`/api/admin/support/${issueId}/resolve`, {
+    method: 'POST',
+    headers: await authHeaders(),
+    body: JSON.stringify({ reason }),
+  });
+  const body = await readJson<{ issue: SupportIssue }>(response);
+  return body.issue;
+}
+
+export async function fileSupportIssue(subject: string, body: string): Promise<SupportIssue> {
+  const response = await fetch('/api/support', {
+    method: 'POST',
+    headers: await authHeaders(),
+    body: JSON.stringify({ subject, body }),
+  });
+  const result = await readJson<{ issue: SupportIssue }>(response);
+  return result.issue;
+}
+
+export async function submitMentorVerification() {
+  const response = await fetch('/api/profiles/me/verification/submit', {
+    method: 'POST',
+    headers: await authHeaders(),
+  });
+  return readJson<{ verificationCaseStatus: string }>(response);
 }
 
 export async function acceptMentorshipApplication(

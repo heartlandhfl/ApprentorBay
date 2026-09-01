@@ -33,15 +33,17 @@ A user has exactly one role, set at signup: `mentor` | `learner` | `admin`.
 
 | Collection | Shape |
 | --- | --- |
-| `/users/{uid}` | `uid`, `role`, `email`, `displayName`, `createdAt` |
+| `/users/{uid}` | `uid`, `role`, `email`, `displayName`, `active`, `accountStatus`, `createdAt` |
 | `/learnerProfiles/{uid}` | Private learner record. Visitors read `publicProfiles` instead |
-| `/mentorProfiles/{uid}` | Private mentor record. `verificationStatus` is participation **approval**, not a background check |
+| `/mentorProfiles/{uid}` | Private mentor record. `verificationStatus` is participation **approval**; `verificationCaseStatus` is a separate evidence check |
 | `/publicProfiles/{slug}` | Published projection only. No email, uid, or hidden location |
 | `/profileSlugs/{slug}` | Server-only slug uniqueness index |
 | `/mentorshipApplications/{id}` | learnerId, mentorId, message, status (`pending` / `accepted` / `declined`) |
 | `/mentorshipRelationships/{id}` | learnerId, mentorId, status (`active` / `ended`) |
 | `/messages/{id}` | relationshipId, senderId, text, createdAt |
 | `/learningContracts/{id}` | relationshipId, status, currentStepOwner, goal, objectives, milestones, deliverable |
+| `/adminAuditLogs/{id}` | Server-only admin actions: adminId, action, targetUserId, reason, timestamp |
+| `/supportIssues/{id}` | Signed-in reports. Admins resolve them. Clients cannot update. |
 
 Signup writes the user doc and the matching profile in one Firestore transaction. New mentors always start as `verificationStatus: 'pending'`.
 
@@ -54,7 +56,8 @@ Signup writes the user doc and the matching profile in one Firestore transaction
 | `/login` | Email / password |
 | `/learners/:slug` | Public learner profile. Portfolio is the strongest section. `:slug` is not a Firebase UID |
 | `/mentors/:slug` | Public mentor profile. **Approved** means participation; **Verified** is a specific claim |
-| `/admin` | Admin-only approvals, verified claims, and accounts. Guarded in React **and** Express **and** Firestore rules |
+| `/admin` | Admin dashboard: approvals, verification, account governance, support, audit log. Guarded in React **and** Express **and** Firestore rules |
+| `/support` | Signed-in users can file a support issue |
 | `/dashboard/applications` | Mentor inbox of pending applications (Accept / Decline) |
 | `/dashboard/messages` | Active pairings |
 | `/dashboard/messages/:relationshipId` | Real-time chat. The only **Start Learning Journey** entry point lives here |

@@ -10,7 +10,7 @@ import {
 } from '@apprentorbay/shared';
 import { Button, Card, Checkbox, Input, Stack, Text, TextArea } from '../../components';
 import { getFirebaseStorage } from '../../lib/firebase';
-import { updateOwnProfile } from '../../lib/api';
+import { submitMentorVerification, updateOwnProfile } from '../../lib/api';
 
 type ProfileEditorProps = {
   role: 'learner' | 'mentor';
@@ -215,6 +215,27 @@ export function ProfileEditor({ role, profile, onSaved }: ProfileEditorProps) {
           <Button type="submit" loading={busy}>
             Save profile
           </Button>
+          {role === 'mentor' ? (
+            <Button
+              type="button"
+              variant="secondary"
+              loading={busy}
+              onClick={() => {
+                setBusy(true);
+                void submitMentorVerification()
+                  .then(() => {
+                    setSaved(true);
+                    setError(null);
+                  })
+                  .catch((err: unknown) => {
+                    setError(err instanceof Error ? err.message : 'Could not submit verification');
+                  })
+                  .finally(() => setBusy(false));
+              }}
+            >
+              Submit for verification
+            </Button>
+          ) : null}
         </Stack>
       </form>
     </Card>

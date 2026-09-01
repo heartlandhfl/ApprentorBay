@@ -1,6 +1,7 @@
 import { collection, doc, getDoc, onSnapshot, query, where } from 'firebase/firestore';
 import {
   COLLECTIONS,
+  emptyMentorProfile,
   type LearnerProfile,
   type MentorProfile,
   type PublicProfile,
@@ -138,9 +139,8 @@ export function watchApprovedMentors(
   return watchListedMentors((rows) => {
     onNext(
       rows.map((row) => ({
-        userId: '',
+        ...emptyMentorProfile('', row.displayName),
         slug: row.slug,
-        displayName: row.displayName,
         photoPath: row.photoPath,
         professionalIdentity: row.professionalIdentity,
         location: row.location ?? '',
@@ -153,8 +153,6 @@ export function watchApprovedMentors(
         experience: row.experience,
         professionalGoals: row.professionalGoals,
         mentoringInterests: row.mentoringInterests,
-        deliverables: [],
-        reviews: [],
         verificationStatus: row.approvalStatus,
         verifiedClaims: row.verifiedClaims,
         public: row.published,

@@ -9,12 +9,14 @@ import {
   canAcceptApplication,
   canApplyForMentorship,
   canDeclineApplication,
+  canParticipate,
   isClosedRelationship,
   isOpenRelationship,
   normalizeRelationship,
   relationshipDocId,
   type MentorshipApplication,
   type MentorshipRelationship,
+  type User,
 } from '@apprentorbay/shared';
 import { recordAudit } from '../lib/audit.js';
 import { adminDb } from '../lib/firebase.js';
@@ -54,7 +56,8 @@ applicationsRouter.post('/', async (req: AccountRequest, res, next) => {
       sendApiError(res, 404, 'not_found', 'Mentor not found');
       return;
     }
-    if (!canApplyForMentorship(account, loaded.profile, message)) {
+    const mentorUser = (await adminDb().collection(COLLECTIONS.users).doc(record.userId).get()).data() as User | undefined;
+    if (!canParticipate(account) || !canParticipate(mentorUser) || !canApplyForMentorship(account, loaded.profile, message)) {
       sendApiError(res, 400, 'invalid', 'This mentor is not open for applications');
       return;
     }

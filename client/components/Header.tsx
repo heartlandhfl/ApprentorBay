@@ -23,6 +23,9 @@ export function Header() {
           <Button variant="ghost" size="sm" to="/mentors">
             Mentors
           </Button>
+          <Button variant="ghost" size="sm" to="/support">
+            Support
+          </Button>
           {loading ? null : account ? (
             <>
               {account.role === USER_ROLE.admin ? (

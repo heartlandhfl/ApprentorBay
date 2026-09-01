@@ -46,9 +46,14 @@ export const RELATIONSHIP_TRANSITIONS: TransitionMap<RelationshipStatus> = {
 };
 
 export const VERIFICATION_TRANSITIONS: TransitionMap<VerificationStatus> = {
-  [VERIFICATION_STATUS.pending]: [VERIFICATION_STATUS.approved, VERIFICATION_STATUS.rejected],
-  [VERIFICATION_STATUS.approved]: [],
-  [VERIFICATION_STATUS.rejected]: [],
+  [VERIFICATION_STATUS.pending]: [
+    VERIFICATION_STATUS.approved,
+    VERIFICATION_STATUS.rejected,
+    VERIFICATION_STATUS.suspended,
+  ],
+  [VERIFICATION_STATUS.approved]: [VERIFICATION_STATUS.rejected, VERIFICATION_STATUS.suspended],
+  [VERIFICATION_STATUS.rejected]: [VERIFICATION_STATUS.approved, VERIFICATION_STATUS.pending],
+  [VERIFICATION_STATUS.suspended]: [VERIFICATION_STATUS.approved, VERIFICATION_STATUS.rejected],
 };
 
 /**

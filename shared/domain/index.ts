@@ -14,6 +14,7 @@ export {
 export type { PairingIdField, SignupRole, UserRole } from './identities.js';
 
 export {
+  ACCOUNT_STATUS,
   APPLICATION_STATUS,
   DELIVERABLE_STATUS,
   LEARNING_CONTRACT_STATUS,
@@ -24,6 +25,8 @@ export {
   NOTIFICATION_STATUS,
   RELATIONSHIP_STATUS,
   STEP_OWNER,
+  SUPPORT_ISSUE_STATUS,
+  VERIFICATION_CASE_STATUS,
   VERIFICATION_STATUS,
   VERIFIED_CLAIM_TYPE,
   isApplicationStatus,
@@ -39,9 +42,12 @@ export {
   isOperationalContractStatus,
   isRelationshipStatus,
   isStepOwner,
+  isAccountStatus,
+  isVerificationCaseStatus,
   isVerificationStatus,
 } from './statuses.js';
 export type {
+  AccountStatus,
   ApplicationStatus,
   DeliverableStatus,
   LearningContractStatus,
@@ -50,6 +56,8 @@ export type {
   NotificationStatus,
   RelationshipStatus,
   StepOwner,
+  SupportIssueStatus,
+  VerificationCaseStatus,
   VerificationStatus,
   VerifiedClaim,
   VerifiedClaimType,
@@ -258,6 +266,31 @@ export type { SlugValidation } from './slugs.js';
 export { ADMIN_AUDIT_ACTION, AUDIT_EVENT, buildAuditLog } from './auditLog.js';
 export type { AdminAuditAction, AdminAuditLog, AuditEvent } from './auditLog.js';
 
+export {
+  ACCOUNT_STATUS_LABEL,
+  ACCOUNT_STATUS_TRANSITIONS,
+  ADMIN_ACTION,
+  VERIFICATION_CASE_STATUS_LABEL,
+  accountActiveFlag,
+  accountStatusOf,
+  allClaimTypesVerified,
+  canApproveMentor,
+  canChangeAccountStatus,
+  canGovernAccounts,
+  canParticipate,
+  canSignIn,
+  canTransitionAccountStatus,
+  canVerifyMentor,
+  deriveVerificationCase,
+  isAccountRestricted,
+  isPendingVerificationCase,
+  reasonRequiredForAccountStatus,
+  validateAdminReason,
+  validateSupportIssue,
+  verifiedClaimSet,
+} from './administration.js';
+export type { AdminAction, GovernanceActor, SupportIssue } from './administration.js';
+
 export type { Mentorship } from './legacy.js';
 
 export {
@@ -278,7 +311,11 @@ export {
   canResumeRelationship,
   canSendMessage,
   canStartLearningJourney,
+  canChangeOwnRole,
+  canRestrictAccount,
+  canSelfApprove,
   canSuspendAccount,
+  canTerminateAccount,
   canTerminateRelationship,
 } from './permissions.js';
 export type { PermissionActor } from './permissions.js';
