@@ -7,7 +7,7 @@ import {
   type StepOwner,
 } from './statuses.js';
 import type { Deliverable } from './deliverables.js';
-import type { Milestone } from './milestones.js';
+import { nextBeginWorkMilestone, type Milestone } from './milestones.js';
 import type { UserRole } from './identities.js';
 import type { IsoDateString } from './users.js';
 import {
@@ -385,6 +385,14 @@ export function workspaceFocus(contract: LearningContract): WorkspaceFocus {
               ? `Resubmit evidence for “${current.title}”.`
               : `Submit evidence for “${current.title}”.`,
           currentMilestoneTitle: current.title,
+        };
+      }
+      const begin = nextBeginWorkMilestone(ordered);
+      if (begin) {
+        return {
+          who: 'learner',
+          next: `Begin work on “${begin.title}”.`,
+          currentMilestoneTitle: begin.title,
         };
       }
       return {

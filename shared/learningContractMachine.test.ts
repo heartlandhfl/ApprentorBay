@@ -750,6 +750,36 @@ describe('milestone and evidence system', () => {
     assert.equal(contractProgress(contract).percent, 50);
     assert.ok(contract.revisionHistory.some((item) => item.action === 'MILESTONE_APPROVED'));
     assert.equal(contract.milestones[1]?.status, 'locked');
+    assert.equal(workspaceFocus(contract).who, 'learner');
+    assert.match(workspaceFocus(contract).next, /Begin work/);
+  });
+
+  it('records terminal REJECTED and does not count it toward progress', () => {
+    let contract = inProgress();
+    let result = reduceContract(
+      contract,
+      { type: 'SUBMIT_EVIDENCE', text: 'Stock is milled', link: '', now },
+      learner,
+    );
+    assert.equal(result.ok, true);
+    if (!result.ok) throw new Error(result.error);
+    result = reduceContract(
+      result.contract,
+      { type: 'DECLINE_MILESTONE', feedback: 'This is not the work we agreed.', now },
+      mentor,
+    );
+    assert.equal(result.ok, true);
+    if (!result.ok) throw new Error(result.error);
+    contract = result.contract;
+    assert.equal(contract.milestones[0]?.status, 'declined');
+    assert.equal(contractProgress(contract).percent, 0);
+    assert.ok(contract.revisionHistory.some((item) => item.action === 'MILESTONE_REJECTED'));
+    const resubmit = reduceContract(
+      contract,
+      { type: 'SUBMIT_EVIDENCE', text: 'Trying again', link: '', now },
+      learner,
+    );
+    assert.equal(resubmit.ok, false);
   });
 
   it('rejects a public storage path and a stranger file path', () => {

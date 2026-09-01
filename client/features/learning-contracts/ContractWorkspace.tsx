@@ -308,9 +308,9 @@ function partyName(
 ): string {
   if (party === 'nobody') return 'Nobody';
   if (party === 'learner') {
-    return account.uid === contract.learnerId ? `Learner (${learnerName === account.displayName ? 'you' : learnerName})` : `Learner (${learnerName})`;
+    return account.uid === contract.learnerId ? 'Learner (you)' : `Learner (${learnerName})`;
   }
-  return account.uid === contract.mentorId ? `Mentor (${mentorName === account.displayName ? 'you' : mentorName})` : `Mentor (${mentorName})`;
+  return account.uid === contract.mentorId ? 'Mentor (you)' : `Mentor (${mentorName})`;
 }
 
 function MilestonesSection({
