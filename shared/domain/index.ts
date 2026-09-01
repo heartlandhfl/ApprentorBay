@@ -291,6 +291,27 @@ export {
 } from './administration.js';
 export type { AdminAction, GovernanceActor, SupportIssue } from './administration.js';
 
+export {
+  LEARNER_JOURNEY,
+  MENTOR_JOURNEY,
+  isLearnerProfileReady,
+  isMentorProfileReady,
+  learnerDashboardModel,
+  learnerJourneyStage,
+  lifecycleProfileFrom,
+  mentorDashboardModel,
+  mentorJourneyStage,
+} from './lifecycle.js';
+export type {
+  DashboardAction,
+  LearnerDashboardModel,
+  LearnerJourneyStage,
+  LifecycleProfile,
+  MentorDashboardModel,
+  MentorJourneyStage,
+  MentorQueueItem,
+} from './lifecycle.js';
+
 export type { Mentorship } from './legacy.js';
 
 export {

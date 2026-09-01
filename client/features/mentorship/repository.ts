@@ -156,6 +156,29 @@ export function watchPairing(
   };
 }
 
+export function watchLearnerApplications(
+  learnerId: string,
+  onNext: (rows: MentorshipApplication[]) => void,
+  onError?: (error: Error) => void,
+): () => void {
+  const db = getFirebaseDb();
+  if (!db) {
+    onError?.(new Error('Firebase is not initialized'));
+    return () => undefined;
+  }
+
+  return onSnapshot(
+    query(collection(db, COLLECTIONS.applications), where('learnerId', '==', learnerId)),
+    (snap) =>
+      onNext(
+        snap.docs
+          .map((item) => item.data() as MentorshipApplication)
+          .sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
+      ),
+    (error) => onError?.(error),
+  );
+}
+
 export function watchPendingApplications(
   mentorId: string,
   onNext: (rows: MentorshipApplication[]) => void,

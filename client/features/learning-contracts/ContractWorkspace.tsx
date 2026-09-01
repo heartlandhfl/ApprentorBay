@@ -38,6 +38,7 @@ import {
   Card,
   Cluster,
   EmptyState,
+  FileField,
   Input,
   MessageBubble,
   MilestoneStatusMark,
@@ -585,16 +586,12 @@ function MilestoneActions({
               onChange={(event) => setLink(event.target.value)}
               hint="Optional public URL. Files go through private Storage, not here."
             />
-            <label>
-              <Text variant="small" as="span">
-                File
-              </Text>
-              <input
-                type="file"
-                className="mt-2 block w-full text-small"
-                onChange={(event) => setFile(event.target.files?.[0] ?? null)}
-              />
-            </label>
+            <FileField
+              label="File"
+              hint="Optional private file. A written explanation is still required unless you attach a file or link."
+              fileName={file?.name}
+              onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+            />
             <Button
               type="submit"
               loading={busy}
@@ -928,16 +925,11 @@ function CompletionSection({
                   ))}
                 </Stack>
               ) : null}
-              <label>
-                <Text variant="small" as="span">
-                  File
-                </Text>
-                <input
-                  type="file"
-                  className="mt-2 block w-full text-small"
-                  onChange={(event) => setFile(event.target.files?.[0] ?? null)}
-                />
-              </label>
+              <FileField
+                label="File"
+                fileName={file?.name}
+                onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+              />
               <Button type="submit" loading={busy}>
                 Submit final deliverable
               </Button>

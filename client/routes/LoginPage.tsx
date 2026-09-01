@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { Navigate } from 'react-router-dom';
 import { Button, Card, Cluster, Input, Page, Stack, Text } from '../components';
-import { profilePath, useAuth } from '../lib/auth';
+import { signedInHomePath, useAuth } from '../lib/auth';
 
 export function LoginPage() {
   const { account, loading, logIn } = useAuth();
@@ -11,7 +11,7 @@ export function LoginPage() {
   const [busy, setBusy] = useState(false);
 
   if (!loading && account) {
-    return <Navigate to={profilePath(account)} replace />;
+    return <Navigate to={signedInHomePath(account)} replace />;
   }
 
   async function onSubmit(event: FormEvent) {

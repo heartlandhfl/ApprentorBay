@@ -1,7 +1,7 @@
 import type { ElementType, ReactNode } from 'react';
 
 const variants = {
-  display: 'font-display text-display text-ink tracking-tight',
+  display: 'font-display text-[2.25rem] leading-[2.75rem] text-ink tracking-tight sm:text-display sm:leading-[3.5rem]',
   h1: 'font-display text-h1 text-ink tracking-tight',
   h2: 'font-display text-h2 text-ink',
   h3: 'font-sans text-h3 font-medium text-ink',

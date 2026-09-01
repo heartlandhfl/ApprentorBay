@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useLocation } from 'react-router-dom';
 import {
   RELATIONSHIP_STATUS,
@@ -56,6 +56,9 @@ export function MentorshipsPage() {
     <Page>
       <Stack gap={32}>
         <Stack gap={12}>
+          <Button variant="ghost" size="sm" to="/dashboard">
+            Back to dashboard
+          </Button>
           <Text variant="h1">{title}</Text>
           <Text variant="muted">
             Active mentorships are dedicated relationships — not just an accepted
@@ -73,6 +76,13 @@ export function MentorshipsPage() {
             <RelationshipTable
               heading="Active mentorships"
               empty="No active mentorships yet"
+              emptyAction={
+                account?.role === USER_ROLE.learner ? (
+                  <Button to="/mentors">Browse mentors</Button>
+                ) : (
+                  <Button to="/mentors/me">Prepare your mentoring profile</Button>
+                )
+              }
               rows={current}
               accountUid={account?.uid}
               names={names}
@@ -96,12 +106,14 @@ export function MentorshipsPage() {
 function RelationshipTable({
   heading,
   empty,
+  emptyAction,
   rows,
   accountUid,
   names,
 }: {
   heading: string;
   empty: string;
+  emptyAction?: ReactNode;
   rows: MentorshipRelationship[];
   accountUid?: string;
   names: Record<string, string>;
@@ -110,7 +122,15 @@ function RelationshipTable({
     <Stack gap={16}>
       <Text variant="h2">{heading}</Text>
       {rows.length === 0 ? (
-        <EmptyState title={empty} />
+        <EmptyState
+          title={empty}
+          description={
+            emptyAction
+              ? 'The dashboard will tell you the next step. You can also start from here.'
+              : undefined
+          }
+          action={emptyAction}
+        />
       ) : (
         <Table
           rows={rows}

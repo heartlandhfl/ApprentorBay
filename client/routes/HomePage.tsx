@@ -9,7 +9,7 @@ import {
 } from '../components';
 import { USER_ROLE } from '@apprentorbay/shared';
 import { HowItWorks } from '../components/HowItWorks';
-import { useAuth } from '../lib/auth';
+import { signedInHomePath, useAuth } from '../lib/auth';
 
 export function HomePage() {
   const { account } = useAuth();
@@ -32,8 +32,8 @@ export function HomePage() {
             {account ? (
               <>
                 <Button to="/mentors">Browse mentors</Button>
-                <Button variant="secondary" to={account.role === USER_ROLE.admin ? '/admin' : '/dashboard/mentorships'}>
-                  {account.role === USER_ROLE.admin ? 'Open admin' : 'Go to messages'}
+                <Button variant="secondary" to={signedInHomePath(account)}>
+                  {account.role === USER_ROLE.admin ? 'Open admin' : 'Open dashboard'}
                 </Button>
               </>
             ) : (

@@ -279,3 +279,8 @@ export function profilePath(account: User): string {
   }
   return '/admin';
 }
+
+export function signedInHomePath(account: User): string {
+  if (account.role === USER_ROLE.admin) return '/admin';
+  return '/dashboard';
+}

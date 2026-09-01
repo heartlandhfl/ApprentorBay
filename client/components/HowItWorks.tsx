@@ -1,3 +1,4 @@
+import { LEARNER_JOURNEY, MENTOR_JOURNEY } from '@apprentorbay/shared';
 import { Badge } from './Badge';
 import { Card } from './Card';
 import { Grid } from './Grid';
@@ -5,28 +6,11 @@ import { Cluster, Stack } from './Stack';
 import { Stepper } from './Stepper';
 import { Text } from './Text';
 
-export const HOW_IT_WORKS_STEPS = [
-  {
-    id: 'mentor',
-    label: 'Find a mentor',
-    description: 'Browse verified mentors. Each one has done the work you want to learn.',
-  },
-  {
-    id: 'pairing',
-    label: 'Form a pairing',
-    description: 'The learner applies. The mentor accepts. One apprenticeship, two people.',
-  },
-  {
-    id: 'contract',
-    label: 'Write the contract',
-    description: 'A shared goal, objectives, and an ordered list of milestones with required evidence.',
-  },
-  {
-    id: 'deliverable',
-    label: 'Ship a deliverable',
-    description: 'Finish the last milestone and the deliverable lands on both public profiles.',
-  },
-];
+export const HOW_IT_WORKS_STEPS = LEARNER_JOURNEY.map((step) => ({
+  id: step.id,
+  label: step.label,
+  description: step.description,
+}));
 
 export function HowItWorks({ featured = false }: { featured?: boolean }) {
   return (
@@ -37,11 +21,19 @@ export function HowItWorks({ featured = false }: { featured?: boolean }) {
             <Text variant="caption">Mentorship and apprenticeship</Text>
             <Text variant={featured ? 'h1' : 'h2'}>How It Works</Text>
             <Text variant="muted">
-              Four steps. One path. You pair with a mentor, write a living learning
-              contract, and ship work both of you can point to.
+              One pairing. One living contract. Proof that both people can point to.
+              Learners move from discover to showcase. Mentors move from being found
+              to building a public legacy.
             </Text>
           </Stack>
-          <Stepper steps={HOW_IT_WORKS_STEPS} currentStep={0} />
+          <Stack gap={16}>
+            <Text variant="caption">Learner</Text>
+            <Stepper steps={[...LEARNER_JOURNEY]} currentStep={0} layout="rail" />
+          </Stack>
+          <Stack gap={16}>
+            <Text variant="caption">Mentor</Text>
+            <Stepper steps={[...MENTOR_JOURNEY]} currentStep={0} layout="rail" />
+          </Stack>
         </Stack>
       </Card>
 
@@ -87,26 +79,26 @@ export function HowItWorks({ featured = false }: { featured?: boolean }) {
         <Card>
           <Stack gap={12}>
             <Cluster gap={8}>
-              <Badge tone="accent">1–2</Badge>
+              <Badge tone="accent">Discover–Agree</Badge>
               <Text variant="h3">Pairing</Text>
             </Cluster>
             <Text variant="small">
-              ApprentorBay is not a feed or a marketplace. A learner chooses one
-              mentor, applies, and — if accepted — they form a private pairing.
-              Messages stay between those two people.
+              A learner finds a mentor, applies, and — if accepted — they form a
+              private pairing. Messages stay between those two people while they
+              write the contract.
             </Text>
           </Stack>
         </Card>
         <Card>
           <Stack gap={12}>
             <Cluster gap={8}>
-              <Badge tone="accent">3–4</Badge>
-              <Text variant="h3">Contract and proof</Text>
+              <Badge tone="accent">Learn–Showcase</Badge>
+              <Text variant="h3">Work and proof</Text>
             </Cluster>
             <Text variant="small">
-              Together they write a learning contract: a goal, objectives, and
-              milestones that require evidence. When the last milestone is approved,
-              the finished deliverable is published on both profiles.
+              They work one milestone at a time. The mentor validates evidence.
+              When the contract completes, the finished work can be published on
+              both profiles.
             </Text>
           </Stack>
         </Card>

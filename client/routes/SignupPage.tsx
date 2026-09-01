@@ -6,6 +6,7 @@ import {
   Card,
   Checkbox,
   Cluster,
+  Grid,
   Input,
   Page,
   Stack,
@@ -13,7 +14,7 @@ import {
   Text,
   TextArea,
 } from '../components';
-import { profilePath, useAuth } from '../lib/auth';
+import { signedInHomePath, useAuth } from '../lib/auth';
 
 const steps = [
   { id: 'role', label: 'Choose your role', description: 'Mentor or learner — one role, set here.' },
@@ -42,7 +43,7 @@ export function SignupPage() {
   const [busy, setBusy] = useState(false);
 
   if (!loading && account) {
-    return <Navigate to={profilePath(account)} replace />;
+    return <Navigate to={signedInHomePath(account)} replace />;
   }
 
   function chooseRole(next: SignupRole) {
@@ -84,7 +85,7 @@ export function SignupPage() {
         expertise,
         termsAccepted: true,
       });
-      navigate(profilePath(created));
+      navigate(signedInHomePath(created));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Sign up failed');
     } finally {
@@ -106,7 +107,7 @@ export function SignupPage() {
         <Stepper steps={steps} currentStep={step} onStepSelect={goToStep} />
 
         {step === 0 ? (
-          <Cluster gap={16}>
+          <Grid cols={2}>
             <Card>
               <Stack gap={16}>
                 <Text variant="h3">Learner</Text>
@@ -127,7 +128,7 @@ export function SignupPage() {
                 <Button onClick={() => chooseRole(USER_ROLE.mentor)}>I am a mentor</Button>
               </Stack>
             </Card>
-          </Cluster>
+          </Grid>
         ) : null}
 
         {step === 1 ? (

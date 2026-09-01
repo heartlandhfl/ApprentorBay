@@ -7,6 +7,7 @@ export {
   sendMessage,
   watchAccountRelationships,
   watchActiveRelationships,
+  watchLearnerApplications,
   watchMessages,
   watchPairing,
   watchPendingApplications,
