@@ -54,14 +54,22 @@ export async function getPublicDisplayName(userId: string): Promise<string> {
   const db = getFirebaseDb();
   if (!db) return 'Member';
 
-  const learner = await getDoc(doc(db, COLLECTIONS.learnerProfiles, userId));
-  if (learner.exists()) {
-    return (learner.data() as LearnerProfile).displayName || 'Learner';
+  try {
+    const learner = await getDoc(doc(db, COLLECTIONS.learnerProfiles, userId));
+    if (learner.exists()) {
+      return (learner.data() as LearnerProfile).displayName || 'Learner';
+    }
+  } catch (error) {
+    if (!firestoreDenied(error)) throw error;
   }
 
-  const mentor = await getDoc(doc(db, COLLECTIONS.mentorProfiles, userId));
-  if (mentor.exists()) {
-    return (mentor.data() as MentorProfile).displayName || 'Mentor';
+  try {
+    const mentor = await getDoc(doc(db, COLLECTIONS.mentorProfiles, userId));
+    if (mentor.exists()) {
+      return (mentor.data() as MentorProfile).displayName || 'Mentor';
+    }
+  } catch (error) {
+    if (!firestoreDenied(error)) throw error;
   }
 
   return 'Member';

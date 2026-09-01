@@ -130,3 +130,24 @@ Written to `adminAuditLogs` (client writes denied):
 - New fields optional on read (`normalizeRelationship`).
 - Persisted status strings stay lowercase.
 - Old `/dashboard/messages` URLs still work.
+
+---
+
+## Verified lifecycle (2026-09-01)
+
+Exercised against the Firebase emulators and the Vite client.
+
+**API / Admin SDK**
+
+- Accept creates one `mentorshipRelationships` document with `id`, `mentorId`, `learnerId`, `applicationId`, `status`, `createdAt`, `startedAt`, `updatedAt`, `endedAt`.
+- A second accept of the same application returns the same document (HTTP 200). A query for that learner+mentor pair returns exactly one row.
+- Pause then end updates status and writes `RELATIONSHIP_PAUSED` / `RELATIONSHIP_ENDED`. Accept also writes `APPLICATION_ACCEPTED` and `RELATIONSHIP_CREATED`.
+
+**UI (real pages, not inferred from application status)**
+
+1. Learner browses `/mentors`, opens a verified mentor, applies.
+2. Mentor profile shows **APPLICATION PENDING**. Learner **My Mentors** is still empty.
+3. Mentor **Applications** lists the pending row (Accept / Decline).
+4. Accept opens `/dashboard/mentorships/{learnerId}_{mentorId}` with status **ACTIVE**, people cards, messages, and Learning journey.
+5. Mentor **My Learners** and learner **My Mentors** both list the dedicated relationship and **Open workspace**.
+6. Both members can open the workspace. The learner can send a message. Pause / End mentorship are available to members.
