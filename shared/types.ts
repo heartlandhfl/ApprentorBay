@@ -68,6 +68,7 @@ export interface HealthStatus {
     adminConfigured: boolean;
     adminInitialized: boolean;
     emulator: boolean;
+    error?: string | null;
   };
 }
 
