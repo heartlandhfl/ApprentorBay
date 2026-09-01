@@ -16,14 +16,33 @@ import { profilesRouter } from './routes/profiles.js';
 import { relationshipsRouter } from './routes/relationships.js';
 import { supportRouter } from './routes/support.js';
 
-const here = path.dirname(fileURLToPath(import.meta.url));
+function thisDir(): string {
+  try {
+    const url = import.meta.url;
+    if (url) return path.dirname(fileURLToPath(url));
+  } catch {
+    // Hostinger CJS bundle leaves import.meta empty.
+  }
+  return process.cwd();
+}
+
+const here = thisDir();
+
+function hasIndexHtml(dir: string): boolean {
+  return existsSync(path.join(dir, 'index.html'));
+}
 
 function resolveRepoRoot(startDir: string): string {
   for (const candidate of [
+    startDir,
     path.resolve(startDir, '..'),
     path.resolve(startDir, '../..'),
   ]) {
-    if (existsSync(path.join(candidate, 'client/dist'))) {
+    if (
+      hasIndexHtml(path.join(candidate, 'public')) ||
+      hasIndexHtml(path.join(candidate, 'dist/public')) ||
+      hasIndexHtml(path.join(candidate, 'client/dist'))
+    ) {
       return candidate;
     }
   }
@@ -31,13 +50,28 @@ function resolveRepoRoot(startDir: string): string {
   return path.resolve(startDir, '..');
 }
 
+function resolveClientDist(repoRoot: string, startDir: string): string {
+  const candidates = [
+    path.join(startDir, 'public'),
+    path.join(repoRoot, 'dist/public'),
+    path.join(repoRoot, 'public'),
+    path.join(repoRoot, 'client/dist'),
+  ];
+  return candidates.find((dir) => hasIndexHtml(dir)) ?? path.join(repoRoot, 'client/dist');
+}
+
+function listenPort(): number {
+  const parsed = Number(process.env.PORT);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 3001;
+}
+
 const repoRoot = resolveRepoRoot(here);
 
 dotenv.config({ path: path.join(repoRoot, '.env') });
 
-const port = Number(process.env.PORT ?? 3001);
-const clientDist = path.join(repoRoot, 'client/dist');
-const hasClientBuild = existsSync(clientDist);
+const port = listenPort();
+const clientDist = resolveClientDist(repoRoot, here);
+const hasClientBuild = hasIndexHtml(clientDist);
 const clientOrigin =
   process.env.CLIENT_ORIGIN ??
   (process.env.NODE_ENV === 'production' ? true : 'http://localhost:5173');
@@ -74,7 +108,7 @@ if (hasClientBuild) {
 
 app.use(errorHandler);
 
-app.listen(port, '0.0.0.0', () => {
+const server = app.listen(port, '0.0.0.0', () => {
   console.log(`ApprentorBay API listening on http://0.0.0.0:${port}`);
   console.log(hasClientBuild ? `Serving client from ${clientDist}` : 'API only (client/dist not found)');
   console.log(
@@ -89,4 +123,9 @@ app.listen(port, '0.0.0.0', () => {
     }`,
   );
   void seedAdmin();
+});
+
+server.on('error', (error) => {
+  console.error('Failed to bind HTTP port', error);
+  process.exit(1);
 });
