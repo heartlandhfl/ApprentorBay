@@ -633,6 +633,24 @@ describe('learning contract workspace', () => {
     assert.equal(legacy.milestones[0]?.successCriteria, 'Photo');
     assert.equal(legacy.deliverable?.expectedEvidence, '');
     assert.equal(contractProgress(legacy).percent, 50);
+    const booleanEvidence = normalizeContract({
+      ...legacy,
+      milestones: [
+        {
+          id: 'm1',
+          order: 0,
+          title: 'Prep',
+          description: 'Mill',
+          evidenceRequired: true as never,
+          status: 'approved',
+          evidenceText: 'Done',
+          evidenceLink: '',
+          lastFeedback: null,
+        },
+      ],
+    } as never);
+    assert.equal(booleanEvidence.milestones[0]?.successCriteria, '');
+    assert.equal(booleanEvidence.milestones[0]?.evidenceRequired, '');
     assert.equal(canAccessContractWorkspace(learner, legacy), true);
     assert.equal(
       canAccessContractWorkspace({ uid: 'other', role: 'learner', active: true }, legacy),

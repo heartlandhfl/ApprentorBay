@@ -108,10 +108,14 @@ export function combineGoalText(title: string, description: string): string {
   return heading || body;
 }
 
+function asText(value: unknown): string {
+  return typeof value === 'string' ? value : '';
+}
+
 export function normalizeGoal(input: Partial<Goal> & { id: string }): Goal {
-  const title = (input.title ?? '').trim() || firstLine(input.text ?? '');
-  const description = (input.description ?? '').trim() || restLines(input.text ?? '');
-  const text = (input.text ?? '').trim() || combineGoalText(title, description);
+  const title = asText(input.title).trim() || firstLine(asText(input.text));
+  const description = asText(input.description).trim() || restLines(asText(input.text));
+  const text = asText(input.text).trim() || combineGoalText(title, description);
   return {
     id: input.id,
     title,
@@ -125,9 +129,9 @@ export function normalizeObjective(
   input: Partial<Objective> & { id: string },
   order: number,
 ): Objective {
-  const title = (input.title ?? '').trim() || firstLine(input.text ?? '');
-  const description = (input.description ?? '').trim() || restLines(input.text ?? '');
-  const text = (input.text ?? '').trim() || combineGoalText(title, description);
+  const title = asText(input.title).trim() || firstLine(asText(input.text));
+  const description = asText(input.description).trim() || restLines(asText(input.text));
+  const text = asText(input.text).trim() || combineGoalText(title, description);
   return {
     id: input.id,
     title,
@@ -141,18 +145,18 @@ export function normalizeMilestone(
   input: Partial<Milestone> & { id: string },
   order: number,
 ): Milestone {
-  const criteria = (input.successCriteria ?? input.evidenceRequired ?? '').trim();
+  const criteria = (asText(input.successCriteria) || asText(input.evidenceRequired)).trim();
   return {
     id: input.id,
     order: input.order ?? order,
-    title: (input.title ?? '').trim(),
-    description: (input.description ?? '').trim(),
-    evidenceRequired: (input.evidenceRequired ?? criteria).trim(),
-    successCriteria: criteria || (input.evidenceRequired ?? '').trim(),
+    title: asText(input.title).trim(),
+    description: asText(input.description).trim(),
+    evidenceRequired: (asText(input.evidenceRequired) || criteria).trim(),
+    successCriteria: criteria || asText(input.evidenceRequired).trim(),
     status: input.status ?? 'locked',
-    evidenceText: input.evidenceText ?? '',
-    evidenceLink: input.evidenceLink ?? '',
-    lastFeedback: input.lastFeedback ?? null,
+    evidenceText: asText(input.evidenceText),
+    evidenceLink: asText(input.evidenceLink),
+    lastFeedback: input.lastFeedback == null ? null : asText(input.lastFeedback) || null,
   };
 }
 
@@ -162,10 +166,10 @@ export function normalizeDeliverable(
   if (!input) return null;
   return {
     id: input.id,
-    title: (input.title ?? '').trim(),
-    description: (input.description ?? '').trim(),
-    expectedEvidence: (input.expectedEvidence ?? '').trim(),
-    finalEvidenceUrl: input.finalEvidenceUrl ?? '',
+    title: asText(input.title).trim(),
+    description: asText(input.description).trim(),
+    expectedEvidence: asText(input.expectedEvidence).trim(),
+    finalEvidenceUrl: asText(input.finalEvidenceUrl),
     status: input.status ?? 'draft',
   };
 }
