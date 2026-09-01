@@ -280,16 +280,16 @@ export function AdminPage() {
           rows={mentors}
           onStatus={(user, status) =>
             ask({
-              title: `${ACCOUNT_STATUS_LABEL[status]} ${user.displayName}`,
-              confirm: ACCOUNT_STATUS_LABEL[status],
+              title: `${accountActionLabel(status)} ${user.displayName}`,
+              confirm: accountActionLabel(status),
               required: status !== ACCOUNT_STATUS.active,
               run: (nextReason) => setAccountStatus(user.uid, status, nextReason).then(() => undefined),
             })
           }
           onApproval={(user, status) =>
             ask({
-              title: `${APPROVAL_STATUS_LABEL[status]} ${user.displayName}`,
-              confirm: APPROVAL_STATUS_LABEL[status],
+              title: `${approvalActionLabel(status)} ${user.displayName}`,
+              confirm: approvalActionLabel(status),
               required: status !== VERIFICATION_STATUS.approved,
               run: (nextReason) => setMentorVerification(user.uid, status, nextReason),
             })
@@ -309,8 +309,8 @@ export function AdminPage() {
           rows={learners}
           onStatus={(user, status) =>
             ask({
-              title: `${ACCOUNT_STATUS_LABEL[status]} ${user.displayName}`,
-              confirm: ACCOUNT_STATUS_LABEL[status],
+              title: `${accountActionLabel(status)} ${user.displayName}`,
+              confirm: accountActionLabel(status),
               required: status !== ACCOUNT_STATUS.active,
               run: (nextReason) => setAccountStatus(user.uid, status, nextReason).then(() => undefined),
             })
@@ -521,6 +521,34 @@ function AccountTable({
       )}
     </Stack>
   );
+}
+
+function accountActionLabel(status: AccountStatus): string {
+  switch (status) {
+    case ACCOUNT_STATUS.active:
+      return 'Restore';
+    case ACCOUNT_STATUS.restricted:
+      return 'Restrict';
+    case ACCOUNT_STATUS.suspended:
+      return 'Suspend';
+    case ACCOUNT_STATUS.terminated:
+      return 'Terminate';
+    default:
+      return ACCOUNT_STATUS_LABEL[status];
+  }
+}
+
+function approvalActionLabel(status: Exclude<VerificationStatus, 'pending'>): string {
+  switch (status) {
+    case VERIFICATION_STATUS.approved:
+      return 'Approve';
+    case VERIFICATION_STATUS.rejected:
+      return 'Reject';
+    case VERIFICATION_STATUS.suspended:
+      return 'Suspend mentor';
+    default:
+      return APPROVAL_STATUS_LABEL[status];
+  }
 }
 
 function StatusBadge({ status }: { status: AccountStatus }) {
