@@ -50,12 +50,15 @@ export async function ensureAdminAccount(input: {
 export async function seedAdmin(attempt = 1): Promise<void> {
   const firebase = getAdminFirebase();
   if (!firebase.initialized) {
-    console.warn('Admin seed skipped: Firebase Admin is not initialized');
+    console.warn(
+      'Admin seed skipped: Firebase Admin is not initialized',
+      firebase.error ?? '',
+    );
     return;
   }
 
   if (!firebase.emulator) {
-    console.log('Admin seed skipped: production does not auto-create an admin. Run `npm run create-admin`.');
+    await bootstrapFirstAdmin();
     return;
   }
 
@@ -73,4 +76,34 @@ export async function seedAdmin(attempt = 1): Promise<void> {
     }
     console.error('Admin seed failed', error);
   }
+}
+
+export async function bootstrapFirstAdmin(): Promise<void> {
+  const email = process.env.SEED_ADMIN_EMAIL?.trim();
+  const password = process.env.SEED_ADMIN_PASSWORD;
+  if (!email || !password) {
+    console.log(
+      'First-admin bootstrap skipped: set SEED_ADMIN_EMAIL and SEED_ADMIN_PASSWORD to create the first admin.',
+    );
+    return;
+  }
+  if (password === DEFAULT_SEED_PASSWORD) {
+    console.error(
+      'First-admin bootstrap refused the emulator password. Set a unique SEED_ADMIN_PASSWORD.',
+    );
+    return;
+  }
+
+  const existingAdmins = await adminDb()
+    .collection(COLLECTIONS.users)
+    .where('role', '==', USER_ROLE.admin)
+    .limit(1)
+    .get();
+  if (!existingAdmins.empty) {
+    console.log('First-admin bootstrap skipped: an admin account already exists.');
+    return;
+  }
+
+  const uid = await ensureAdminAccount({ email, password });
+  console.log(`First admin ready: ${email} (${uid}). Sign in at /login, then open /admin.`);
 }

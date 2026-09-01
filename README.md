@@ -146,14 +146,20 @@ The site must be a **Node.js web app**, not a static / Vite website.
 
    If you get **503 Service Unavailable**, the Node process is crashing. Redeploy with Entry `dist/server.js` and Output `dist`, then check Runtime Logs. Common causes: build never produced `dist/server.js`, a bad `FIREBASE_PRIVATE_KEY`, or the panel still using the Vite preset.
 
-6. Create the production admin **once**, on your machine (not on Hostinger), with the live Admin SDK key and a unique password — never `ApprentorBayAdmin-2026`:
+6. Create the first production admin (signup cannot grant `admin`):
 
-   ```bash
-   # in .env: USE_FIREBASE_EMULATOR=false, FIREBASE_* , SEED_ADMIN_EMAIL, SEED_ADMIN_PASSWORD
-   npm run create-admin
-   ```
+   In hPanel environment variables, set a **unique** operator password — never `ApprentorBayAdmin-2026`:
 
-   Sign in at `https://apprentorbay.com/login`, then open `/admin`.
+   | Name | Value |
+   | --- | --- |
+   | `SEED_ADMIN_EMAIL` | your operator email |
+   | `SEED_ADMIN_PASSWORD` | a unique production password |
+
+   Redeploy or Restart. On boot, if Firebase Admin is initialized and **no** `users.role == admin` exists, Express creates that Auth user and Firestore doc. Sign in at `/login`, then open `/admin`.
+
+   `https://apprentorbay.com/api/health` must show `"adminInitialized": true`. If it is `false`, read `firebase.error` — usually `FIREBASE_PRIVATE_KEY` is not the PEM key (paste the key with literal `\n` newlines, no extra quotes).
+
+   You can also run `npm run create-admin` on your machine with the same vars. After the first admin exists, later boots skip bootstrap.
 
 Signup cannot grant `admin`. Firestore freezes `role` after create. Local emulator admin remains `admin@apprentorbay.test` / `ApprentorBayAdmin-2026`.
 

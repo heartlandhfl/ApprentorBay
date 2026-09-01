@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { USER_ROLE } from '@apprentorbay/shared';
-import { Button, EmptyState, Page, Text } from '../components';
+import { Button, Cluster, EmptyState, Page, Text } from '../components';
 import { useAuth } from '../lib/auth';
 
 export function RequireAdmin({ children }: { children: ReactNode }) {
@@ -14,12 +14,31 @@ export function RequireAdmin({ children }: { children: ReactNode }) {
     );
   }
 
-  if (!account || account.role !== USER_ROLE.admin) {
+  if (!account) {
+    return (
+      <Page>
+        <EmptyState
+          title="Sign in to administer"
+          description="The dashboard is only for an admin account. Sign up cannot create that role — use the operator email from SEED_ADMIN_EMAIL."
+          action={
+            <Cluster gap={12}>
+              <Button to="/login">Log in</Button>
+              <Button variant="secondary" to="/">
+                Back home
+              </Button>
+            </Cluster>
+          }
+        />
+      </Page>
+    );
+  }
+
+  if (account.role !== USER_ROLE.admin) {
     return (
       <Page>
         <EmptyState
           title="Admins only"
-          description="This page is locked. Your account role is checked here and again on the server."
+          description="This account is a learner or mentor. Role cannot be changed from the app. The first admin is created from SEED_ADMIN_EMAIL on the server."
           action={
             <Button variant="secondary" to="/">
               Back home
