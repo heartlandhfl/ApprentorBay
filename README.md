@@ -34,8 +34,10 @@ A user has exactly one role, set at signup: `mentor` | `learner` | `admin`.
 | Collection | Shape |
 | --- | --- |
 | `/users/{uid}` | `uid`, `role`, `email`, `displayName`, `createdAt` |
-| `/learnerProfiles/{uid}` | education, jobStatus, careerAspirations, competencyGoals, deliverables, public |
-| `/mentorProfiles/{uid}` | education, experience, deliverables, reviews, verificationStatus, public |
+| `/learnerProfiles/{uid}` | Private learner record. Visitors read `publicProfiles` instead |
+| `/mentorProfiles/{uid}` | Private mentor record. `verificationStatus` is participation **approval**, not a background check |
+| `/publicProfiles/{slug}` | Published projection only. No email, uid, or hidden location |
+| `/profileSlugs/{slug}` | Server-only slug uniqueness index |
 | `/mentorshipApplications/{id}` | learnerId, mentorId, message, status (`pending` / `accepted` / `declined`) |
 | `/mentorshipRelationships/{id}` | learnerId, mentorId, status (`active` / `ended`) |
 | `/messages/{id}` | relationshipId, senderId, text, createdAt |
@@ -50,9 +52,9 @@ Signup writes the user doc and the matching profile in one Firestore transaction
 | `/how-it-works` | Public explanation of pairing, contract, and deliverable |
 | `/signup` | Role first (Mentor or Learner), then the Terms, then the role-specific form |
 | `/login` | Email / password |
-| `/learners/:id` | Public learner profile (empty states when fields are blank) |
-| `/mentors/:id` | Public mentor profile + Verified / Pending Approval / Rejected badge |
-| `/admin/verification` | Admin-only pending table. Guarded in React **and** Express **and** Firestore rules |
+| `/learners/:slug` | Public learner profile. Portfolio is the strongest section. `:slug` is not a Firebase UID |
+| `/mentors/:slug` | Public mentor profile. **Approved** means participation; **Verified** is a specific claim |
+| `/admin` | Admin-only approvals, verified claims, and accounts. Guarded in React **and** Express **and** Firestore rules |
 | `/dashboard/applications` | Mentor inbox of pending applications (Accept / Decline) |
 | `/dashboard/messages` | Active pairings |
 | `/dashboard/messages/:relationshipId` | Real-time chat. The only **Start Learning Journey** entry point lives here |

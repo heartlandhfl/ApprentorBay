@@ -1,5 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { MentorProfile } from '@apprentorbay/shared';
+import {
+  APPROVAL_DISCLAIMER,
+  VERIFIED_CLAIM_LABEL,
+  type PublicProfile,
+} from '@apprentorbay/shared';
 import {
   Badge,
   Button,
@@ -11,15 +15,15 @@ import {
   Stack,
   Text,
 } from '../components';
-import { watchApprovedMentors } from '../features/profiles';
+import { watchListedMentors } from '../features/profiles';
 
 export function MentorsPage() {
-  const [mentors, setMentors] = useState<MentorProfile[] | null>(null);
+  const [mentors, setMentors] = useState<PublicProfile[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState('');
 
   useEffect(() => {
-    return watchApprovedMentors(setMentors, (err) => setError(err.message));
+    return watchListedMentors(setMentors, (err) => setError(err.message));
   }, []);
 
   const filtered = useMemo(() => {
@@ -33,10 +37,10 @@ export function MentorsPage() {
       <Stack gap={32}>
         <Stack gap={12}>
           <Text variant="caption">Directory</Text>
-          <Text variant="h1">Verified mentors</Text>
+          <Text variant="h1">Approved mentors</Text>
           <Text variant="muted">
-            Public profiles only. A mentor appears here after an admin approves them,
-            and disappears if their account is suspended.
+            Public profiles only. A mentor appears here after the platform approves
+            participation. {APPROVAL_DISCLAIMER}
           </Text>
           <Input
             label="Search by name or expertise"
@@ -52,7 +56,7 @@ export function MentorsPage() {
           <Text variant="muted">Loading mentors…</Text>
         ) : filtered.length === 0 ? (
           <EmptyState
-            title={query.trim() ? 'No mentors match that search' : 'No verified mentors yet'}
+            title={query.trim() ? 'No mentors match that search' : 'No approved mentors yet'}
             description={
               query.trim()
                 ? 'Try a different name or area of expertise.'
@@ -62,7 +66,7 @@ export function MentorsPage() {
         ) : (
           <Grid cols={3}>
             {filtered.map((mentor) => (
-              <MentorCard key={mentor.userId} mentor={mentor} />
+              <MentorCard key={mentor.slug} mentor={mentor} />
             ))}
           </Grid>
         )}
@@ -71,26 +75,33 @@ export function MentorsPage() {
   );
 }
 
-function MentorCard({ mentor }: { mentor: MentorProfile }) {
-  const craft = mentor.expertise?.trim() || mentor.experience[0]?.title || 'Mentor';
+function MentorCard({ mentor }: { mentor: PublicProfile }) {
+  const craft = mentor.areasOfExpertise[0] || mentor.professionalIdentity || 'Mentor';
 
   return (
     <Card>
       <Stack gap={16}>
         <Stack gap={8}>
-          <Badge tone="success">Verified</Badge>
+          <Badge tone="success">Approved</Badge>
+          {mentor.verifiedClaims
+            .filter((item) => item.verified)
+            .map((item) => (
+              <Badge key={item.type}>
+                {VERIFIED_CLAIM_LABEL[item.type as keyof typeof VERIFIED_CLAIM_LABEL] ?? 'Verified claim'}
+              </Badge>
+            ))}
           <Text variant="h3">{mentor.displayName || 'Mentor'}</Text>
           <Text variant="small">{craft}</Text>
         </Stack>
-        {mentor.deliverables.length > 0 ? (
+        {mentor.mentoredDeliverables.length > 0 ? (
           <Text variant="small">
-            {mentor.deliverables.length} completed deliverable
-            {mentor.deliverables.length === 1 ? '' : 's'}
+            {mentor.mentoredDeliverables.length} mentored deliverable
+            {mentor.mentoredDeliverables.length === 1 ? '' : 's'}
           </Text>
         ) : (
           <Text variant="small">No public deliverables yet</Text>
         )}
-        <Button variant="secondary" to={`/mentors/${mentor.userId}`}>
+        <Button variant="secondary" to={`/mentors/${mentor.slug}`}>
           View profile
         </Button>
       </Stack>
@@ -98,10 +109,11 @@ function MentorCard({ mentor }: { mentor: MentorProfile }) {
   );
 }
 
-function mentorMatches(mentor: MentorProfile, needle: string): boolean {
+function mentorMatches(mentor: PublicProfile, needle: string): boolean {
   const haystack = [
     mentor.displayName,
-    mentor.expertise ?? '',
+    mentor.professionalIdentity,
+    ...mentor.areasOfExpertise,
     ...mentor.experience.map((item) => `${item.title} ${item.organization} ${item.summary}`),
     ...mentor.education.map((item) => `${item.credential} ${item.institution}`),
   ]

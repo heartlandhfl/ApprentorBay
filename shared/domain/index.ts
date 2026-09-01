@@ -25,6 +25,7 @@ export {
   RELATIONSHIP_STATUS,
   STEP_OWNER,
   VERIFICATION_STATUS,
+  VERIFIED_CLAIM_TYPE,
   isApplicationStatus,
   isContractActiveStatus,
   isDeliverableStatus,
@@ -50,6 +51,8 @@ export type {
   RelationshipStatus,
   StepOwner,
   VerificationStatus,
+  VerifiedClaim,
+  VerifiedClaimType,
 } from './statuses.js';
 
 export { COLLECTIONS, RESERVED_COLLECTIONS } from './collections.js';
@@ -59,12 +62,15 @@ export {
   emptyLearnerProfile,
   emptyMentorProfile,
   isAccountActive,
+  normalizeLearnerProfile,
+  normalizeMentorProfile,
   profileCollectionForRole,
 } from './users.js';
 export type {
   AccountRow,
   AdminCounts,
   CompetencyGoal,
+  CredentialEntry,
   EducationEntry,
   ExperienceEntry,
   IsoDateString,
@@ -212,6 +218,43 @@ export type {
 export { NOTIFICATION_TYPE, isUnreadNotification } from './notifications.js';
 export type { Notification, NotificationType } from './notifications.js';
 
+export {
+  APPROVAL_DISCLAIMER,
+  APPROVAL_STATUS,
+  APPROVAL_STATUS_LABEL,
+  VERIFIED_CLAIM_LABEL,
+  buildPublicLearnerProfile,
+  buildPublicMentorProfile,
+  canListPublicMentor,
+  isPublicPhotoPath,
+  portfolioItemFromShowcase,
+  profilePhotoStoragePath,
+  ownPublicProfilePath,
+  publicProfileOmitsPrivateFields,
+  publicProfilePath,
+  publicReviewsFrom,
+  toStoredPublicProfile,
+  verifiedClaimsPublic,
+} from './publicProfiles.js';
+export type {
+  ApprovalStatus,
+  PublicPortfolioItem,
+  PublicProfile,
+  PublicReview,
+  ProfileSlugRecord,
+} from './publicProfiles.js';
+
+export {
+  PROFILE_SLUG,
+  RESERVED_PROFILE_SLUGS,
+  looksLikeFirebaseUid,
+  nextSlugCandidate,
+  normalizeSlugInput,
+  suggestSlug,
+  validateProfileSlug,
+} from './slugs.js';
+export type { SlugValidation } from './slugs.js';
+
 export { ADMIN_AUDIT_ACTION, AUDIT_EVENT, buildAuditLog } from './auditLog.js';
 export type { AdminAuditAction, AdminAuditLog, AuditEvent } from './auditLog.js';
 
@@ -230,6 +273,8 @@ export {
   canEndRelationship,
   canPauseRelationship,
   canReadPairing,
+  canReadPrivateProfile,
+  canEditOwnProfile,
   canResumeRelationship,
   canSendMessage,
   canStartLearningJourney,

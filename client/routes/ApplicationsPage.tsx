@@ -90,7 +90,7 @@ export function ApplicationsPage() {
               {
                 key: 'learner',
                 header: 'Learner',
-                render: (row) => <Text>{names[row.learnerId] ?? 'Learner'}</Text>,
+                render: (row) => <Text>{row.learnerDisplayName || names[row.learnerId] || 'Learner'}</Text>,
               },
               {
                 key: 'message',
@@ -117,9 +117,11 @@ export function ApplicationsPage() {
                     >
                       Decline
                     </Button>
-                    <Button size="sm" variant="ghost" to={`/learners/${row.learnerId}`}>
-                      View profile
-                    </Button>
+                    {row.learnerSlug ? (
+                      <Button size="sm" variant="ghost" to={`/learners/${row.learnerSlug}`}>
+                        View profile
+                      </Button>
+                    ) : null}
                   </Cluster>
                 ),
               },

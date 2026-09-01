@@ -39,6 +39,7 @@ export async function seedAdmin(attempt = 1): Promise<void> {
       createdAt: prior?.createdAt ?? now,
       termsAcceptedAt: prior?.termsAcceptedAt ?? now,
       termsVersion: prior?.termsVersion ?? TERMS_VERSION,
+      profileSlug: prior?.profileSlug ?? null,
     };
 
     await adminDb().collection(COLLECTIONS.users).doc(uid).set(account, { merge: true });

@@ -21,6 +21,7 @@ import {
   emptyLearnerProfile,
   emptyMentorProfile,
   isAccountActive,
+  ownPublicProfilePath,
   type SignupRole,
   type User,
 } from '@apprentorbay/shared';
@@ -86,7 +87,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setLoading(false);
             return;
           }
-          setAccount(nextAccount);
+          if (
+            nextAccount &&
+            !nextAccount.profileSlug &&
+            (nextAccount.role === USER_ROLE.learner || nextAccount.role === USER_ROLE.mentor)
+          ) {
+            void next.getIdToken().then((token) =>
+              fetch('/api/profiles/me/bootstrap', {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${token}` },
+              }),
+            );
+          }
+          setAccount(
+            nextAccount
+              ? { ...nextAccount, profileSlug: nextAccount.profileSlug ?? null }
+              : null,
+          );
           setLoading(false);
         },
         () => {
@@ -137,6 +154,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           createdAt,
           termsAcceptedAt: createdAt,
           termsVersion: TERMS_VERSION,
+          profileSlug: null,
         };
 
         try {
@@ -185,7 +203,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
 
         const stored = await getDoc(doc(db, COLLECTIONS.users, uid));
-        return (stored.data() as User | undefined) ?? userDoc;
+        const token = await credential.user.getIdToken();
+        await fetch('/api/profiles/me/bootstrap', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` },
+        }).catch(() => undefined);
+        const after = await getDoc(doc(db, COLLECTIONS.users, uid));
+        return (after.data() as User | undefined) ?? (stored.data() as User | undefined) ?? userDoc;
       },
       async logIn(email, password) {
         const auth = getFirebaseAuth();
@@ -248,7 +272,8 @@ function authMessage(error: unknown): string {
 }
 
 export function profilePath(account: User): string {
-  if (account.role === USER_ROLE.learner) return `/learners/${account.uid}`;
-  if (account.role === USER_ROLE.mentor) return `/mentors/${account.uid}`;
+  if (account.role === USER_ROLE.learner || account.role === USER_ROLE.mentor) {
+    return ownPublicProfilePath(account.role, account.profileSlug);
+  }
   return '/admin';
 }

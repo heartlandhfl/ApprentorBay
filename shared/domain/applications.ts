@@ -13,6 +13,10 @@ export interface MentorshipApplication {
   message: string;
   status: ApplicationStatus;
   createdAt: IsoDateString;
+  learnerDisplayName?: string;
+  mentorDisplayName?: string;
+  learnerSlug?: string | null;
+  mentorSlug?: string | null;
 }
 
 export type MentorApplication = MentorshipApplication;

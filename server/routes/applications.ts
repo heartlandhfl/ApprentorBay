@@ -7,6 +7,7 @@ import {
   USER_ROLE,
   buildActiveRelationship,
   canAcceptApplication,
+  canApplyForMentorship,
   canDeclineApplication,
   isClosedRelationship,
   isOpenRelationship,
@@ -22,6 +23,75 @@ import { requireAccount, sendApiError, type AccountRequest } from '../middleware
 export const applicationsRouter = Router();
 
 applicationsRouter.use(requireAccount);
+
+applicationsRouter.post('/', async (req: AccountRequest, res, next) => {
+  try {
+    const account = req.account;
+    if (!account) {
+      sendApiError(res, 401, 'unauthenticated', 'Sign in required');
+      return;
+    }
+    if (account.role !== USER_ROLE.learner) {
+      sendApiError(res, 403, 'forbidden', 'Only a learner can apply');
+      return;
+    }
+
+    const mentorSlug = typeof req.body?.mentorSlug === 'string' ? req.body.mentorSlug.trim() : '';
+    const message = typeof req.body?.message === 'string' ? req.body.message : '';
+    if (!mentorSlug) {
+      sendApiError(res, 400, 'invalid', 'mentorSlug is required');
+      return;
+    }
+
+    const { resolveSlug, loadPrivateProfile } = await import('../lib/profiles.js');
+    const record = await resolveSlug(mentorSlug);
+    if (!record || record.role !== USER_ROLE.mentor) {
+      sendApiError(res, 404, 'not_found', 'Mentor not found');
+      return;
+    }
+    const loaded = await loadPrivateProfile(record.userId, USER_ROLE.mentor);
+    if (!loaded || loaded.role !== USER_ROLE.mentor) {
+      sendApiError(res, 404, 'not_found', 'Mentor not found');
+      return;
+    }
+    if (!canApplyForMentorship(account, loaded.profile, message)) {
+      sendApiError(res, 400, 'invalid', 'This mentor is not open for applications');
+      return;
+    }
+
+    const pending = await adminDb()
+      .collection(COLLECTIONS.applications)
+      .where('learnerId', '==', account.uid)
+      .where('mentorId', '==', record.userId)
+      .limit(8)
+      .get();
+    const existingPending = pending.docs.find(
+      (doc) => (doc.data() as MentorshipApplication).status === APPLICATION_STATUS.pending,
+    );
+    if (existingPending) {
+      res.json({ application: existingPending.data() });
+      return;
+    }
+
+    const ref = adminDb().collection(COLLECTIONS.applications).doc();
+    const application: MentorshipApplication = {
+      id: ref.id,
+      learnerId: account.uid,
+      mentorId: record.userId,
+      message: message.trim(),
+      status: APPLICATION_STATUS.pending,
+      createdAt: new Date().toISOString(),
+      learnerDisplayName: account.displayName,
+      mentorDisplayName: loaded.profile.displayName,
+      learnerSlug: account.profileSlug,
+      mentorSlug: mentorSlug,
+    };
+    await ref.set(application);
+    res.status(201).json({ application });
+  } catch (error) {
+    next(error);
+  }
+});
 
 async function loadApplication(applicationId: string) {
   const snap = await adminDb().collection(COLLECTIONS.applications).doc(applicationId).get();

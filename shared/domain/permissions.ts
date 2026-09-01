@@ -160,6 +160,25 @@ export function canDecideVerification(actor: PermissionActor | null | undefined)
   return canAdminister(actor);
 }
 
+export function canReadPrivateProfile(
+  actor: PermissionActor | null | undefined,
+  profileUserId: string,
+  pairing?: PairingMemberIds | null,
+): boolean {
+  if (!actor || !isAccountActive(actor)) return false;
+  if (actor.role === USER_ROLE.admin) return true;
+  if (actor.uid === profileUserId) return true;
+  return Boolean(pairing && isPairingMember(actor.uid, pairing));
+}
+
+export function canEditOwnProfile(
+  actor: PermissionActor | null | undefined,
+  profileUserId: string,
+): boolean {
+  if (!actor || !isAccountActive(actor)) return false;
+  return actor.uid === profileUserId && actor.role !== USER_ROLE.admin;
+}
+
 export function canSuspendAccount(
   actor: PermissionActor | null | undefined,
   target: Pick<User, 'uid' | 'role'>,

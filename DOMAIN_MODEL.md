@@ -35,7 +35,9 @@ Account document. One role at signup. Admin is seeded, never self-assigned.
 
 ### LearnerProfile / MentorProfile
 
-Public (or owner) profile keyed by `uid`. Mentor has `verificationStatus`. Both may carry `deliverables: DeliverableRef[]` after a contract completes. Public proof of work is the `showcases` document, not the contract itself.
+### LearnerProfile / MentorProfile
+
+**Private** records keyed by `uid`. Visitors do not read these. Public pages read `publicProfiles/{slug}`. Mentor `verificationStatus` is participation **approval**, not a background check. Verified claims are separate. See `PUBLIC_PROFILE_SYSTEM.md`.
 
 ### Mentor Application (`MentorshipApplication`)
 
@@ -87,11 +89,19 @@ Missing `active` is treated as `true` (`isAccountActive`).
 
 ### `learnerProfiles/{uid}`
 
-`userId`, `displayName`, `education[]`, `jobStatus`, `careerAspirations`, `competencyGoals[]`, `deliverables[]`, `public`
+Private. `userId`, `slug`, `displayName`, `photoPath`, `professionalIdentity`, `location`, `locationPublic`, `education[]`, `qualifications[]`, `certifications[]`, `jobStatus`, `careerAspirations`, `competencyGoals[]`, `skillsDeveloping[]`, `skillsDemonstrated[]`, `deliverables[]`, `public`
 
 ### `mentorProfiles/{uid}`
 
-`userId`, `displayName`, `expertise`, `education[]`, `experience[]`, `deliverables[]`, `reviews[]`, `verificationStatus`, `public`
+Private. Learner fields plus `expertise`, `areasOfExpertise[]`, `experience[]`, `professionalGoals`, `mentoringInterests`, `reviews[]`, `verificationStatus` (approval), `verifiedClaims[]`
+
+### `publicProfiles/{slug}`
+
+Public projection. No `userId`, email, or hidden location. Photo paths use the slug. Portfolio / mentored deliverables are embedded. Visitors do not read `showcases`.
+
+### `profileSlugs/{slug}`
+
+Server-only uniqueness index: `userId`, `role`.
 
 ### `mentorshipApplications/{id}`
 

@@ -69,10 +69,23 @@ service firebase.storage {
       allow delete: if isOwner(userId);
     }
 
+    match /profile-photos/{slug}/{fileId} {
+      allow read: if true;
+      allow create, update: if isSignedIn()
+        && firestore.exists(/databases/(default)/documents/users/$(request.auth.uid))
+        && userDoc(request.auth.uid).profileSlug == slug
+        && isValidImageWrite();
+      allow delete: if (
+        isSignedIn()
+        && firestore.exists(/databases/(default)/documents/users/$(request.auth.uid))
+        && userDoc(request.auth.uid).profileSlug == slug
+      ) || isAdmin();
+    }
+
+    // Legacy public folder. New photos use profile-photos. Writes stay denied.
     match /portfolios/{userId}/{allPaths=**} {
       allow read: if true;
-      allow create, update: if isOwner(userId) && isValidImageWrite();
-      allow delete: if isOwner(userId);
+      allow write: if false;
     }
 
     // Private evidence: pairing members and admins may read.
