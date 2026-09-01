@@ -11,5 +11,5 @@
     "isolatedModules": true,
     "types": ["node"]
   },
-  "include": ["index.ts", "lib/**/*.ts", "middleware/**/*.ts", "routes/**/*.ts"]
+  "include": ["index.ts", "createAdmin.ts", "lib/**/*.ts", "middleware/**/*.ts", "routes/**/*.ts"]
 }

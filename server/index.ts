@@ -36,8 +36,11 @@ const repoRoot = resolveRepoRoot(here);
 dotenv.config({ path: path.join(repoRoot, '.env') });
 
 const port = Number(process.env.PORT ?? 3001);
-const clientOrigin = process.env.CLIENT_ORIGIN ?? 'http://localhost:5173';
 const clientDist = path.join(repoRoot, 'client/dist');
+const hasClientBuild = existsSync(clientDist);
+const clientOrigin =
+  process.env.CLIENT_ORIGIN ??
+  (process.env.NODE_ENV === 'production' ? true : 'http://localhost:5173');
 
 const firebase = getAdminFirebase();
 
@@ -60,17 +63,20 @@ app.use('/api/contracts', contractsRouter);
 app.use('/api/support', supportRouter);
 app.use('/api', notFound);
 
-if (process.env.NODE_ENV === 'production' && existsSync(clientDist)) {
+if (hasClientBuild) {
   app.use(express.static(clientDist));
   app.get('/{*path}', (_req, res) => {
     res.sendFile(path.join(clientDist, 'index.html'));
   });
+} else if (process.env.NODE_ENV === 'production') {
+  console.warn('client/dist is missing. Run `npm run build` so Express can serve the app.');
 }
 
 app.use(errorHandler);
 
 app.listen(port, '0.0.0.0', () => {
   console.log(`ApprentorBay API listening on http://0.0.0.0:${port}`);
+  console.log(hasClientBuild ? `Serving client from ${clientDist}` : 'API only (client/dist not found)');
   console.log(
     `Firebase Admin: ${
       firebase.initialized
