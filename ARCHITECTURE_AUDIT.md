@@ -526,6 +526,8 @@ The unused `mentorships` collection name should **not** be revived.
 
 ## 6. Security Risks
 
+**Superseded.** Live rules, queries, and findings are in `SECURITY_AUDIT.md`. This section describes an older ruleset (client relationship create, client profile updates) and must not be used as the current threat model.
+
 Severity in this section is about **exploitability in the current rules/API**, not product completeness.
 
 ### 6.1 Unauthorized writes

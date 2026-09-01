@@ -8,6 +8,7 @@ import {
   createDraftContract,
   deliverableRefFromShowcase,
   mergeShowcaseRecord,
+  canParticipate,
   normalizeContract,
   reduceContract,
   type ApiError,
@@ -55,6 +56,10 @@ contractsRouter.post('/', async (req: AccountRequest, res, next) => {
     }
     if (account.role !== USER_ROLE.learner) {
       sendApiError(res, 403, 'forbidden', 'Only the learner can start a learning journey');
+      return;
+    }
+    if (!canParticipate(account)) {
+      sendApiError(res, 403, 'forbidden', 'This account cannot start a learning journey');
       return;
     }
 
@@ -107,6 +112,10 @@ contractsRouter.post('/:id/action', async (req: AccountRequest, res, next) => {
     const actor = asActor(account);
     if (!actor) {
       sendApiError(res, 403, 'forbidden', 'Only the learner, mentor, or an admin can act');
+      return;
+    }
+    if (account.role !== USER_ROLE.admin && !canParticipate(account)) {
+      sendApiError(res, 403, 'forbidden', 'This account cannot change a learning contract');
       return;
     }
 

@@ -33,6 +33,44 @@ service cloud.firestore {
         && userDoc(request.auth.uid).role == 'learner';
     }
 
+    // Caller-only gets. Safe on list rules because they do not vary by result row.
+    function callerExists() {
+      return isSignedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
+    function callerAccountStatus() {
+      return userDoc(request.auth.uid).accountStatus;
+    }
+
+    function accountCanSignIn() {
+      return callerExists()
+        && userDoc(request.auth.uid).active != false
+        && (
+          !('accountStatus' in userDoc(request.auth.uid))
+          || callerAccountStatus() == 'active'
+          || callerAccountStatus() == 'restricted'
+        );
+    }
+
+    function accountParticipates() {
+      return callerExists()
+        && userDoc(request.auth.uid).active != false
+        && (
+          !('accountStatus' in userDoc(request.auth.uid))
+          || callerAccountStatus() == 'active'
+        );
+    }
+
+    function userParticipates(uid) {
+      return exists(/databases/$(database)/documents/users/$(uid))
+        && get(/databases/$(database)/documents/users/$(uid)).data.active != false
+        && (
+          !('accountStatus' in get(/databases/$(database)/documents/users/$(uid)).data)
+          || get(/databases/$(database)/documents/users/$(uid)).data.accountStatus == 'active'
+        );
+    }
+
     function relationshipPath(relationshipId) {
       return /databases/$(database)/documents/mentorshipRelationships/$(relationshipId);
     }
@@ -148,6 +186,7 @@ service cloud.firestore {
     match /mentorshipApplications/{applicationId} {
       allow read: if isPairingMember() || isAdmin();
       allow create: if isLearner()
+        && accountParticipates()
         && request.resource.data.learnerId == request.auth.uid
         && request.resource.data.status == 'pending'
         && request.resource.data.mentorId is string
@@ -155,7 +194,8 @@ service cloud.firestore {
         && request.resource.data.message is string
         && request.resource.data.message.size() > 0
         && request.resource.data.message.size() <= 1000
-        && mentorIsApproved(request.resource.data.mentorId);
+        && mentorIsApproved(request.resource.data.mentorId)
+        && userParticipates(request.resource.data.mentorId);
       allow update, delete: if false;
     }
 
@@ -166,7 +206,8 @@ service cloud.firestore {
 
     match /messages/{messageId} {
       allow read: if isRelationshipMember(resource.data.relationshipId) || isAdmin();
-      allow create: if isActiveRelationshipMember(request.resource.data.relationshipId)
+      allow create: if accountParticipates()
+        && isActiveRelationshipMember(request.resource.data.relationshipId)
         && request.resource.data.senderId == request.auth.uid
         && request.resource.data.text is string
         && request.resource.data.text.size() > 0
@@ -199,7 +240,7 @@ service cloud.firestore {
     match /supportIssues/{issueId} {
       allow read: if isAdmin()
         || (isSignedIn() && resource.data.reporterId == request.auth.uid);
-      allow create: if isSignedIn()
+      allow create: if accountCanSignIn()
         && request.resource.data.reporterId == request.auth.uid
         && request.resource.data.status == 'open'
         && request.resource.data.subject is string
