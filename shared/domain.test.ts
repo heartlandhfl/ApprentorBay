@@ -55,6 +55,14 @@ import {
   deriveVerificationCase,
   emptyLearnerProfile,
   emptyMentorProfile,
+  LEARNER_JOURNEY,
+  lifecycleProfileFrom,
+  learnerDashboardModel,
+  learnerJourneyStage,
+  mentorDashboardModel,
+  mentorJourneyStage,
+  MENTOR_JOURNEY,
+  normalizeContract,
   isPublicPhotoPath,
   looksLikeFirebaseUid,
   normalizeLearnerProfile,
@@ -614,6 +622,292 @@ describe('public profile system', () => {
     assert.equal(canReadPrivateProfile(visitor, 'learner-1', pairing), false);
     assert.equal(canReadPrivateProfile(admin, 'learner-1'), true);
     assert.equal(canReadPrivateProfile(null, 'learner-1'), false);
+  });
+});
+
+describe('lifecycle dashboards', () => {
+  const now = '2026-09-01T12:00:00.000Z';
+
+  function draftContract() {
+    return normalizeContract({
+      id: 'c1',
+      relationshipId: 'r1',
+      learnerId: 'l1',
+      mentorId: 'm1',
+      status: LEARNING_CONTRACT_STATUS.draft,
+      currentStepOwner: 'learner',
+      createdAt: now,
+      updatedAt: now,
+      goal: null,
+      goalHistory: [],
+      objectives: [],
+      milestones: [],
+      deliverable: null,
+      changeRequestReason: null,
+      context: null,
+      mentorComment: null,
+      revisionHistory: [],
+      evidenceItems: [],
+      showcaseId: null,
+      showcasePublished: false,
+    });
+  }
+
+  function relationship(status: (typeof RELATIONSHIP_STATUS)[keyof typeof RELATIONSHIP_STATUS] = RELATIONSHIP_STATUS.active) {
+    return {
+      ...buildActiveRelationship({
+        id: 'r1',
+        learnerId: 'l1',
+        mentorId: 'm1',
+        applicationId: 'a1',
+        now,
+      }),
+      status,
+    };
+  }
+
+  it('names the learner and mentor journeys', () => {
+    assert.deepEqual(
+      LEARNER_JOURNEY.map((step) => step.label),
+      ['Discover', 'Connect', 'Agree', 'Learn', 'Build', 'Prove', 'Showcase'],
+    );
+    assert.deepEqual(
+      MENTOR_JOURNEY.map((step) => step.label),
+      ['Be discovered', 'Connect', 'Guide', 'Review', 'Validate', 'Build legacy'],
+    );
+  });
+
+  it('keeps an empty learner on Discover with onboarding actions', () => {
+    const profile = lifecycleProfileFrom(
+      { displayName: 'Ada', accountStatus: ACCOUNT_STATUS.active, profileSlug: null },
+      emptyLearnerProfile('l1', 'Ada'),
+    );
+    const model = learnerDashboardModel({
+      profile,
+      applications: [],
+      relationships: [],
+      contracts: [],
+    });
+    assert.equal(model.stage, 'discover');
+    assert.equal(model.hasActivity, false);
+    assert.equal(model.next.title, 'Complete your profile');
+    assert.equal(model.onboarding[1]?.title, 'Browse Mentors');
+    assert.match(model.onboarding[2]?.title ?? '', /ambition/i);
+  });
+
+  it('moves the learner from Connect through Showcase', () => {
+    const pending = [
+      {
+        id: 'a1',
+        learnerId: 'l1',
+        mentorId: 'm1',
+        message: 'I want to learn framing',
+        status: APPLICATION_STATUS.pending,
+        createdAt: now,
+      },
+    ];
+    assert.equal(
+      learnerJourneyStage({ applications: pending, relationships: [], contracts: [] }),
+      'connect',
+    );
+    assert.equal(
+      learnerJourneyStage({
+        applications: [],
+        relationships: [relationship()],
+        contracts: [draftContract()],
+      }),
+      'agree',
+    );
+
+    const learning = normalizeContract({
+      ...draftContract(),
+      status: LEARNING_CONTRACT_STATUS.inProgress,
+      milestones: [
+        {
+          id: 'ms-1',
+          order: 1,
+          title: 'Stock prep',
+          description: 'Mill the stock',
+          evidenceRequired: 'Photo',
+          successCriteria: 'Photo',
+          status: MILESTONE_STATUS.active,
+          evidenceText: '',
+          evidenceLink: '',
+          lastFeedback: null,
+        },
+      ],
+    });
+    assert.equal(
+      learnerJourneyStage({ applications: [], relationships: [relationship()], contracts: [learning] }),
+      'learn',
+    );
+
+    const building = normalizeContract({
+      ...learning,
+      milestones: [
+        { ...learning.milestones[0], status: MILESTONE_STATUS.approved },
+        {
+          ...learning.milestones[0],
+          id: 'ms-2',
+          order: 2,
+          title: 'Assembly',
+          status: MILESTONE_STATUS.active,
+        },
+      ],
+    });
+    assert.equal(
+      learnerJourneyStage({ applications: [], relationships: [relationship()], contracts: [building] }),
+      'build',
+    );
+
+    const proving = normalizeContract({
+      ...building,
+      status: LEARNING_CONTRACT_STATUS.completionPending,
+    });
+    assert.equal(
+      learnerJourneyStage({ applications: [], relationships: [relationship()], contracts: [proving] }),
+      'prove',
+    );
+
+    const done = normalizeContract({
+      ...building,
+      status: LEARNING_CONTRACT_STATUS.completed,
+    });
+    assert.equal(
+      learnerJourneyStage({ applications: [], relationships: [], contracts: [done] }),
+      'showcase',
+    );
+  });
+
+  it('answers the five learner dashboard questions from a live contract', () => {
+    const profile = lifecycleProfileFrom(
+      { displayName: 'Ada', accountStatus: ACCOUNT_STATUS.active, profileSlug: 'ada' },
+      { ...emptyLearnerProfile('l1', 'Ada'), professionalIdentity: 'Apprentice', careerAspirations: 'Frame houses', public: true, slug: 'ada' },
+    );
+    const contract = normalizeContract({
+      ...draftContract(),
+      status: LEARNING_CONTRACT_STATUS.inProgress,
+      currentStepOwner: 'learner',
+      milestones: [
+        {
+          id: 'ms-1',
+          order: 1,
+          title: 'Stock prep',
+          description: 'Mill the stock',
+          evidenceRequired: 'Photo',
+          successCriteria: 'Photo',
+          status: MILESTONE_STATUS.active,
+          evidenceText: '',
+          evidenceLink: '',
+          lastFeedback: null,
+        },
+      ],
+    });
+    const model = learnerDashboardModel({
+      profile,
+      applications: [],
+      relationships: [relationship()],
+      contracts: [contract],
+    });
+    assert.equal(model.stage, 'learn');
+    assert.match(model.next.title, /Stock prep/);
+    assert.match(model.waitingFor, /You/);
+    assert.match(model.milestoneNeedingAttention, /Stock prep/);
+    assert.ok(model.achievements.some((item) => /Public profile/.test(item)));
+  });
+
+  it('keeps an empty mentor on Be discovered with onboarding actions', () => {
+    const profile = lifecycleProfileFrom(
+      { displayName: 'Mo', accountStatus: ACCOUNT_STATUS.active, profileSlug: null },
+      emptyMentorProfile('m1', 'Mo'),
+    );
+    const model = mentorDashboardModel({
+      profile,
+      applications: [],
+      relationships: [],
+      contracts: [],
+    });
+    assert.equal(model.stage, 'be_discovered');
+    assert.equal(model.hasActivity, false);
+    assert.equal(model.next.title, 'Complete your professional profile');
+    assert.equal(model.onboarding[1]?.title, 'Set availability');
+    assert.equal(model.onboarding[2]?.title, 'Prepare your mentoring profile');
+    assert.equal(model.pendingApplications, 0);
+  });
+
+  it('queues mentor applications, reviews, evidence, and outcomes', () => {
+    const profile = lifecycleProfileFrom(
+      { displayName: 'Mo', accountStatus: ACCOUNT_STATUS.active, profileSlug: 'mo' },
+      {
+        ...emptyMentorProfile('m1', 'Mo'),
+        professionalIdentity: 'Framer',
+        mentoringInterests: 'Joinery',
+        slug: 'mo',
+        public: true,
+      },
+    );
+    const pending = [
+      {
+        id: 'a1',
+        learnerId: 'l1',
+        mentorId: 'm1',
+        message: 'Please take me on',
+        status: APPLICATION_STATUS.pending,
+        createdAt: now,
+      },
+    ];
+    const submitted = normalizeContract({
+      ...draftContract(),
+      status: LEARNING_CONTRACT_STATUS.inProgress,
+      milestones: [
+        {
+          id: 'ms-1',
+          order: 1,
+          title: 'Stock prep',
+          description: 'Mill the stock',
+          evidenceRequired: 'Photo',
+          successCriteria: 'Photo',
+          status: MILESTONE_STATUS.submitted,
+          evidenceText: 'Done',
+          evidenceLink: '',
+          lastFeedback: null,
+        },
+      ],
+    });
+    const model = mentorDashboardModel({
+      profile,
+      applications: pending,
+      relationships: [relationship()],
+      contracts: [submitted],
+    });
+    assert.equal(model.stage, 'validate');
+    assert.equal(model.pendingApplications, 1);
+    assert.equal(model.evidenceAwaitingReview, 1);
+    assert.equal(model.learnersNeedingAttention, 1);
+    assert.equal(model.next.href, '/dashboard/applications');
+    assert.ok(model.queue.some((item) => item.kind === 'application'));
+    assert.ok(model.queue.some((item) => item.kind === 'evidence'));
+
+    const reviewing = mentorDashboardModel({
+      profile,
+      applications: [],
+      relationships: [relationship()],
+      contracts: [
+        normalizeContract({
+          ...draftContract(),
+          status: LEARNING_CONTRACT_STATUS.underMentorReview,
+        }),
+      ],
+    });
+    assert.equal(reviewing.stage, 'review');
+    assert.equal(reviewing.contractsAwaitingReview, 1);
+
+    const legacy = mentorJourneyStage({
+      applications: [],
+      relationships: [],
+      contracts: [normalizeContract({ ...draftContract(), status: LEARNING_CONTRACT_STATUS.completed })],
+    });
+    assert.equal(legacy, 'build_legacy');
   });
 });
 

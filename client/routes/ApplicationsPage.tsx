@@ -70,6 +70,9 @@ export function ApplicationsPage() {
     <Page>
       <Stack gap={24}>
         <Stack gap={12}>
+          <Button variant="ghost" size="sm" to="/dashboard">
+            Back to dashboard
+          </Button>
           <Text variant="h1">Applications</Text>
           <Text variant="muted">
             Accepting opens a private conversation. Only the two of you can read it.
@@ -81,7 +84,15 @@ export function ApplicationsPage() {
         {rows === null ? (
           <Text variant="muted">Loading applications…</Text>
         ) : rows.length === 0 ? (
-          <EmptyState title="No pending applications" />
+          <EmptyState
+            title="No pending applications"
+            description="When a learner applies, they appear here. Until then, keep your mentoring profile easy to find."
+            action={
+              <Button variant="secondary" to="/mentors/me">
+                Prepare your mentoring profile
+              </Button>
+            }
+          />
         ) : (
           <Table
             rows={rows}

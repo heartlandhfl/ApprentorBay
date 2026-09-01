@@ -11,13 +11,36 @@ type StepperProps = {
   steps: Step[];
   currentStep: number;
   onStepSelect?: (index: number) => void;
+  /** `rail` wraps on small screens so dashboards stay scannable. Same marks as the stack. */
+  layout?: 'stack' | 'rail';
 };
 
 /**
  * The single stepper used by every multi-step flow in ApprentorBay.
  * Do not introduce a second stepper UI.
  */
-export function Stepper({ steps, currentStep, onStepSelect }: StepperProps) {
+export function Stepper({ steps, currentStep, onStepSelect, layout = 'stack' }: StepperProps) {
+  if (layout === 'rail') {
+    return (
+      <ol className="flex flex-wrap gap-x-4 gap-y-4">
+        {steps.map((step, index) => {
+          const state =
+            index < currentStep ? 'complete' : index === currentStep ? 'current' : 'upcoming';
+          return (
+            <li key={step.id} className="flex min-w-[6.5rem] flex-1 items-start gap-2">
+              <span
+                className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-small font-medium ${markClass(state)}`}
+              >
+                {index + 1}
+              </span>
+              <StepCopy step={step} state={state} compact />
+            </li>
+          );
+        })}
+      </ol>
+    );
+  }
+
   return (
     <ol className="flex flex-col gap-0">
       {steps.map((step, index) => {
@@ -29,13 +52,7 @@ export function Stepper({ steps, currentStep, onStepSelect }: StepperProps) {
           <li key={step.id} className="flex gap-4">
             <div className="flex w-8 flex-col items-center">
               <span
-                className={`flex h-8 w-8 items-center justify-center rounded-full text-small font-medium ${
-                  state === 'current'
-                    ? 'bg-accent text-paper-raised'
-                    : state === 'complete'
-                      ? 'bg-ink text-paper-raised'
-                      : 'border border-line bg-paper text-ink-muted'
-                }`}
+                className={`flex h-8 w-8 items-center justify-center rounded-full text-small font-medium ${markClass(state)}`}
               >
                 {index + 1}
               </span>
@@ -63,17 +80,25 @@ export function Stepper({ steps, currentStep, onStepSelect }: StepperProps) {
   );
 }
 
+function markClass(state: 'complete' | 'current' | 'upcoming'): string {
+  if (state === 'current') return 'bg-accent text-paper-raised';
+  if (state === 'complete') return 'bg-ink text-paper-raised';
+  return 'border border-line bg-paper text-ink-muted';
+}
+
 function StepCopy({
   step,
   state,
+  compact = false,
 }: {
   step: Step;
   state: 'complete' | 'current' | 'upcoming';
+  compact?: boolean;
 }) {
   return (
     <Stack gap={4}>
       <Cluster gap={8}>
-        <Text variant="h3" as="h3">
+        <Text variant={compact ? 'small' : 'h3'} as={compact ? 'span' : 'h3'}>
           {step.label}
         </Text>
         {state === 'current' ? (
@@ -82,7 +107,7 @@ function StepCopy({
           </Text>
         ) : null}
       </Cluster>
-      {step.description ? <Text variant="small">{step.description}</Text> : null}
+      {step.description && !compact ? <Text variant="small">{step.description}</Text> : null}
     </Stack>
   );
 }

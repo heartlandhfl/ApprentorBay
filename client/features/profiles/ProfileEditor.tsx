@@ -8,7 +8,7 @@ import {
   type LearnerProfile,
   type MentorProfile,
 } from '@apprentorbay/shared';
-import { Button, Card, Checkbox, Input, Stack, Text, TextArea } from '../../components';
+import { Button, Card, Checkbox, FileField, Input, Stack, Text, TextArea } from '../../components';
 import { getFirebaseStorage } from '../../lib/firebase';
 import { submitMentorVerification, updateOwnProfile } from '../../lib/api';
 
@@ -125,17 +125,12 @@ export function ProfileEditor({ role, profile, onSaved }: ProfileEditorProps) {
             onChange={(event) => setSlug(event.target.value)}
             hint={`/${role === 'mentor' ? 'mentors' : 'learners'}/your-name`}
           />
-          <label>
-            <Text variant="small" as="span">
-              Photo
-            </Text>
-            <input
-              type="file"
-              accept="image/jpeg,image/png,image/webp"
-              className="mt-2 block w-full text-small"
-              onChange={(event) => setPhoto(event.target.files?.[0] ?? null)}
-            />
-          </label>
+          <FileField
+            label="Photo"
+            accept="image/jpeg,image/png,image/webp"
+            fileName={photo?.name}
+            onChange={(event) => setPhoto(event.target.files?.[0] ?? null)}
+          />
           <TextArea
             label="Education"
             value={education}

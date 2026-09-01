@@ -34,7 +34,7 @@ export function Modal({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center px-6">
+    <div className="fixed inset-0 z-50 flex items-end justify-center px-4 py-4 sm:items-center sm:px-6">
       {dismissible && onClose ? (
         <button
           type="button"
@@ -49,7 +49,7 @@ export function Modal({
         role="dialog"
         aria-modal="true"
         aria-labelledby="modal-title"
-        className="relative z-10 w-full max-w-lg rounded-sm border border-line bg-paper-raised p-6 shadow-lg"
+        className="relative z-10 max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-sm border border-line bg-paper-raised p-4 shadow-lg sm:p-6"
       >
         <Stack gap={16}>
           <Text variant="h2" as="h2">

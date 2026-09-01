@@ -20,6 +20,7 @@ import { RequireAdmin } from './routes/RequireAdmin';
 import { RequireAuth } from './routes/RequireAuth';
 import { SignupPage } from './routes/SignupPage';
 import { SupportPage } from './routes/SupportPage';
+import { DashboardPage } from './routes/DashboardPage';
 import { VerificationPage } from './routes/VerificationPage';
 
 export function App() {
@@ -51,6 +52,14 @@ export function App() {
               <RequireAdmin>
                 <VerificationPage />
               </RequireAdmin>
+            }
+          />
+          <Route
+            path="/dashboard"
+            element={
+              <RequireAuth>
+                <DashboardPage />
+              </RequireAuth>
             }
           />
           <Route

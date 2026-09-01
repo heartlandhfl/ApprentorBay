@@ -16,7 +16,10 @@ type TableProps<T> = {
 export function Table<T>({ columns, rows, rowKey }: TableProps<T>) {
   return (
     <div className="overflow-x-auto rounded-sm border border-line bg-paper-raised">
-      <table className="w-full border-collapse text-left">
+      <p className="border-b border-line px-4 py-2 text-small text-ink-muted md:hidden">
+        Swipe sideways to see every column.
+      </p>
+      <table className="w-full min-w-[40rem] border-collapse text-left">
         <thead>
           <tr className="border-b border-line">
             {columns.map((column) => (

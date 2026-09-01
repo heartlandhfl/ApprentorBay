@@ -11,7 +11,12 @@ export function HowItWorksPage() {
         <HowItWorks featured />
         <Cluster gap={12}>
           {account ? (
-            <Button to="/mentors">Browse mentors</Button>
+            <>
+              <Button to="/dashboard">Open dashboard</Button>
+              <Button variant="secondary" to="/mentors">
+                Browse mentors
+              </Button>
+            </>
           ) : (
             <>
               <Button to="/signup">Sign up</Button>

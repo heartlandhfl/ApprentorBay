@@ -3,6 +3,7 @@ export { Button } from './Button';
 export { Card } from './Card';
 export { Checkbox } from './Checkbox';
 export { EmptyState } from './EmptyState';
+export { FileField } from './FileField';
 export { Grid } from './Grid';
 export { Header } from './Header';
 export { HowItWorks, HOW_IT_WORKS_STEPS } from './HowItWorks';
