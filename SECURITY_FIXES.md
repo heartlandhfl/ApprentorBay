@@ -91,4 +91,20 @@ That prefix is not used by the current client (photos go to `/profile-photos/{sl
 
 ## Validation
 
-See the PR walkthrough and `SECURITY_AUDIT.md` query table. After these edits: `npm run build -w shared && npm run typecheck && npm test`, plus live learner / mentor / admin / anonymous Firestore and API checks against the emulators.
+Performed on the Firebase emulators after reloading `firestore.rules`:
+
+| Check | Result |
+| --- | --- |
+| `npm run build` (shared + client + server) | Pass |
+| `npm run typecheck` | Pass |
+| `npm test` (50 tests) | Pass |
+| Anonymous list of published `publicProfiles` | Allowed |
+| Anonymous read of `users`, contracts, applications, messages, audit, support | Denied |
+| Anonymous `/api/admin/stats` | 401 |
+| Learner read own user; list own pairing contracts | Allowed |
+| Learner grant admin / change `accountStatus` / write contracts / admin API | Denied |
+| Mentor self-approve, self-verify, grant admin | Denied |
+| Mentor submit verification + admin approve | Allowed |
+| Stranger list another pairing’s contracts or messages | Denied (`permission-denied`, not an empty success) |
+| Restricted learner send message / create application / start journey | Denied |
+| Restricted learner file support | Allowed (201) |
