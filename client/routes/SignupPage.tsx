@@ -1,16 +1,16 @@
 import { useState, type FormEvent } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
-import { TERMS_SUMMARY, TERMS_VERSION, USER_ROLE, type SignupRole } from '@apprentorbay/shared';
+import { TERMS_SUMMARY, USER_ROLE, validateSignupTermsAcceptance, type SignupRole } from '@apprentorbay/shared';
 import {
   Button,
   Card,
-  Checkbox,
   Cluster,
   Grid,
   Input,
   Page,
   Stack,
   Stepper,
+  TermsAcceptance,
   Text,
   TextArea,
 } from '../components';
@@ -66,8 +66,9 @@ export function SignupPage() {
       setStep(0);
       return;
     }
-    if (!termsAgreed) {
-      setError('You must accept the Terms of Use.');
+    const terms = validateSignupTermsAcceptance({ accepted: termsAgreed });
+    if (!terms.ok) {
+      setError(terms.error ?? 'You must agree to the Terms of Use.');
       setStep(1);
       return;
     }
@@ -83,7 +84,7 @@ export function SignupPage() {
         careerAspirations,
         recentRole,
         expertise,
-        termsAccepted: true,
+        termsAccepted: termsAgreed,
       });
       navigate(signedInHomePath(created));
     } catch (err) {
@@ -135,15 +136,11 @@ export function SignupPage() {
           <Card>
             <Stack gap={16}>
               <Text variant="h3">Terms of Use</Text>
-              <Text variant="small">Version {TERMS_VERSION}</Text>
               <Text>{TERMS_SUMMARY}</Text>
-              <Button variant="secondary" href="/legal/terms">
-                Read the full Terms of Use
-              </Button>
-              <Checkbox
-                label="I have read and agree to the Terms of Use"
+              <TermsAcceptance
+                id="signup-terms"
                 checked={termsAgreed}
-                onChange={(event) => setTermsAgreed(event.target.checked)}
+                onChange={setTermsAgreed}
               />
               <Cluster gap={12}>
                 <Button disabled={!termsAgreed} onClick={() => goToStep(2)}>
@@ -220,6 +217,11 @@ export function SignupPage() {
                     />
                   </>
                 )}
+                <TermsAcceptance
+                  id="signup-terms-create"
+                  checked={termsAgreed}
+                  onChange={setTermsAgreed}
+                />
                 {error ? <Text variant="danger">{error}</Text> : null}
                 <Cluster gap={12}>
                   <Button type="submit" loading={busy} disabled={!termsAgreed}>

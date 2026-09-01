@@ -18,13 +18,24 @@ export type {
 } from './learningContractMachine.js';
 
 export {
+  TERMS_ACCEPTANCE_LABEL,
+  TERMS_CONFIG,
+  TERMS_EFFECTIVE_DATE,
   TERMS_SECTIONS,
   TERMS_SUMMARY,
   TERMS_TITLE,
   TERMS_VERSION,
+  buildTermsAcceptance,
+  formatTermsEffectiveDate,
+  isValidTermsAcceptance,
   needsTermsAcceptance,
+  termsAcceptanceFromUser,
+  termsEffectiveLabel,
+  termsEffectiveStartUtc,
+  termsEffectiveStatus,
+  validateSignupTermsAcceptance,
 } from './legal.js';
-export type { TermsSection } from './legal.js';
+export type { TermsAcceptanceInput, TermsAcceptanceRecord, TermsEffectiveStatus, TermsSection } from './legal.js';
 
 export {
   COLLECTIONS,

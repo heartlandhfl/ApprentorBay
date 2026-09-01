@@ -13,11 +13,12 @@ import {
   signOut,
   type User as FirebaseUser,
 } from 'firebase/auth';
-import { doc, getDoc, onSnapshot, runTransaction, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, onSnapshot, runTransaction } from 'firebase/firestore';
 import {
   COLLECTIONS,
   ACCOUNT_STATUS,
-  TERMS_VERSION,
+  buildTermsAcceptance,
+  validateSignupTermsAcceptance,
   USER_ROLE,
   emptyLearnerProfile,
   emptyMentorProfile,
@@ -26,6 +27,7 @@ import {
   type SignupRole,
   type User,
 } from '@apprentorbay/shared';
+import { recordTermsAcceptance } from './api';
 import { getFirebaseAuth, getFirebaseDb } from './firebase';
 
 type AuthContextValue = {
@@ -131,8 +133,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (!auth || !db) {
           throw new Error('Firebase is not initialized');
         }
-        if (input.termsAccepted !== true) {
-          throw new Error('You must accept the Terms of Use.');
+        const terms = validateSignupTermsAcceptance({ accepted: input.termsAccepted });
+        if (!terms.ok) {
+          throw new Error(terms.error ?? 'You must agree to the Terms of Use.');
         }
 
         const credential = await createUserWithEmailAndPassword(
@@ -154,8 +157,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           active: true,
           accountStatus: ACCOUNT_STATUS.active,
           createdAt,
-          termsAcceptedAt: createdAt,
-          termsVersion: TERMS_VERSION,
+          ...buildTermsAcceptance(createdAt),
           profileSlug: null,
         };
 
@@ -237,13 +239,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         await signOut(auth);
       },
       async acceptCurrentTerms() {
-        const db = getFirebaseDb();
-        const uid = firebaseUser?.uid ?? account?.uid;
-        if (!db || !uid) throw new Error('Sign in required');
-        await updateDoc(doc(db, COLLECTIONS.users, uid), {
-          termsAcceptedAt: new Date().toISOString(),
-          termsVersion: TERMS_VERSION,
-        });
+        await recordTermsAcceptance();
       },
     }),
     [account, firebaseUser, loading],
