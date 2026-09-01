@@ -7,6 +7,7 @@ import express from 'express';
 import { getAdminFirebase } from './lib/firebase.js';
 import { seedAdmin } from './lib/seedAdmin.js';
 import { errorHandler, notFound } from './middleware/errorHandler.js';
+import { accountRouter } from './routes/account.js';
 import { adminRouter } from './routes/admin.js';
 import { applicationsRouter } from './routes/applications.js';
 import { contractsRouter } from './routes/contracts.js';
@@ -50,6 +51,7 @@ app.use(
 app.use(express.json());
 
 app.use('/api/health', healthRouter);
+app.use('/api/account', accountRouter);
 app.use('/api/admin', adminRouter);
 app.use('/api/profiles', profilesRouter);
 app.use('/api/applications', applicationsRouter);

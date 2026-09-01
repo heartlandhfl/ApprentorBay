@@ -1,4 +1,4 @@
-import { ACCOUNT_STATUS, COLLECTIONS, TERMS_VERSION, USER_ROLE, type User } from '@apprentorbay/shared';
+import { ACCOUNT_STATUS, COLLECTIONS, USER_ROLE, buildTermsAcceptance, type User } from '@apprentorbay/shared';
 import { adminAuth, adminDb, getAdminFirebase } from './firebase.js';
 
 const RETRY_MS = 1500;
@@ -38,8 +38,7 @@ export async function seedAdmin(attempt = 1): Promise<void> {
       active: true,
       accountStatus: prior?.accountStatus ?? ACCOUNT_STATUS.active,
       createdAt: prior?.createdAt ?? now,
-      termsAcceptedAt: prior?.termsAcceptedAt ?? now,
-      termsVersion: prior?.termsVersion ?? TERMS_VERSION,
+      ...buildTermsAcceptance(prior?.termsAcceptedAt ?? now),
       profileSlug: prior?.profileSlug ?? null,
     };
 

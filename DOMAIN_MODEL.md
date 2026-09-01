@@ -90,7 +90,9 @@ Shapes match existing production documents. New optional fields were **not** add
 
 ### `users/{uid}`
 
-`uid`, `role`, `email`, `displayName`, `active`, `accountStatus?`, `createdAt`, `termsAcceptedAt`, `termsVersion`, `profileSlug`
+`uid`, `role`, `email`, `displayName`, `active`, `accountStatus?`, `createdAt`, `termsAccepted?`, `termsAcceptedAt`, `termsVersion`, `profileSlug`
+
+New accounts must store `termsAccepted: true`, `termsVersion` (current `TERMS_CONFIG.version`), and `termsAcceptedAt`. Visiting `/legal/terms` is not acceptance. See `TERMS_ACCEPTANCE.md`.
 
 Missing `active` is treated as `true` (`isAccountActive`). Missing `accountStatus` follows `active` (`active` / `suspended`).
 

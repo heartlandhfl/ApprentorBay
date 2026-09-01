@@ -6,6 +6,7 @@ import {
   buildPublicMentorProfile,
   isPublicPhotoPath,
   looksLikeFirebaseUid,
+  needsTermsAcceptance,
   nextSlugCandidate,
   normalizeLearnerProfile,
   normalizeMentorProfile,
@@ -204,6 +205,11 @@ export async function assignSlug(input: {
 }
 
 export async function bootstrapProfile(account: User) {
+  if (needsTermsAcceptance(account)) {
+    throw Object.assign(new Error('Valid Terms acceptance is required before onboarding can continue'), {
+      status: 403,
+    });
+  }
   const loaded = await loadPrivateProfile(account.uid, account.role);
   if (!loaded) {
     throw Object.assign(new Error('Profile not found'), { status: 404 });

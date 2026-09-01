@@ -28,6 +28,8 @@ export interface User {
   active: boolean;
   accountStatus?: AccountStatus;
   createdAt: IsoDateString;
+  /** Explicit signup / re-acceptance confirmation. Missing on older documents. */
+  termsAccepted?: boolean;
   termsAcceptedAt: IsoDateString | null;
   termsVersion: string | null;
   /** Public URL slug. Null until the server assigns one. Not a Firebase UID. */

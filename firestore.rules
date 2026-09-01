@@ -122,6 +122,7 @@ service cloud.firestore {
           !('accountStatus' in request.resource.data)
           || request.resource.data.accountStatus == 'active'
         )
+        && request.resource.data.termsAccepted == true
         && request.resource.data.termsVersion is string
         && request.resource.data.termsVersion.size() > 0
         && request.resource.data.termsAcceptedAt is string
@@ -145,6 +146,10 @@ service cloud.firestore {
         && (
           request.resource.data.termsVersion == resource.data.termsVersion
           || request.resource.data.termsVersion is string
+        )
+        && (
+          !('termsAccepted' in request.resource.data)
+          || request.resource.data.termsAccepted == true
         )
         && (
           !('profileSlug' in request.resource.data)
