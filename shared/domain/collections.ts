@@ -11,6 +11,7 @@ export const COLLECTIONS = {
   relationships: 'mentorshipRelationships',
   messages: 'messages',
   contracts: 'learningContracts',
+  auditLogs: 'adminAuditLogs',
 } as const;
 
 export type CollectionName = (typeof COLLECTIONS)[keyof typeof COLLECTIONS];

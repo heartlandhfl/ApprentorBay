@@ -11,8 +11,11 @@ import {
   RESERVED_COLLECTIONS,
   USER_ROLE,
   VERIFICATION_STATUS,
+  buildActiveRelationship,
   canAcceptApplication,
   canApplyForMentorship,
+  canEndRelationship,
+  canPauseRelationship,
   canStartLearningJourney,
   canTransitionApplication,
   canTransitionContract,
@@ -20,7 +23,10 @@ import {
   canTransitionRelationship,
   isAccountActive,
   isLearnerRole,
+  isOpenRelationship,
+  normalizeRelationship,
   pairingIdFieldForRole,
+  relationshipDocId,
   showcaseFromDeliverableRef,
   validateApplicationMessage,
   validateEvidenceSubmission,
@@ -40,6 +46,7 @@ describe('domain identities', () => {
     assert.equal(COLLECTIONS.applications, 'mentorshipApplications');
     assert.equal(COLLECTIONS.relationships, 'mentorshipRelationships');
     assert.equal(COLLECTIONS.contracts, 'learningContracts');
+    assert.equal(COLLECTIONS.auditLogs, 'adminAuditLogs');
     assert.equal(RESERVED_COLLECTIONS.legacyMentorships, 'mentorships');
     assert.equal(RESERVED_COLLECTIONS.notifications, 'notifications');
     assert.equal(RESERVED_COLLECTIONS.adminAuditLogs, 'adminAuditLogs');
@@ -61,7 +68,19 @@ describe('domain transitions', () => {
       true,
     );
     assert.equal(
+      canTransitionRelationship(RELATIONSHIP_STATUS.active, RELATIONSHIP_STATUS.paused),
+      true,
+    );
+    assert.equal(
+      canTransitionRelationship(RELATIONSHIP_STATUS.paused, RELATIONSHIP_STATUS.active),
+      true,
+    );
+    assert.equal(
       canTransitionRelationship(RELATIONSHIP_STATUS.ended, RELATIONSHIP_STATUS.active),
+      false,
+    );
+    assert.equal(
+      canTransitionRelationship(RELATIONSHIP_STATUS.terminated, RELATIONSHIP_STATUS.active),
       false,
     );
   });
@@ -159,3 +178,53 @@ describe('showcase projection', () => {
     assert.equal(item.title, 'A sawhorse');
   });
 });
+
+describe('mentorship relationship engine', () => {
+  it('uses a deterministic id so accept retries hit the same document', () => {
+    assert.equal(relationshipDocId('learner-1', 'mentor-1'), 'learner-1_mentor-1');
+  });
+
+  it('fills missing fields on older relationship documents', () => {
+    const normalized = normalizeRelationship({
+      id: 'rel-old',
+      learnerId: 'learner-1',
+      mentorId: 'mentor-1',
+      status: RELATIONSHIP_STATUS.active,
+      createdAt: '2026-01-01T00:00:00.000Z',
+    });
+    assert.equal(normalized.applicationId, null);
+    assert.equal(normalized.startedAt, '2026-01-01T00:00:00.000Z');
+    assert.equal(normalized.endedAt, null);
+    assert.equal(isOpenRelationship(normalized), true);
+  });
+
+  it('builds a complete active relationship from an accepted application', () => {
+    const relationship = buildActiveRelationship({
+      id: relationshipDocId('learner-1', 'mentor-1'),
+      learnerId: 'learner-1',
+      mentorId: 'mentor-1',
+      applicationId: 'app-1',
+      now: '2026-09-01T00:00:00.000Z',
+    });
+    assert.equal(relationship.status, RELATIONSHIP_STATUS.active);
+    assert.equal(relationship.applicationId, 'app-1');
+    assert.equal(relationship.startedAt, relationship.createdAt);
+    assert.equal(relationship.endedAt, null);
+  });
+
+  it('lets either pairing member pause or end an active relationship', () => {
+    const relationship = buildActiveRelationship({
+      id: 'rel-1',
+      learnerId: 'learner-1',
+      mentorId: 'mentor-1',
+      applicationId: 'app-1',
+      now: '2026-09-01T00:00:00.000Z',
+    });
+    const learner = { uid: 'learner-1', role: USER_ROLE.learner, active: true };
+    const stranger = { uid: 'other', role: USER_ROLE.learner, active: true };
+    assert.equal(canPauseRelationship(learner, relationship), true);
+    assert.equal(canEndRelationship(learner, relationship), true);
+    assert.equal(canPauseRelationship(stranger, relationship), false);
+  });
+});
+

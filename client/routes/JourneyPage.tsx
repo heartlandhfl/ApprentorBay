@@ -77,8 +77,8 @@ export function JourneyPage() {
           title="This journey is not yours"
           description="Only the learner and mentor on the relationship can open it."
           action={
-            <Button variant="secondary" to="/dashboard/messages">
-              Back to messages
+            <Button variant="secondary" to="/dashboard/mentorships">
+              Back to mentorships
             </Button>
           }
         />
@@ -101,7 +101,7 @@ export function JourneyPage() {
           title="No learning journey yet"
           description="Start it from the relationship page. That is the only entry point."
           action={
-            <Button to={relationshipId ? `/dashboard/messages/${relationshipId}` : '/dashboard/messages'}>
+            <Button to={relationshipId ? `/dashboard/mentorships/${relationshipId}` : '/dashboard/mentorships'}>
               Back to the relationship
             </Button>
           }
@@ -147,7 +147,7 @@ function JourneyBody({
     <Page>
       <Stack gap={32}>
         <Stack gap={12}>
-          <Button variant="ghost" size="sm" to={`/dashboard/messages/${contract.relationshipId}`}>
+          <Button variant="ghost" size="sm" to={`/dashboard/mentorships/${contract.relationshipId}`}>
             Back to the relationship
           </Button>
           <Text variant="h1">Learning journey</Text>

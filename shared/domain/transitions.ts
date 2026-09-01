@@ -28,12 +28,21 @@ export const APPLICATION_TRANSITIONS: TransitionMap<ApplicationStatus> = {
 };
 
 export const RELATIONSHIP_TRANSITIONS: TransitionMap<RelationshipStatus> = {
-  [RELATIONSHIP_STATUS.active]: [RELATIONSHIP_STATUS.ended],
+  [RELATIONSHIP_STATUS.active]: [
+    RELATIONSHIP_STATUS.paused,
+    RELATIONSHIP_STATUS.ended,
+    RELATIONSHIP_STATUS.terminated,
+  ],
+  [RELATIONSHIP_STATUS.paused]: [
+    RELATIONSHIP_STATUS.active,
+    RELATIONSHIP_STATUS.ended,
+    RELATIONSHIP_STATUS.terminated,
+  ],
   /**
-   * Rules currently allow ended → active. Domain intent is one-way.
-   * Keep the map one-way; do not use a client write to reactivate.
+   * Reactivation after ended happens only via application accept, not this map.
    */
   [RELATIONSHIP_STATUS.ended]: [],
+  [RELATIONSHIP_STATUS.terminated]: [],
 };
 
 export const VERIFICATION_TRANSITIONS: TransitionMap<VerificationStatus> = {

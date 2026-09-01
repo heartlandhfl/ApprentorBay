@@ -66,8 +66,9 @@ export function JourneyEntry({ relationship, account, otherName }: JourneyEntryP
             </Button>
           ) : (
             <Text variant="muted">
-              Waiting on {account.role === USER_ROLE.mentor ? otherName : 'the learner'} to start the
-              learning journey.
+              {relationship.status === RELATIONSHIP_STATUS.active
+                ? `Waiting on ${account.role === USER_ROLE.mentor ? otherName : 'the learner'} to start the learning journey.`
+                : 'Resume the mentorship to start a learning journey.'}
             </Text>
           )}
           {error ? <Text variant="danger">{error}</Text> : null}

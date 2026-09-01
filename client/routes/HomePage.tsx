@@ -32,7 +32,7 @@ export function HomePage() {
             {account ? (
               <>
                 <Button to="/mentors">Browse mentors</Button>
-                <Button variant="secondary" to={account.role === USER_ROLE.admin ? '/admin' : '/dashboard/messages'}>
+                <Button variant="secondary" to={account.role === USER_ROLE.admin ? '/admin' : '/dashboard/mentorships'}>
                   {account.role === USER_ROLE.admin ? 'Open admin' : 'Go to messages'}
                 </Button>
               </>
