@@ -77,7 +77,8 @@
       "collectionGroup": "publicProfiles",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "listed", "order": "ASCENDING" }
+        { "fieldPath": "listed", "order": "ASCENDING" },
+        { "fieldPath": "published", "order": "ASCENDING" }
       ]
     }
   ],

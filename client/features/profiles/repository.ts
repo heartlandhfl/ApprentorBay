@@ -48,7 +48,11 @@ export function watchListedMentors(
   }
 
   return onSnapshot(
-    query(collection(db, COLLECTIONS.publicProfiles), where('listed', '==', true)),
+    query(
+      collection(db, COLLECTIONS.publicProfiles),
+      where('listed', '==', true),
+      where('published', '==', true),
+    ),
     (snap) => {
       const rows = snap.docs
         .map((item) => item.data() as PublicProfile)
