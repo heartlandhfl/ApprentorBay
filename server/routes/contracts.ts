@@ -1,18 +1,21 @@
 import { Router } from 'express';
-import { FieldValue } from 'firebase-admin/firestore';
+import { FieldValue, type DocumentReference } from 'firebase-admin/firestore';
 import {
   COLLECTIONS,
   RELATIONSHIP_STATUS,
   USER_ROLE,
+  buildShowcase,
   createDraftContract,
+  deliverableRefFromShowcase,
+  mergeShowcaseRecord,
   normalizeContract,
   reduceContract,
   type ApiError,
   type ContractAction,
   type ContractActor,
-  type DeliverableRef,
   type LearningContract,
   type MentorshipRelationship,
+  type Showcase,
   type User,
 } from '@apprentorbay/shared';
 import { adminDb } from '../lib/firebase.js';
@@ -125,8 +128,13 @@ contractsRouter.post('/:id/action', async (req: AccountRequest, res, next) => {
 
     await ref.set(result.contract);
 
-    if (result.effects.some((effect) => effect.type === 'publish_deliverable_refs')) {
-      await publishDeliverableRefs(result.contract);
+    for (const effect of result.effects) {
+      if (effect.type === 'publish_showcase') {
+        await publishShowcase(result.contract);
+      }
+      if (effect.type === 'set_showcase_published') {
+        await setShowcasePublished(result.contract, effect.published);
+      }
     }
 
     res.json({ contract: result.contract });
@@ -135,21 +143,73 @@ contractsRouter.post('/:id/action', async (req: AccountRequest, res, next) => {
   }
 });
 
-async function publishDeliverableRefs(contract: LearningContract) {
-  if (!contract.deliverable) return;
+async function publishShowcase(contract: LearningContract) {
+  const [learnerName, mentorName] = await Promise.all([
+    displayName(contract.learnerId, 'Learner'),
+    displayName(contract.mentorId, 'Mentor'),
+  ]);
+  const next = buildShowcase({
+    contract,
+    learnerDisplayName: learnerName,
+    mentorDisplayName: mentorName,
+    now: contract.updatedAt,
+    published: contract.showcasePublished,
+  });
+  const ref = adminDb().collection(COLLECTIONS.showcases).doc(next.id);
+  const existingSnap = await ref.get();
+  const existing = existingSnap.exists ? (existingSnap.data() as Showcase) : null;
+  await ref.set(mergeShowcaseRecord(existing, next));
+  await attachDeliverableRefs(contract, next);
+}
 
-  const entry: DeliverableRef = {
-    id: contract.deliverable.id,
-    contractId: contract.id,
-    title: contract.deliverable.title,
-    description: contract.deliverable.description,
-  };
+async function setShowcasePublished(contract: LearningContract, published: boolean) {
+  const id = contract.showcaseId ?? contract.id;
+  const ref = adminDb().collection(COLLECTIONS.showcases).doc(id);
+  const snap = await ref.get();
+  if (!snap.exists) {
+    await publishShowcase({ ...contract, showcasePublished: published });
+    return;
+  }
+  await ref.set(
+    {
+      published,
+      publishedAt: published ? new Date().toISOString() : null,
+      updatedAt: new Date().toISOString(),
+    },
+    { merge: true },
+  );
+}
 
+async function attachDeliverableRefs(
+  contract: LearningContract,
+  showcase: { id: string; contractId: string; title: string; description: string },
+) {
+  const entry = deliverableRefFromShowcase(showcase);
   const learnerRef = adminDb().collection(COLLECTIONS.learnerProfiles).doc(contract.learnerId);
   const mentorRef = adminDb().collection(COLLECTIONS.mentorProfiles).doc(contract.mentorId);
-
   await Promise.all([
-    learnerRef.update({ deliverables: FieldValue.arrayUnion(entry) }),
-    mentorRef.update({ deliverables: FieldValue.arrayUnion(entry) }),
+    unionDeliverable(learnerRef, entry),
+    unionDeliverable(mentorRef, entry),
   ]);
+}
+
+async function unionDeliverable(
+  ref: DocumentReference,
+  entry: { id: string; contractId: string; title: string; description: string },
+) {
+  const snap = await ref.get();
+  if (!snap.exists) return;
+  await ref.update({ deliverables: FieldValue.arrayUnion(entry) });
+}
+
+async function displayName(uid: string, fallback: string): Promise<string> {
+  const userSnap = await adminDb().collection(COLLECTIONS.users).doc(uid).get();
+  const fromUser = (userSnap.data() as { displayName?: string } | undefined)?.displayName?.trim();
+  if (fromUser) return fromUser;
+  const learner = await adminDb().collection(COLLECTIONS.learnerProfiles).doc(uid).get();
+  const fromLearner = (learner.data() as { displayName?: string } | undefined)?.displayName?.trim();
+  if (fromLearner) return fromLearner;
+  const mentor = await adminDb().collection(COLLECTIONS.mentorProfiles).doc(uid).get();
+  const fromMentor = (mentor.data() as { displayName?: string } | undefined)?.displayName?.trim();
+  return fromMentor || fallback;
 }

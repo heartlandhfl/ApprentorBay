@@ -8,6 +8,10 @@ import {
   type Evidence,
   type EvidenceDraft,
 } from './evidence.js';
+import {
+  FINAL_DELIVERABLE_MILESTONE_ID,
+  type FinalDeliverableFile,
+} from './finalDeliverable.js';
 import { MESSAGE_TEXT } from './messages.js';
 
 export type ValidationResult =
@@ -147,5 +151,43 @@ export function validateChangeRequestReason(reason: string): ValidationResult {
 
 export function validateMilestoneFeedback(feedback: string): ValidationResult {
   if (!feedback.trim()) return fail('Feedback is required to request a revision or reject');
+  return ok;
+}
+
+export function validateFinalDeliverable(input: {
+  title: string;
+  description: string;
+  links?: string[];
+  files?: FinalDeliverableFile[];
+  evidenceItemIds?: string[];
+  skillsDemonstrated?: string[];
+  contractId: string;
+  userId: string;
+}): ValidationResult {
+  if (!input.title.trim()) return fail('The final deliverable needs a title');
+  if (!input.description.trim()) return fail('The final deliverable needs a description');
+  const links = (input.links ?? []).map((item) => item.trim()).filter(Boolean);
+  const files = input.files ?? [];
+  const evidenceItemIds = (input.evidenceItemIds ?? []).map((item) => item.trim()).filter(Boolean);
+  if (links.length === 0 && files.length === 0 && evidenceItemIds.length === 0) {
+    return fail('Add a file, a link, or approved evidence to the final deliverable');
+  }
+  for (const file of files) {
+    if (!file.fileName.trim() || !file.storagePath.trim()) {
+      return fail('Each file needs a name and a private storage path');
+    }
+    if (!isPrivateEvidencePath(file.storagePath)) {
+      return fail('Final deliverable files must use the private evidence Storage path');
+    }
+    const parsed = parseEvidenceStoragePath(file.storagePath);
+    if (
+      !parsed ||
+      parsed.contractId !== input.contractId ||
+      parsed.milestoneId !== FINAL_DELIVERABLE_MILESTONE_ID ||
+      parsed.userId !== input.userId
+    ) {
+      return fail('File path does not match this learner and contract');
+    }
+  }
   return ok;
 }

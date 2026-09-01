@@ -1,12 +1,16 @@
 import {
   DELIVERABLE_STATUS,
+  FINAL_DELIVERABLE_REVIEW,
   LEARNING_CONTRACT_STATUS,
   MILESTONE_STATUS,
   STEP_OWNER,
   USER_ROLE,
+  canConfirmCompletion,
   canTransitionContract,
   canTransitionMilestone,
   combineGoalText,
+  completionBlockers,
+  emptyFinalDeliverable,
   EVIDENCE_TYPE,
   isLearnerReviewStatus,
   isMentorReviewStatus,
@@ -15,17 +19,21 @@ import {
   normalizeContract,
   normalizeDeliverable,
   normalizeEvidenceItem,
+  normalizeFinalDeliverable,
   normalizeGoal,
   normalizeMilestone,
   normalizeObjective,
   restLines,
   firstLine,
+  showcaseDocId,
   validateChangeRequestReason,
   validateEvidenceDrafts,
+  validateFinalDeliverable,
   validateGoalDraft,
   validateMentorPlan,
   type EvidenceDraft,
   type EvidenceItem,
+  type FinalDeliverableFile,
 } from './domain/index.js';
 import type {
   ContractRevision,
@@ -82,6 +90,20 @@ export type ContractAction =
   | { type: 'RESUME_CONTRACT'; now: IsoNow }
   | { type: 'CONFIRM_COMPLETION'; now: IsoNow }
   | { type: 'REOPEN_COMPLETION'; now: IsoNow }
+  | {
+      type: 'SUBMIT_FINAL_DELIVERABLE';
+      title: string;
+      description: string;
+      links?: string[];
+      files?: FinalDeliverableFile[];
+      evidenceItemIds?: string[];
+      skillsDemonstrated?: string[];
+      now: IsoNow;
+    }
+  | { type: 'REVIEW_FINAL_DELIVERABLE'; comment?: string; now: IsoNow }
+  | { type: 'REQUEST_FINAL_REVISION'; comment: string; now: IsoNow }
+  | { type: 'PUBLISH_SHOWCASE'; now: IsoNow }
+  | { type: 'UNPUBLISH_SHOWCASE'; now: IsoNow }
   | { type: 'REJECT_PROPOSAL'; reason: string; now: IsoNow }
   | { type: 'CANCEL'; reason?: string; now: IsoNow }
   | {
@@ -104,7 +126,9 @@ export type ClientContractAction = {
   [Type in ContractAction['type']]: Omit<Extract<ContractAction, { type: Type }>, 'now'>;
 }[ContractAction['type']];
 
-export type ContractEffect = { type: 'publish_deliverable_refs' };
+export type ContractEffect =
+  | { type: 'publish_showcase' }
+  | { type: 'set_showcase_published'; published: boolean };
 
 export type ReduceResult =
   | { ok: true; contract: LearningContract; effects: ContractEffect[] }
@@ -141,7 +165,7 @@ export const LEARNING_JOURNEY_STEPS = [
   {
     id: LEARNING_CONTRACT_STATUS.completed,
     label: 'Completed',
-    description: 'The deliverable is published on both profiles.',
+    description: 'The showcase is created. Ordinary editing is closed.',
   },
 ] as const;
 
@@ -207,6 +231,9 @@ export function createDraftContract(input: {
       },
     ],
     evidenceItems: [],
+    finalDeliverable: emptyFinalDeliverable(),
+    showcaseId: null,
+    showcasePublished: false,
   };
 }
 
@@ -239,6 +266,16 @@ export function reduceContract(
       return confirmCompletion(current, action, actor);
     case 'REOPEN_COMPLETION':
       return reopenCompletion(current, action, actor);
+    case 'SUBMIT_FINAL_DELIVERABLE':
+      return submitFinalDeliverable(current, action, actor);
+    case 'REVIEW_FINAL_DELIVERABLE':
+      return reviewFinalDeliverable(current, action, actor);
+    case 'REQUEST_FINAL_REVISION':
+      return requestFinalRevision(current, action, actor);
+    case 'PUBLISH_SHOWCASE':
+      return publishShowcaseAction(current, action, actor, true);
+    case 'UNPUBLISH_SHOWCASE':
+      return publishShowcaseAction(current, action, actor, false);
     case 'REJECT_PROPOSAL':
       return rejectProposal(current, action, actor);
     case 'CANCEL':
@@ -309,10 +346,10 @@ export function availableActions(
     }
     case LEARNING_CONTRACT_STATUS.paused:
     case LEARNING_CONTRACT_STATUS.completionPending:
+    case LEARNING_CONTRACT_STATUS.completed:
       return workspace;
     case LEARNING_CONTRACT_STATUS.rejected:
     case LEARNING_CONTRACT_STATUS.cancelled:
-    case LEARNING_CONTRACT_STATUS.completed:
       return [];
   }
 }
@@ -336,7 +373,33 @@ function workspaceActions(
     return ['RESUME_CONTRACT', 'CANCEL'];
   }
   if (contract.status === LEARNING_CONTRACT_STATUS.completionPending) {
-    return ['CONFIRM_COMPLETION', 'REOPEN_COMPLETION'];
+    const actions: ContractActionType[] = ['REOPEN_COMPLETION'];
+    if (
+      actor.role === USER_ROLE.learner &&
+      actor.uid === contract.learnerId &&
+      contract.currentStepOwner === STEP_OWNER.learner
+    ) {
+      actions.push('SUBMIT_FINAL_DELIVERABLE');
+    }
+    if (actor.role === USER_ROLE.mentor && actor.uid === contract.mentorId) {
+      const status = contract.finalDeliverable.reviewStatus;
+      if (
+        status === FINAL_DELIVERABLE_REVIEW.submitted ||
+        status === FINAL_DELIVERABLE_REVIEW.reviewed
+      ) {
+        actions.push('REVIEW_FINAL_DELIVERABLE', 'REQUEST_FINAL_REVISION');
+      }
+      if (canConfirmCompletion(contract)) {
+        actions.push('CONFIRM_COMPLETION');
+      }
+    }
+    return actions;
+  }
+  if (contract.status === LEARNING_CONTRACT_STATUS.completed) {
+    if (actor.role === USER_ROLE.learner && actor.uid === contract.learnerId) {
+      return contract.showcasePublished ? ['UNPUBLISH_SHOWCASE'] : ['PUBLISH_SHOWCASE'];
+    }
+    return [];
   }
   return [];
 }
@@ -797,8 +860,12 @@ function confirmCompletion(
   if (contract.status !== LEARNING_CONTRACT_STATUS.completionPending) {
     return fail('Completion can only be confirmed when it is pending');
   }
-  if (!isPairingActor(contract, actor)) {
-    return fail('You cannot act on this step');
+  if (actor.role !== USER_ROLE.mentor || actor.uid !== contract.mentorId) {
+    return fail('Only the mentor can confirm completion');
+  }
+  const missing = completionBlockers(contract);
+  if (missing.length > 0) {
+    return fail(missing[0] ?? 'Completion requirements are not satisfied');
   }
   const blocked = moveTo(contract, LEARNING_CONTRACT_STATUS.completed);
   if (blocked) return blocked;
@@ -808,26 +875,58 @@ function confirmCompletion(
     ? {
         ...contract.deliverable,
         status: DELIVERABLE_STATUS.completed,
-        finalEvidenceUrl: last?.evidenceLink || last?.evidenceText || contract.deliverable.finalEvidenceUrl,
+        finalEvidenceUrl:
+          contract.finalDeliverable.links[0] ||
+          last?.evidenceLink ||
+          last?.evidenceText ||
+          contract.deliverable.finalEvidenceUrl,
       }
     : contract.deliverable;
 
-  return ok(
-    {
-      ...contract,
-      status: LEARNING_CONTRACT_STATUS.completed,
-      currentStepOwner: STEP_OWNER.mentor,
-      updatedAt: action.now,
-      deliverable,
-      revisionHistory: appendRevision(contract, {
-        actor,
-        action: 'COMPLETED',
-        now: action.now,
-        summary: 'Completion confirmed. The deliverable is published on both profiles.',
-      }),
-    },
-    [{ type: 'publish_deliverable_refs' }],
-  );
+  const showcaseId = showcaseDocId(contract.id);
+  const withCompleted: LearningContract = {
+    ...contract,
+    status: LEARNING_CONTRACT_STATUS.completed,
+    currentStepOwner: STEP_OWNER.mentor,
+    updatedAt: action.now,
+    deliverable,
+    showcaseId,
+    showcasePublished: true,
+    revisionHistory: appendRevision(contract, {
+      actor,
+      action: 'CONTRACT_COMPLETED',
+      now: action.now,
+      summary: 'Completion confirmed. The showcase was created and published.',
+    }),
+  };
+  const withShowcase = {
+    ...withCompleted,
+    revisionHistory: [
+      ...withCompleted.revisionHistory,
+      {
+        id: newId(),
+        actorId: actor.uid,
+        actorRole: actor.role,
+        stage: LEARNING_CONTRACT_STATUS.completed,
+        action: 'SHOWCASE_CREATED',
+        timestamp: action.now,
+        comment: null,
+        summary: 'Showcase record created for this completed contract.',
+      },
+      {
+        id: newId(),
+        actorId: actor.uid,
+        actorRole: actor.role,
+        stage: LEARNING_CONTRACT_STATUS.completed,
+        action: 'SHOWCASE_PUBLISHED',
+        timestamp: action.now,
+        comment: null,
+        summary: 'Showcase published on the learner and mentor profiles.',
+      },
+    ],
+  };
+
+  return ok(withShowcase, [{ type: 'publish_showcase' }]);
 }
 
 function reopenCompletion(
@@ -865,6 +964,180 @@ function reopenCompletion(
       summary: 'Completion was reopened. The last milestone is active again.',
     }),
   });
+}
+
+function submitFinalDeliverable(
+  contract: LearningContract,
+  action: Extract<ContractAction, { type: 'SUBMIT_FINAL_DELIVERABLE' }>,
+  actor: ContractActor,
+): ReduceResult {
+  const blocked =
+    requireStatuses(contract, [LEARNING_CONTRACT_STATUS.completionPending]) ??
+    requireActor(contract, actor, STEP_OWNER.learner);
+  if (blocked) return blocked;
+
+  const valid = validateFinalDeliverable({
+    title: action.title,
+    description: action.description,
+    links: action.links,
+    files: action.files,
+    evidenceItemIds: action.evidenceItemIds,
+    skillsDemonstrated: action.skillsDemonstrated,
+    contractId: contract.id,
+    userId: actor.uid,
+  });
+  if (!valid.ok) return fail(valid.error);
+
+  const allowedEvidence = new Set(contract.evidenceItems.map((item) => item.id));
+  const evidenceItemIds = (action.evidenceItemIds ?? []).filter((id) => allowedEvidence.has(id));
+
+  const revised =
+    contract.finalDeliverable.reviewStatus === FINAL_DELIVERABLE_REVIEW.revisionRequested;
+  const finalDeliverable = normalizeFinalDeliverable({
+    title: action.title,
+    description: action.description,
+    links: action.links,
+    files: action.files,
+    evidenceItemIds,
+    skillsDemonstrated: action.skillsDemonstrated,
+    submittedAt: action.now,
+    submittedBy: actor.uid,
+    reviewStatus: FINAL_DELIVERABLE_REVIEW.submitted,
+    reviewComment: contract.finalDeliverable.reviewComment,
+    reviewedAt: null,
+    reviewedBy: null,
+  });
+
+  return ok({
+    ...contract,
+    currentStepOwner: STEP_OWNER.mentor,
+    updatedAt: action.now,
+    finalDeliverable,
+    revisionHistory: appendRevision(contract, {
+      actor,
+      action: 'FINAL_DELIVERABLE_SUBMITTED',
+      now: action.now,
+      summary: revised
+        ? 'Learner resubmitted the final deliverable.'
+        : 'Learner submitted the final deliverable.',
+    }),
+  });
+}
+
+function reviewFinalDeliverable(
+  contract: LearningContract,
+  action: Extract<ContractAction, { type: 'REVIEW_FINAL_DELIVERABLE' }>,
+  actor: ContractActor,
+): ReduceResult {
+  const blocked =
+    requireStatuses(contract, [LEARNING_CONTRACT_STATUS.completionPending]) ??
+    requireActor(contract, actor, STEP_OWNER.mentor);
+  if (blocked) return blocked;
+  if (
+    contract.finalDeliverable.reviewStatus !== FINAL_DELIVERABLE_REVIEW.submitted &&
+    contract.finalDeliverable.reviewStatus !== FINAL_DELIVERABLE_REVIEW.reviewed
+  ) {
+    return fail('There is no submitted final deliverable to review');
+  }
+
+  return ok({
+    ...contract,
+    currentStepOwner: STEP_OWNER.mentor,
+    updatedAt: action.now,
+    finalDeliverable: {
+      ...contract.finalDeliverable,
+      reviewStatus: FINAL_DELIVERABLE_REVIEW.reviewed,
+      reviewComment: action.comment?.trim() || contract.finalDeliverable.reviewComment,
+      reviewedAt: action.now,
+      reviewedBy: actor.uid,
+    },
+    revisionHistory: appendRevision(contract, {
+      actor,
+      action: 'FINAL_DELIVERABLE_REVIEWED',
+      now: action.now,
+      comment: action.comment,
+      summary: 'Mentor completed the final deliverable review.',
+    }),
+  });
+}
+
+function requestFinalRevision(
+  contract: LearningContract,
+  action: Extract<ContractAction, { type: 'REQUEST_FINAL_REVISION' }>,
+  actor: ContractActor,
+): ReduceResult {
+  const blocked =
+    requireStatuses(contract, [LEARNING_CONTRACT_STATUS.completionPending]) ??
+    requireActor(contract, actor, STEP_OWNER.mentor);
+  if (blocked) return blocked;
+  if (!action.comment.trim()) return fail('Feedback is required to request a revision');
+  if (!isFinalDeliverableSubmittedStatus(contract.finalDeliverable.reviewStatus)) {
+    return fail('There is no submitted final deliverable to revise');
+  }
+
+  return ok({
+    ...contract,
+    currentStepOwner: STEP_OWNER.learner,
+    updatedAt: action.now,
+    finalDeliverable: {
+      ...contract.finalDeliverable,
+      reviewStatus: FINAL_DELIVERABLE_REVIEW.revisionRequested,
+      reviewComment: action.comment.trim(),
+      reviewedAt: action.now,
+      reviewedBy: actor.uid,
+    },
+    revisionHistory: appendRevision(contract, {
+      actor,
+      action: 'REVISION_REQUESTED',
+      now: action.now,
+      comment: action.comment,
+      summary: 'Mentor requested a revision of the final deliverable.',
+    }),
+  });
+}
+
+function isFinalDeliverableSubmittedStatus(status: string): boolean {
+  return (
+    status === FINAL_DELIVERABLE_REVIEW.submitted ||
+    status === FINAL_DELIVERABLE_REVIEW.reviewed ||
+    status === FINAL_DELIVERABLE_REVIEW.revisionRequested
+  );
+}
+
+function publishShowcaseAction(
+  contract: LearningContract,
+  action: Extract<ContractAction, { type: 'PUBLISH_SHOWCASE' | 'UNPUBLISH_SHOWCASE' }>,
+  actor: ContractActor,
+  published: boolean,
+): ReduceResult {
+  if (contract.status !== LEARNING_CONTRACT_STATUS.completed) {
+    return fail('Only a completed contract has a showcase');
+  }
+  if (actor.role !== USER_ROLE.learner || actor.uid !== contract.learnerId) {
+    return fail('Only the learner can change showcase publication');
+  }
+  if (contract.showcasePublished === published) {
+    return ok(contract);
+  }
+
+  const showcaseId = contract.showcaseId ?? showcaseDocId(contract.id);
+  return ok(
+    {
+      ...contract,
+      showcaseId,
+      showcasePublished: published,
+      updatedAt: action.now,
+      revisionHistory: appendRevision(contract, {
+        actor,
+        action: published ? 'SHOWCASE_PUBLISHED' : 'SHOWCASE_UNPUBLISHED',
+        now: action.now,
+        summary: published
+          ? 'Learner published the showcase.'
+          : 'Learner hid the showcase from public profiles.',
+      }),
+    },
+    [{ type: 'set_showcase_published', published }],
+  );
 }
 
 function rejectProposal(
@@ -1159,14 +1432,14 @@ function approveMilestone(
     return ok({
       ...contract,
       status: LEARNING_CONTRACT_STATUS.completionPending,
-      currentStepOwner: STEP_OWNER.mentor,
+      currentStepOwner: STEP_OWNER.learner,
       updatedAt: action.now,
       milestones: approvedMilestones,
       revisionHistory: appendRevision(contract, {
         actor,
         action: 'MILESTONE_APPROVED',
         now: action.now,
-        summary: `Mentor approved the last milestone “${current.title}”. Completion is pending confirmation.`,
+        summary: `Mentor approved the last milestone “${current.title}”. The learner submits the final deliverable next.`,
       }),
     });
   }

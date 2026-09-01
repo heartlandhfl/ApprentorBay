@@ -21,7 +21,7 @@
 | Milestone | `Milestone` | Milestone | Embedded on the contract |
 | Evidence | `Evidence` | Evidence | Embedded on the milestone (`evidenceText`, `evidenceLink`) |
 | Deliverable | `Deliverable` / `DeliverableRef` | Deliverable | Contract field + profile array |
-| Showcase | `ShowcaseItem` | Showcase / completed work | **Projection of `DeliverableRef`** — no collection |
+| Showcase | `Showcase` | Showcase / completed work | `showcases/{contractId}` |
 | Notification | `Notification` | Notification | Reserved: `notifications` (not written) |
 | Admin Audit Log | `AdminAuditLog` | — | Reserved: `adminAuditLogs` (not written) |
 
@@ -35,7 +35,7 @@ Account document. One role at signup. Admin is seeded, never self-assigned.
 
 ### LearnerProfile / MentorProfile
 
-Public (or owner) profile keyed by `uid`. Mentor has `verificationStatus`. Both may carry `deliverables: DeliverableRef[]` after a contract completes.
+Public (or owner) profile keyed by `uid`. Mentor has `verificationStatus`. Both may carry `deliverables: DeliverableRef[]` after a contract completes. Public proof of work is the `showcases` document, not the contract itself.
 
 ### Mentor Application (`MentorshipApplication`)
 
@@ -105,6 +105,10 @@ Missing `active` is treated as `true` (`isAccountActive`).
 
 `id`, `relationshipId`, `senderId`, `text`, `createdAt`
 
+### `showcases/{id}`
+
+`id` (= `contractId`), `learnerId`, `mentorId`, `title`, `description`, `skillsDemonstrated`, `completedAt`, `published`, `creatorRole` (`learner`), `mentorContribution`
+
 ### `learningContracts/{id}`
 
 `id`, `relationshipId`, `learnerId`, `mentorId`, `status`, `currentStepOwner`, `createdAt`, `updatedAt`, `goal`, `goalHistory`, `objectives`, `milestones`, `deliverable`, `changeRequestReason`
@@ -143,7 +147,8 @@ Contract 1──* Milestone
 Milestone 1──0..1 Evidence (embedded)
 Contract 1──0..1 Deliverable
 Deliverable (completed) ── copies ── DeliverableRef on both profiles
-DeliverableRef ── projects ── ShowcaseItem
+Completed contract ── upserts ── Showcase (`showcases/{contractId}`)
+DeliverableRef ── points at ── Showcase
 ```
 
 Foreign keys already on documents:

@@ -1,4 +1,9 @@
-import { APPLICATION_STATUS, RELATIONSHIP_STATUS, VERIFICATION_STATUS } from './statuses.js';
+import {
+  APPLICATION_STATUS,
+  LEARNING_CONTRACT_STATUS,
+  RELATIONSHIP_STATUS,
+  VERIFICATION_STATUS,
+} from './statuses.js';
 import { USER_ROLE } from './identities.js';
 import { isAccountActive, type MentorProfile, type User } from './users.js';
 import { isPendingApplication, type MentorshipApplication } from './applications.js';
@@ -80,6 +85,16 @@ export function canReadEvidenceObject(
   contract: Pick<LearningContract, 'learnerId' | 'mentorId'>,
 ): boolean {
   return canAccessContractWorkspace(actor, contract);
+}
+
+export function canPublishContractShowcase(
+  actor: PermissionActor | null | undefined,
+  contract: Pick<LearningContract, 'learnerId' | 'status'>,
+): boolean {
+  if (!actor || !isAccountActive(actor)) return false;
+  if (actor.role !== USER_ROLE.learner) return false;
+  if (actor.uid !== contract.learnerId) return false;
+  return contract.status === LEARNING_CONTRACT_STATUS.completed;
 }
 
 export function canWriteEvidenceObject(

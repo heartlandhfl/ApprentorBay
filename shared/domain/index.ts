@@ -132,6 +132,22 @@ export { isCompletedDeliverable } from './deliverables.js';
 export type { Deliverable, DeliverableRef } from './deliverables.js';
 
 export {
+  FINAL_DELIVERABLE_MILESTONE_ID,
+  FINAL_DELIVERABLE_REVIEW,
+  allRequiredMilestonesApproved,
+  emptyFinalDeliverable,
+  isFinalDeliverableReviewed,
+  isFinalDeliverableSubmitted,
+  normalizeFinalDeliverable,
+  publicEvidenceFromFinal,
+} from './finalDeliverable.js';
+export type {
+  FinalDeliverable,
+  FinalDeliverableFile,
+  FinalDeliverableReviewStatus,
+} from './finalDeliverable.js';
+
+export {
   combineGoalText,
   contractEvidenceItems,
   contractProgress,
@@ -168,8 +184,30 @@ export type {
 } from './learningContracts.js';
 
 
-export { SHOWCASE_SOURCE, showcaseFromDeliverableRef, showcasesFromProfile } from './showcases.js';
-export type { ShowcaseItem, ShowcaseSource } from './showcases.js';
+export {
+  MENTOR_CONTRIBUTION,
+  SHOWCASE_SOURCE,
+  buildShowcase,
+  canConfirmCompletion,
+  canPublishShowcase,
+  canReadShowcase,
+  completionBlockers,
+  completionRequirements,
+  deliverableRefFromShowcase,
+  mergeShowcaseRecord,
+  publicEvidenceForShowcase,
+  showcaseDocId,
+  showcaseFromDeliverableRef,
+  showcasesFromProfile,
+} from './showcases.js';
+export type {
+  CompletionRequirement,
+  Showcase,
+  ShowcaseContract,
+  ShowcaseEvidence,
+  ShowcaseItem,
+  ShowcaseSource,
+} from './showcases.js';
 
 export { NOTIFICATION_TYPE, isUnreadNotification } from './notifications.js';
 export type { Notification, NotificationType } from './notifications.js';
@@ -181,6 +219,7 @@ export type { Mentorship } from './legacy.js';
 
 export {
   canAccessContractWorkspace,
+  canPublishContractShowcase,
   canReadEvidenceObject,
   canWriteEvidenceObject,
   canAcceptApplication,
@@ -204,6 +243,7 @@ export {
   validateChangeRequestReason,
   validateEvidenceDrafts,
   validateEvidenceSubmission,
+  validateFinalDeliverable,
   validateGoalDraft,
   validateMentorPlan,
   validateMessageText,

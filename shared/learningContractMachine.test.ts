@@ -11,11 +11,15 @@ import {
   type ContractActor,
 } from './learningContractMachine.js';
 import {
+  MENTOR_CONTRIBUTION,
+  buildShowcase,
   canAccessContractWorkspace,
   contractProgress,
   evidenceStoragePath,
   isContractWorkspaceView,
+  mergeShowcaseRecord,
   normalizeContract,
+  showcaseDocId,
   workspaceFocus,
 } from './domain/index.js';
 import type { LearningContract } from './types.js';
@@ -97,6 +101,34 @@ function inProgress(): LearningContract {
   assert.equal(result.ok, true);
   if (!result.ok) throw new Error(result.error);
   result = reduceContract(result.contract, { type: 'ACTIVATE', now }, learner);
+  assert.equal(result.ok, true);
+  if (!result.ok) throw new Error(result.error);
+  return result.contract;
+}
+
+function completionPending(): LearningContract {
+  let contract = inProgress();
+  let result = reduceContract(
+    contract,
+    { type: 'SUBMIT_EVIDENCE', text: 'Stock is milled', link: '', now },
+    learner,
+  );
+  assert.equal(result.ok, true);
+  if (!result.ok) throw new Error(result.error);
+  result = reduceContract(result.contract, { type: 'APPROVE_MILESTONE', now }, mentor);
+  assert.equal(result.ok, true);
+  if (!result.ok) throw new Error(result.error);
+  result = reduceContract(result.contract, { type: 'BEGIN_WORK', now }, learner);
+  assert.equal(result.ok, true);
+  if (!result.ok) throw new Error(result.error);
+  result = reduceContract(
+    result.contract,
+    { type: 'SUBMIT_EVIDENCE', text: 'Assembled', link: '', now },
+    learner,
+  );
+  assert.equal(result.ok, true);
+  if (!result.ok) throw new Error(result.error);
+  result = reduceContract(result.contract, { type: 'APPROVE_MILESTONE', now }, mentor);
   assert.equal(result.ok, true);
   if (!result.ok) throw new Error(result.error);
   return result.contract;
@@ -291,19 +323,38 @@ describe('learning contract machine', () => {
     contract = result.contract;
     assert.equal(contract.status, 'completion_pending');
     assert.equal(contract.milestones[1]?.status, 'approved');
-    assert.deepEqual(availableActions(contract, mentor), [
-      'CONFIRM_COMPLETION',
-      'REOPEN_COMPLETION',
-    ]);
+    assert.deepEqual(availableActions(contract, mentor), ['REOPEN_COMPLETION']);
+    assert.ok(availableActions(contract, learner).includes('SUBMIT_FINAL_DELIVERABLE'));
 
-    result = reduceContract(contract, { type: 'CONFIRM_COMPLETION', now }, mentor);
+    const blocked = reduceContract(contract, { type: 'CONFIRM_COMPLETION', now }, mentor);
+    assert.equal(blocked.ok, false);
+
+    result = reduceContract(
+      contract,
+      {
+        type: 'SUBMIT_FINAL_DELIVERABLE',
+        title: 'A sawhorse',
+        description: 'Square and load-bearing',
+        links: ['https://example.com/sawhorse'],
+        skillsDemonstrated: ['Joinery'],
+        now,
+      },
+      learner,
+    );
+    assert.equal(result.ok, true);
+    if (!result.ok) throw new Error(result.error);
+    result = reduceContract(result.contract, { type: 'REVIEW_FINAL_DELIVERABLE', now }, mentor);
+    assert.equal(result.ok, true);
+    if (!result.ok) throw new Error(result.error);
+    result = reduceContract(result.contract, { type: 'CONFIRM_COMPLETION', now }, mentor);
     assert.equal(result.ok, true);
     if (!result.ok) throw new Error(result.error);
     contract = result.contract;
     assert.equal(contract.status, 'completed');
     assert.equal(contract.deliverable?.status, 'completed');
-    assert.deepEqual(result.effects, [{ type: 'publish_deliverable_refs' }]);
-    assert.deepEqual(availableActions(contract, learner), []);
+    assert.equal(contract.showcaseId, 'contract-1');
+    assert.deepEqual(result.effects, [{ type: 'publish_showcase' }]);
+    assert.deepEqual(availableActions(contract, learner), ['UNPUBLISH_SHOWCASE']);
     assert.deepEqual(availableActions(contract, mentor), []);
     assert.equal(journeyStepIndex(contract.status), 5);
   });
@@ -559,7 +610,7 @@ describe('learning contract workspace', () => {
     assert.equal(contract.status, 'completion_pending');
     assert.equal(contractProgress(contract).percent, 100);
     assert.equal(result.effects.length, 0);
-    assert.equal(workspaceFocus(contract).who, 'either');
+    assert.equal(workspaceFocus(contract).who, 'learner');
 
     const reopen = reduceContract(contract, { type: 'REOPEN_COMPLETION', now }, learner);
     assert.equal(reopen.ok, true);
@@ -575,11 +626,31 @@ describe('learning contract workspace', () => {
     );
     assert.equal(result.ok, true);
 
-    result = reduceContract(contract, { type: 'CONFIRM_COMPLETION', now }, mentor);
+    const earlyConfirm = reduceContract(contract, { type: 'CONFIRM_COMPLETION', now }, mentor);
+    assert.equal(earlyConfirm.ok, false);
+
+    result = reduceContract(
+      contract,
+      {
+        type: 'SUBMIT_FINAL_DELIVERABLE',
+        title: 'A sawhorse',
+        description: 'Square and load-bearing',
+        links: ['https://example.com/sawhorse'],
+        skillsDemonstrated: ['Joinery'],
+        now,
+      },
+      learner,
+    );
+    assert.equal(result.ok, true);
+    if (!result.ok) throw new Error(result.error);
+    result = reduceContract(result.contract, { type: 'REVIEW_FINAL_DELIVERABLE', now }, mentor);
+    assert.equal(result.ok, true);
+    if (!result.ok) throw new Error(result.error);
+    result = reduceContract(result.contract, { type: 'CONFIRM_COMPLETION', now }, mentor);
     assert.equal(result.ok, true);
     if (!result.ok) throw new Error(result.error);
     assert.equal(result.contract.status, 'completed');
-    assert.deepEqual(result.effects, [{ type: 'publish_deliverable_refs' }]);
+    assert.deepEqual(result.effects, [{ type: 'publish_showcase' }]);
     assert.equal(isContractWorkspaceView(result.contract), true);
   });
 
@@ -834,5 +905,129 @@ describe('milestone and evidence system', () => {
       learner,
     );
     assert.equal(stolen.ok, false);
+  });
+});
+
+describe('completion and showcase', () => {
+  it('walks final deliverable, mentor review, completion, and a single showcase', () => {
+    let contract = completionPending();
+    assert.equal(contract.status, 'completion_pending');
+    assert.equal(contractProgress(contract).percent, 100);
+    assert.equal(reduceContract(contract, { type: 'CONFIRM_COMPLETION', now }, mentor).ok, false);
+    assert.equal(
+      reduceContract(
+        contract,
+        {
+          type: 'SUBMIT_FINAL_DELIVERABLE',
+          title: 'Stolen',
+          description: 'Nope',
+          links: ['https://example.com'],
+          now,
+        },
+        stranger,
+      ).ok,
+      false,
+    );
+
+    let result = reduceContract(
+      contract,
+      {
+        type: 'SUBMIT_FINAL_DELIVERABLE',
+        title: 'A sawhorse',
+        description: 'Square, load-bearing, and photographed',
+        links: ['https://example.com/sawhorse'],
+        evidenceItemIds: contract.evidenceItems.map((item) => item.id),
+        skillsDemonstrated: ['Joinery', 'Layout'],
+        now,
+      },
+      learner,
+    );
+    assert.equal(result.ok, true);
+    if (!result.ok) throw new Error(result.error);
+    contract = result.contract;
+    assert.equal(contract.finalDeliverable.reviewStatus, 'submitted');
+    assert.ok(contract.revisionHistory.some((item) => item.action === 'FINAL_DELIVERABLE_SUBMITTED'));
+
+    result = reduceContract(contract, { type: 'REVIEW_FINAL_DELIVERABLE', comment: 'Ready', now }, mentor);
+    assert.equal(result.ok, true);
+    if (!result.ok) throw new Error(result.error);
+    contract = result.contract;
+    assert.ok(contract.revisionHistory.some((item) => item.action === 'FINAL_DELIVERABLE_REVIEWED'));
+
+    result = reduceContract(contract, { type: 'CONFIRM_COMPLETION', now }, mentor);
+    assert.equal(result.ok, true);
+    if (!result.ok) throw new Error(result.error);
+    contract = result.contract;
+    assert.equal(contract.status, 'completed');
+    assert.equal(contract.showcaseId, showcaseDocId(contract.id));
+    assert.equal(contract.showcasePublished, true);
+    assert.deepEqual(result.effects, [{ type: 'publish_showcase' }]);
+    assert.ok(contract.revisionHistory.some((item) => item.action === 'CONTRACT_COMPLETED'));
+    assert.ok(contract.revisionHistory.some((item) => item.action === 'SHOWCASE_CREATED'));
+    assert.ok(contract.revisionHistory.some((item) => item.action === 'SHOWCASE_PUBLISHED'));
+
+    const again = reduceContract(contract, { type: 'CONFIRM_COMPLETION', now }, mentor);
+    assert.equal(again.ok, false);
+
+    const first = buildShowcase({
+      contract,
+      learnerDisplayName: 'Ada',
+      mentorDisplayName: 'Ben',
+      now,
+    });
+    const second = buildShowcase({
+      contract,
+      learnerDisplayName: 'Ada',
+      mentorDisplayName: 'Ben',
+      now: '2026-09-01T00:00:00.000Z',
+    });
+    const merged = mergeShowcaseRecord(first, second);
+    assert.equal(first.id, second.id);
+    assert.equal(merged.id, first.id);
+    assert.equal(merged.createdAt, first.createdAt);
+    assert.equal(merged.mentorContribution, MENTOR_CONTRIBUTION);
+    assert.equal(merged.creatorRole, 'learner');
+    assert.match(merged.mentorContribution, /learner remains the creator/i);
+  });
+
+  it('lets the learner hide and republish the showcase without creating another one', () => {
+    let contract = completionPending();
+    let result = reduceContract(
+      contract,
+      {
+        type: 'SUBMIT_FINAL_DELIVERABLE',
+        title: 'A sawhorse',
+        description: 'Done',
+        links: ['https://example.com/done'],
+        skillsDemonstrated: ['Joinery'],
+        now,
+      },
+      learner,
+    );
+    assert.equal(result.ok, true);
+    if (!result.ok) throw new Error(result.error);
+    result = reduceContract(result.contract, { type: 'REVIEW_FINAL_DELIVERABLE', now }, mentor);
+    assert.equal(result.ok, true);
+    if (!result.ok) throw new Error(result.error);
+    result = reduceContract(result.contract, { type: 'CONFIRM_COMPLETION', now }, mentor);
+    assert.equal(result.ok, true);
+    if (!result.ok) throw new Error(result.error);
+    contract = result.contract;
+
+    result = reduceContract(contract, { type: 'UNPUBLISH_SHOWCASE', now }, learner);
+    assert.equal(result.ok, true);
+    if (!result.ok) throw new Error(result.error);
+    assert.equal(result.contract.showcasePublished, false);
+    assert.equal(result.contract.showcaseId, contract.showcaseId);
+    assert.deepEqual(result.effects, [{ type: 'set_showcase_published', published: false }]);
+
+    const mentorPublish = reduceContract(result.contract, { type: 'UNPUBLISH_SHOWCASE', now }, mentor);
+    assert.equal(mentorPublish.ok, false);
+
+    result = reduceContract(result.contract, { type: 'PUBLISH_SHOWCASE', now }, learner);
+    assert.equal(result.ok, true);
+    if (!result.ok) throw new Error(result.error);
+    assert.equal(result.contract.showcasePublished, true);
+    assert.equal(result.contract.showcaseId, contract.showcaseId);
   });
 });

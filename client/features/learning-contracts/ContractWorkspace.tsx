@@ -1,11 +1,14 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import {
   EVIDENCE_TYPE_LABEL,
+  FINAL_DELIVERABLE_MILESTONE_ID,
   LEARNING_CONTRACT_STATUS,
   LEARNING_CONTRACT_STATUS_LABEL,
+  MENTOR_CONTRIBUTION,
   MILESTONE_STATUS,
   RELATIONSHIP_STATUS,
   USER_ROLE,
+  completionRequirements,
   availableActions,
   canSendMessage,
   contractProgress,
@@ -172,6 +175,12 @@ export function ContractWorkspace({
         onError={onError}
       />
       <EvidenceSection contract={contract} />
+      <CompletionSection
+        contract={contract}
+        actions={actions}
+        account={account}
+        onError={onError}
+      />
       <DiscussionSection
         account={account}
         relationship={relationship}
@@ -187,7 +196,11 @@ export function ContractWorkspace({
         <Card>
           <Stack gap={8}>
             <Badge tone="success">COMPLETED</Badge>
-            <Text>The deliverable is now on both public profiles.</Text>
+            <Text>
+              This contract is protected from ordinary editing. The showcase is a public
+              record of the learner&apos;s work.
+            </Text>
+            <Text variant="small">{MENTOR_CONTRIBUTION}</Text>
           </Stack>
         </Card>
       ) : null}
@@ -731,6 +744,277 @@ function EvidenceSection({ contract }: { contract: LearningContract }) {
   );
 }
 
+function CompletionSection({
+  contract,
+  actions,
+  account,
+  onError,
+}: {
+  contract: LearningContract;
+  actions: ContractActionType[];
+  account: User;
+  onError: (message: string | null) => void;
+}) {
+  const gates = completionRequirements(contract);
+  const final = contract.finalDeliverable;
+  const planned = contract.deliverable;
+  const [title, setTitle] = useState(final.title || planned?.title || '');
+  const [description, setDescription] = useState(final.description || planned?.description || '');
+  const [links, setLinks] = useState(final.links.join('\n'));
+  const [skills, setSkills] = useState(final.skillsDemonstrated.join(', '));
+  const [evidenceIds, setEvidenceIds] = useState<string[]>(final.evidenceItemIds);
+  const [file, setFile] = useState<File | null>(null);
+  const [comment, setComment] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    setBusy(true);
+    onError(null);
+    try {
+      const files = [...final.files];
+      if (file) {
+        const uploaded = await uploadEvidenceFile({
+          contractId: contract.id,
+          milestoneId: FINAL_DELIVERABLE_MILESTONE_ID,
+          userId: account.uid,
+          file,
+        });
+        files.push({ fileName: uploaded.fileName, storagePath: uploaded.storagePath });
+      }
+      await dispatchContractAction(contract.id, {
+        type: 'SUBMIT_FINAL_DELIVERABLE',
+        title,
+        description,
+        links: links.split(/\s+/).map((item) => item.trim()).filter(Boolean),
+        files,
+        evidenceItemIds: evidenceIds,
+        skillsDemonstrated: skills
+          .split(',')
+          .map((item) => item.trim())
+          .filter(Boolean),
+      });
+      setFile(null);
+    } catch (err) {
+      onError(err instanceof Error ? err.message : 'Could not submit the final deliverable');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function run(action: Parameters<typeof dispatchContractAction>[1]) {
+    setBusy(true);
+    onError(null);
+    try {
+      await dispatchContractAction(contract.id, action);
+      setComment('');
+    } catch (err) {
+      onError(err instanceof Error ? err.message : 'Could not update completion');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const showForm = actions.includes('SUBMIT_FINAL_DELIVERABLE');
+  const showReview = actions.includes('REVIEW_FINAL_DELIVERABLE');
+  const showConfirm = actions.includes('CONFIRM_COMPLETION');
+  const showPublish =
+    actions.includes('PUBLISH_SHOWCASE') || actions.includes('UNPUBLISH_SHOWCASE');
+  const pending = contract.status === LEARNING_CONTRACT_STATUS.completionPending;
+  const completed = isContractCompleted(contract);
+  if (!pending && !completed) return null;
+
+  return (
+    <Stack gap={16}>
+      <Text variant="h2">4. Final deliverable</Text>
+      <Card>
+        <Stack gap={12}>
+          <Text variant="caption">Completion requirements</Text>
+          <Text variant="small">
+            {gates.milestonesApproved ? 'All required milestones are approved.' : 'Milestones still need approval.'}
+          </Text>
+          <Text variant="small">
+            {gates.finalDeliverableSubmitted
+              ? 'Final deliverable submitted.'
+              : 'Final deliverable has not been submitted.'}
+          </Text>
+          <Text variant="small">
+            {gates.mentorReviewCompleted
+              ? 'Mentor completion review is done.'
+              : 'Mentor completion review is not done.'}
+          </Text>
+          <Text variant="small">
+            A contract cannot become COMPLETED until all three are true.
+          </Text>
+        </Stack>
+      </Card>
+      {final.title || final.description ? (
+        <Card>
+          <Stack gap={8}>
+            <Text variant="h3">{final.title || 'Final deliverable'}</Text>
+            {final.description ? <Text>{final.description}</Text> : null}
+            {final.skillsDemonstrated.length > 0 ? (
+              <Text variant="small">Skills demonstrated: {final.skillsDemonstrated.join(', ')}</Text>
+            ) : null}
+            {final.links.map((link) => (
+              <Text key={link} variant="small">
+                {link}
+              </Text>
+            ))}
+            {final.files.map((item) => (
+              <Text key={item.storagePath} variant="small">
+                FILE: {item.fileName}
+              </Text>
+            ))}
+            {final.reviewComment ? (
+              <Text variant="danger">Mentor feedback: {final.reviewComment}</Text>
+            ) : null}
+          </Stack>
+        </Card>
+      ) : null}
+      {showForm ? (
+        <Card>
+          <form onSubmit={(event) => void submit(event)}>
+            <Stack gap={12}>
+              <Text variant="h3">
+                {final.reviewStatus === 'revision_requested'
+                  ? 'Resubmit final deliverable'
+                  : 'Submit final deliverable'}
+              </Text>
+              <Input
+                label="Title"
+                value={title}
+                onChange={(event) => setTitle(event.target.value)}
+                required
+              />
+              <TextArea
+                label="Description"
+                value={description}
+                onChange={(event) => setDescription(event.target.value)}
+                required
+              />
+              <TextArea
+                label="Links"
+                value={links}
+                onChange={(event) => setLinks(event.target.value)}
+                hint="One URL per line."
+              />
+              <Input
+                label="Skills demonstrated"
+                value={skills}
+                onChange={(event) => setSkills(event.target.value)}
+                hint="Comma-separated. The learner is the creator of this work."
+              />
+              {contract.evidenceItems.length > 0 ? (
+                <Stack gap={8}>
+                  <Text variant="caption">Approved public evidence</Text>
+                  {contract.evidenceItems.map((item) => (
+                    <label key={item.id}>
+                      <input
+                        type="checkbox"
+                        checked={evidenceIds.includes(item.id)}
+                        onChange={(event) => {
+                          setEvidenceIds((current) =>
+                            event.target.checked
+                              ? [...current, item.id]
+                              : current.filter((id) => id !== item.id),
+                          );
+                        }}
+                      />{' '}
+                      <Text as="span" variant="small">
+                        {item.type.toUpperCase()}: {item.content}
+                      </Text>
+                    </label>
+                  ))}
+                </Stack>
+              ) : null}
+              <label>
+                <Text variant="small" as="span">
+                  File
+                </Text>
+                <input
+                  type="file"
+                  className="mt-2 block w-full text-small"
+                  onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+                />
+              </label>
+              <Button type="submit" loading={busy}>
+                Submit final deliverable
+              </Button>
+            </Stack>
+          </form>
+        </Card>
+      ) : null}
+      {showReview || showConfirm ? (
+        <Card>
+          <Stack gap={12}>
+            <Text variant="h3">Mentor completion review</Text>
+            <TextArea
+              label="Review comment"
+              value={comment}
+              onChange={(event) => setComment(event.target.value)}
+            />
+            <Cluster gap={8}>
+              {showReview ? (
+                <Button
+                  variant="secondary"
+                  loading={busy}
+                  onClick={() => void run({ type: 'REVIEW_FINAL_DELIVERABLE', comment })}
+                >
+                  Complete review
+                </Button>
+              ) : null}
+              {actions.includes('REQUEST_FINAL_REVISION') ? (
+                <Button
+                  variant="secondary"
+                  loading={busy}
+                  onClick={() => void run({ type: 'REQUEST_FINAL_REVISION', comment })}
+                >
+                  Request revision
+                </Button>
+              ) : null}
+              {showConfirm ? (
+                <Button loading={busy} onClick={() => void run({ type: 'CONFIRM_COMPLETION' })}>
+                  Confirm completion
+                </Button>
+              ) : null}
+            </Cluster>
+          </Stack>
+        </Card>
+      ) : null}
+      {completed ? (
+        <Card>
+          <Stack gap={12}>
+            <Text variant="h3">Showcase</Text>
+            <Text variant="small">
+              This is a public record of the learner&apos;s work, not a second copy of the
+              contract. {MENTOR_CONTRIBUTION}
+            </Text>
+            {showPublish ? (
+              <Button
+                loading={busy}
+                onClick={() =>
+                  void run({
+                    type: contract.showcasePublished ? 'UNPUBLISH_SHOWCASE' : 'PUBLISH_SHOWCASE',
+                  })
+                }
+              >
+                {contract.showcasePublished ? 'Hide from public profiles' : 'Publish showcase'}
+              </Button>
+            ) : (
+              <Text variant="small">
+                {contract.showcasePublished
+                  ? 'Published on both public profiles.'
+                  : 'Hidden from public profiles.'}
+              </Text>
+            )}
+          </Stack>
+        </Card>
+      ) : null}
+    </Stack>
+  );
+}
+
 function DiscussionSection({
   account,
   relationship,
@@ -785,7 +1069,7 @@ function DiscussionSection({
 
   return (
     <Stack gap={16}>
-      <Text variant="h2">4. Discussion</Text>
+      <Text variant="h2">5. Discussion</Text>
       <Text variant="small">
         Contract-specific communication for this pairing. This is the same thread as the
         relationship — one pair, one contract.
@@ -844,7 +1128,7 @@ function ActivitySection({ contract }: { contract: LearningContract }) {
   const rows = [...contract.revisionHistory].reverse();
   return (
     <Stack gap={16}>
-      <Text variant="h2">5. Activity</Text>
+      <Text variant="h2">6. Activity</Text>
       {rows.length === 0 ? (
         <EmptyState title="No activity yet" />
       ) : (
@@ -901,7 +1185,6 @@ function WorkspaceControls({
     actions.includes('ACTIVATE') ||
     actions.includes('PAUSE_CONTRACT') ||
     actions.includes('RESUME_CONTRACT') ||
-    actions.includes('CONFIRM_COMPLETION') ||
     actions.includes('REOPEN_COMPLETION') ||
     actions.includes('CANCEL');
 
@@ -932,11 +1215,6 @@ function WorkspaceControls({
           {actions.includes('RESUME_CONTRACT') ? (
             <Button loading={busy} onClick={() => void run({ type: 'RESUME_CONTRACT' })}>
               Resume
-            </Button>
-          ) : null}
-          {actions.includes('CONFIRM_COMPLETION') ? (
-            <Button loading={busy} onClick={() => void run({ type: 'CONFIRM_COMPLETION' })}>
-              Confirm completion
             </Button>
           ) : null}
           {actions.includes('REOPEN_COMPLETION') ? (

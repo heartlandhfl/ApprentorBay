@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import type { LearnerProfile } from '@apprentorbay/shared';
+import type { LearnerProfile, Showcase } from '@apprentorbay/shared';
 import {
   Button,
   Card,
@@ -10,10 +10,14 @@ import {
   Text,
 } from '../components';
 import { watchLearnerProfile } from '../features/profiles';
+import { ShowcaseCard, watchLearnerShowcases } from '../features/showcases';
+import { useAuth } from '../lib/auth';
 
 export function LearnerProfilePage() {
   const { id } = useParams<{ id: string }>();
+  const { account } = useAuth();
   const [profile, setProfile] = useState<LearnerProfile | null | undefined>(undefined);
+  const [showcases, setShowcases] = useState<Showcase[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -22,8 +26,18 @@ export function LearnerProfilePage() {
       return;
     }
     setProfile(undefined);
-    return watchLearnerProfile(id, setProfile, (err) => setError(err.message));
-  }, [id]);
+    const unsubProfile = watchLearnerProfile(id, setProfile, (err) => setError(err.message));
+    const unsubShowcases = watchLearnerShowcases(
+      id,
+      setShowcases,
+      (err) => setError(err.message),
+      { publishedOnly: account?.uid !== id },
+    );
+    return () => {
+      unsubProfile();
+      unsubShowcases();
+    };
+  }, [account?.uid, id]);
 
   return (
     <Page>
@@ -42,13 +56,26 @@ export function LearnerProfilePage() {
           }
         />
       ) : (
-        <LearnerBody profile={profile} />
+        <LearnerBody
+          profile={profile}
+          showcases={showcases}
+          isOwner={account?.uid === profile.userId}
+        />
       )}
     </Page>
   );
 }
 
-function LearnerBody({ profile }: { profile: LearnerProfile }) {
+function LearnerBody({
+  profile,
+  showcases,
+  isOwner,
+}: {
+  profile: LearnerProfile;
+  showcases: Showcase[];
+  isOwner: boolean;
+}) {
+  const visible = showcases.filter((item) => item.published || isOwner);
   return (
     <Stack gap={32}>
       <Stack gap={12}>
@@ -116,23 +143,21 @@ function LearnerBody({ profile }: { profile: LearnerProfile }) {
         </Stack>
       </Card>
 
-      <Card>
-        <Stack gap={16}>
-          <Text variant="h2">Completed deliverables</Text>
-          {profile.deliverables.length === 0 ? (
-            <EmptyState title="No completed deliverables yet" />
-          ) : (
-            <Stack gap={8}>
-              {profile.deliverables.map((item) => (
-                <Stack key={item.id} gap={4}>
-                  <Text variant="h3">{item.title || item.id}</Text>
-                  {item.description ? <Text variant="small">{item.description}</Text> : null}
-                </Stack>
-              ))}
-            </Stack>
-          )}
-        </Stack>
-      </Card>
+      <Stack gap={16}>
+        <Text variant="h2">Showcase</Text>
+        {visible.length === 0 ? (
+          <EmptyState
+            title="No published showcase yet"
+            description="Completed work appears here after the mentor confirms completion."
+          />
+        ) : (
+          <Stack gap={16}>
+            {visible.map((item) => (
+              <ShowcaseCard key={item.id} showcase={item} perspective="learner" />
+            ))}
+          </Stack>
+        )}
+      </Stack>
     </Stack>
   );
 }

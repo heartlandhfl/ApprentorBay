@@ -56,6 +56,22 @@
         { "fieldPath": "verificationStatus", "order": "ASCENDING" },
         { "fieldPath": "public", "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "showcases",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "learnerId", "order": "ASCENDING" },
+        { "fieldPath": "published", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "showcases",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "mentorId", "order": "ASCENDING" },
+        { "fieldPath": "published", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

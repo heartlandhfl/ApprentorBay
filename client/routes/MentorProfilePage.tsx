@@ -1,6 +1,11 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { VERIFICATION_STATUS, type MentorProfile, type VerificationStatus } from '@apprentorbay/shared';
+import {
+  VERIFICATION_STATUS,
+  type MentorProfile,
+  type Showcase,
+  type VerificationStatus,
+} from '@apprentorbay/shared';
 import {
   Badge,
   Button,
@@ -13,6 +18,8 @@ import {
 } from '../components';
 import { ApplyMentorship } from '../features/mentorship';
 import { watchMentorProfile } from '../features/profiles';
+import { ShowcaseCard, watchMentorShowcases } from '../features/showcases';
+import { useAuth } from '../lib/auth';
 
 function verificationBadge(status: VerificationStatus) {
   if (status === VERIFICATION_STATUS.approved) return { tone: 'success' as const, label: 'Verified' };
@@ -22,7 +29,9 @@ function verificationBadge(status: VerificationStatus) {
 
 export function MentorProfilePage() {
   const { id } = useParams<{ id: string }>();
+  const { account } = useAuth();
   const [profile, setProfile] = useState<MentorProfile | null | undefined>(undefined);
+  const [showcases, setShowcases] = useState<Showcase[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -31,8 +40,18 @@ export function MentorProfilePage() {
       return;
     }
     setProfile(undefined);
-    return watchMentorProfile(id, setProfile, (err) => setError(err.message));
-  }, [id]);
+    const unsubProfile = watchMentorProfile(id, setProfile, (err) => setError(err.message));
+    const unsubShowcases = watchMentorShowcases(
+      id,
+      setShowcases,
+      (err) => setError(err.message),
+      { publishedOnly: account?.uid !== id },
+    );
+    return () => {
+      unsubProfile();
+      unsubShowcases();
+    };
+  }, [account?.uid, id]);
 
   return (
     <Page>
@@ -51,13 +70,26 @@ export function MentorProfilePage() {
           }
         />
       ) : (
-        <MentorBody profile={profile} />
+        <MentorBody
+          profile={profile}
+          showcases={showcases}
+          isOwner={account?.uid === profile.userId}
+        />
       )}
     </Page>
   );
 }
 
-function MentorBody({ profile }: { profile: MentorProfile }) {
+function MentorBody({
+  profile,
+  showcases,
+  isOwner,
+}: {
+  profile: MentorProfile;
+  showcases: Showcase[];
+  isOwner: boolean;
+}) {
+  const visible = showcases.filter((item) => item.published || isOwner);
   const badge = verificationBadge(profile.verificationStatus);
 
   return (
@@ -119,23 +151,21 @@ function MentorBody({ profile }: { profile: MentorProfile }) {
         </Stack>
       </Card>
 
-      <Card>
-        <Stack gap={16}>
-          <Text variant="h2">Deliverables</Text>
-          {profile.deliverables.length === 0 ? (
-            <EmptyState title="No mentored deliverables yet" />
-          ) : (
-            <Stack gap={8}>
-              {profile.deliverables.map((item) => (
-                <Stack key={item.id} gap={4}>
-                  <Text variant="h3">{item.title || item.id}</Text>
-                  {item.description ? <Text variant="small">{item.description}</Text> : null}
-                </Stack>
-              ))}
-            </Stack>
-          )}
-        </Stack>
-      </Card>
+      <Stack gap={16}>
+        <Text variant="h2">Mentored deliverables</Text>
+        <Text variant="small">
+          These are works the mentor guided. The learner remains the creator.
+        </Text>
+        {visible.length === 0 ? (
+          <EmptyState title="No mentored deliverables yet" />
+        ) : (
+          <Stack gap={16}>
+            {visible.map((item) => (
+              <ShowcaseCard key={item.id} showcase={item} perspective="mentor" />
+            ))}
+          </Stack>
+        )}
+      </Stack>
 
       <Card>
         <Stack gap={16}>
