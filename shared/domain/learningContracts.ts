@@ -7,7 +7,15 @@ import {
   type StepOwner,
 } from './statuses.js';
 import type { Deliverable } from './deliverables.js';
+import {
+  FINAL_DELIVERABLE_REVIEW,
+  isFinalDeliverableReviewed,
+  isFinalDeliverableSubmitted,
+  normalizeFinalDeliverable,
+  type FinalDeliverable,
+} from './finalDeliverable.js';
 import { nextBeginWorkMilestone, type Milestone } from './milestones.js';
+import { canConfirmCompletion } from './showcases.js';
 import type { UserRole } from './identities.js';
 import type { IsoDateString } from './users.js';
 import {
@@ -73,6 +81,11 @@ export interface LearningContract {
   revisionHistory: ContractRevision[];
   /** First-class evidence. Older docs omit this; normalize hydrates from milestone strings. */
   evidenceItems: EvidenceItem[];
+  /** What the learner actually produced. Distinct from the negotiated plan. */
+  finalDeliverable: FinalDeliverable;
+  /** `showcases/{id}` — same as the contract id. Null until completion. */
+  showcaseId: string | null;
+  showcasePublished: boolean;
 }
 
 /**
@@ -257,6 +270,9 @@ export function normalizeContract(input: LearningContract): LearningContract {
     mentorComment: input.mentorComment ?? null,
     revisionHistory: input.revisionHistory ?? [],
     evidenceItems,
+    finalDeliverable: normalizeFinalDeliverable(input.finalDeliverable),
+    showcaseId: input.showcaseId ?? null,
+    showcasePublished: Boolean(input.showcasePublished),
   };
 }
 
@@ -407,16 +423,40 @@ export function workspaceFocus(contract: LearningContract): WorkspaceFocus {
         next: 'Resume the contract to continue evidence work.',
         currentMilestoneTitle: current?.title ?? submitted?.title ?? null,
       };
-    case LEARNING_CONTRACT_STATUS.completionPending:
+    case LEARNING_CONTRACT_STATUS.completionPending: {
+      const final = contract.finalDeliverable;
+      if (
+        !isFinalDeliverableSubmitted(final) ||
+        final.reviewStatus === FINAL_DELIVERABLE_REVIEW.revisionRequested
+      ) {
+        return {
+          who: 'learner',
+          next:
+            final.reviewStatus === FINAL_DELIVERABLE_REVIEW.revisionRequested
+              ? 'Resubmit the final deliverable using the mentor feedback.'
+              : 'Submit the final deliverable for mentor review.',
+          currentMilestoneTitle: null,
+        };
+      }
+      if (!isFinalDeliverableReviewed(final)) {
+        return {
+          who: 'mentor',
+          next: 'Review the final deliverable.',
+          currentMilestoneTitle: null,
+        };
+      }
       return {
-        who: 'either',
-        next: 'Confirm completion to publish the deliverable.',
+        who: 'mentor',
+        next: 'Confirm completion to create the showcase.',
         currentMilestoneTitle: null,
       };
+    }
     case LEARNING_CONTRACT_STATUS.completed:
       return {
-        who: 'nobody',
-        next: 'This contract is complete. The deliverable is on both profiles.',
+        who: contract.showcasePublished ? 'nobody' : 'learner',
+        next: contract.showcasePublished
+          ? 'This contract is complete. The showcase is on both profiles.'
+          : 'Publish the showcase so it appears on public profiles.',
         currentMilestoneTitle: null,
       };
     case LEARNING_CONTRACT_STATUS.cancelled:
@@ -516,9 +556,11 @@ export function nextActionCopy(contract: LearningContract): string {
     case LEARNING_CONTRACT_STATUS.paused:
       return 'This contract is paused. Resume it to submit or review evidence.';
     case LEARNING_CONTRACT_STATUS.completionPending:
-      return 'All milestones are approved. Confirm completion to publish the deliverable.';
+      return canConfirmCompletion(contract)
+        ? 'Mentor confirms completion after reviewing the final deliverable.'
+        : 'Submit and review the final deliverable. Completion cannot skip those gates.';
     case LEARNING_CONTRACT_STATUS.completed:
-      return 'This contract is complete. The deliverable is on both profiles.';
+      return 'This contract is complete. Ordinary editing is closed.';
     case LEARNING_CONTRACT_STATUS.rejected:
       return 'The mentor rejected this proposal. Start a new builder from the relationship.';
     case LEARNING_CONTRACT_STATUS.cancelled:

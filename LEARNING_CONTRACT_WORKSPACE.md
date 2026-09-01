@@ -110,7 +110,7 @@ completed → (terminal)
 cancelled → (terminal)
 ```
 
-`in_progress` cannot jump to `completed`. The last milestone approval writes `completion_pending` and does **not** publish profile deliverable refs. `CONFIRM_COMPLETION` publishes. `REOPEN_COMPLETION` returns to ACTIVE and sets the last milestone back to `active` so work can continue.
+`in_progress` cannot jump to `completed`. The last milestone approval writes `completion_pending`. The learner then submits the final deliverable and the mentor reviews it. `CONFIRM_COMPLETION` is blocked until those gates pass. It writes a `showcases/{contractId}` record (idempotent) and points both profiles at it. See `COMPLETION_AND_SHOWCASE.md`. `REOPEN_COMPLETION` returns to ACTIVE and sets the last milestone back to `active` so work can continue.
 
 Pause / resume / cancel / confirm / reopen are pairing members **or admin**. Evidence submit/review stay learner/mentor on the current step.
 
@@ -130,5 +130,5 @@ Pause / resume / cancel / confirm / reopen are pairing members **or admin**. Evi
 1. Both pairing members can access the same contract; progress matches.
 2. A stranger cannot access or pause it; a suspended admin cannot access it; an active admin can.
 3. Progress is `0` then `50` after one of two milestones is approved, and there is still no `progress` field.
-4. Pause blocks evidence; resume restores ACTIVE; last-milestone approve → `completion_pending` → confirm → `completed`.
+4. Pause blocks evidence; resume restores ACTIVE; last-milestone approve → `completion_pending` → final deliverable → mentor review → confirm → `completed`.
 5. Older `in_progress` documents still normalize and remain readable.

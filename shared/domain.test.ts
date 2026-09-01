@@ -30,6 +30,9 @@ import {
   normalizeRelationship,
   pairingIdFieldForRole,
   relationshipDocId,
+  MENTOR_CONTRIBUTION,
+  canConfirmCompletion,
+  completionRequirements,
   showcaseFromDeliverableRef,
   validateApplicationMessage,
   validateEvidenceDrafts,
@@ -50,6 +53,7 @@ describe('domain identities', () => {
     assert.equal(COLLECTIONS.applications, 'mentorshipApplications');
     assert.equal(COLLECTIONS.relationships, 'mentorshipRelationships');
     assert.equal(COLLECTIONS.contracts, 'learningContracts');
+    assert.equal(COLLECTIONS.showcases, 'showcases');
     assert.equal(COLLECTIONS.auditLogs, 'adminAuditLogs');
     assert.equal(RESERVED_COLLECTIONS.legacyMentorships, 'mentorships');
     assert.equal(RESERVED_COLLECTIONS.notifications, 'notifications');
@@ -273,6 +277,41 @@ describe('showcase projection', () => {
     assert.equal(item.source, 'profile_deliverable_ref');
     assert.equal(item.contractId, 'c-1');
     assert.equal(item.title, 'A sawhorse');
+  });
+
+  it('blocks completion until milestones, final deliverable, and mentor review are done', () => {
+    const empty = {
+      milestones: [{ status: 'approved' }, { status: 'locked' }],
+      finalDeliverable: {
+        title: '',
+        description: '',
+        files: [],
+        links: [],
+        evidenceItemIds: [],
+        skillsDemonstrated: [],
+        submittedAt: null,
+        submittedBy: null,
+        reviewStatus: 'not_submitted' as const,
+        reviewComment: null,
+        reviewedAt: null,
+        reviewedBy: null,
+      },
+    };
+    assert.equal(completionRequirements(empty).milestonesApproved, false);
+    assert.equal(canConfirmCompletion(empty), false);
+
+    const ready = {
+      milestones: [{ status: 'approved' }, { status: 'approved' }],
+      finalDeliverable: {
+        ...empty.finalDeliverable,
+        title: 'A sawhorse',
+        description: 'Done',
+        links: ['https://example.com'],
+        reviewStatus: 'reviewed' as const,
+      },
+    };
+    assert.equal(canConfirmCompletion(ready), true);
+    assert.match(MENTOR_CONTRIBUTION, /learner remains the creator/i);
   });
 });
 

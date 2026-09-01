@@ -143,6 +143,14 @@ service cloud.firestore {
       allow create, update, delete: if false;
     }
 
+    // Public showcase records. Client writes stay denied.
+    match /showcases/{showcaseId} {
+      allow read: if resource.data.published == true
+        || isPairingMember()
+        || isAdmin();
+      allow create, update, delete: if false;
+    }
+
     match /adminAuditLogs/{logId} {
       allow read: if isAdmin();
       allow create, update, delete: if false;
