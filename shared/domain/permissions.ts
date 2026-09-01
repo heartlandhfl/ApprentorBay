@@ -66,8 +66,9 @@ export function canSendMessage(
   relationship: MentorshipRelationship,
   text: string,
 ): boolean {
+  if (!actor || !canParticipate(actor)) return false;
   if (!canReadPairing(actor, relationship)) return false;
-  if (actor?.role === USER_ROLE.admin) return false;
+  if (actor.role === USER_ROLE.admin) return false;
   if (relationship.status !== RELATIONSHIP_STATUS.active) return false;
   return validateMessageText(text).ok;
 }
@@ -133,7 +134,7 @@ export function canResumeRelationship(
   actor: PermissionActor | null | undefined,
   relationship: MentorshipRelationship,
 ): boolean {
-  if (!actor || !isAccountActive(actor)) return false;
+  if (!actor || !canParticipate(actor)) return false;
   if (relationship.status !== RELATIONSHIP_STATUS.paused) return false;
   if (actor.role === USER_ROLE.admin) return true;
   return isPairingMember(actor.uid, relationship);

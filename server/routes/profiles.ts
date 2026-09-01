@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import {
+  canParticipate,
   COLLECTIONS,
   USER_ROLE,
   VERIFICATION_CASE_STATUS,
@@ -86,6 +87,10 @@ profilesRouter.post('/me/verification/submit', requireAccount, async (req: Accou
     }
     if (account.role !== USER_ROLE.mentor) {
       sendApiError(res, 403, 'forbidden', 'Only a mentor can submit verification');
+      return;
+    }
+    if (!canParticipate(account)) {
+      sendApiError(res, 403, 'forbidden', 'This account cannot submit verification');
       return;
     }
     const ref = adminDb().collection(COLLECTIONS.mentorProfiles).doc(account.uid);

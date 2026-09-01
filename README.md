@@ -25,6 +25,8 @@ A mentorship and apprenticeship app — structured pairings and living learning 
   /lib                  firebase.ts, seedAdmin.ts
 /shared                 TypeScript types — single source of truth
 firestore.rules         Deny-by-default + owner/admin/public profile rules
+SECURITY_AUDIT.md       Live collection matrix, query compatibility, findings
+SECURITY_FIXES.md       Security changes from that audit
 ```
 
 ## Data model (`/shared/types.ts`)

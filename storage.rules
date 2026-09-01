@@ -20,7 +20,33 @@ service firebase.storage {
     function isAdmin() {
       return isSignedIn()
         && firestore.exists(/databases/(default)/documents/users/$(request.auth.uid))
-        && userDoc(request.auth.uid).role == 'admin';
+        && userDoc(request.auth.uid).role == 'admin'
+        && userDoc(request.auth.uid).active != false
+        && (
+          !('accountStatus' in userDoc(request.auth.uid))
+          || userDoc(request.auth.uid).accountStatus == 'active'
+        );
+    }
+
+    function accountCanSignIn() {
+      return isSignedIn()
+        && firestore.exists(/databases/(default)/documents/users/$(request.auth.uid))
+        && userDoc(request.auth.uid).active != false
+        && (
+          !('accountStatus' in userDoc(request.auth.uid))
+          || userDoc(request.auth.uid).accountStatus == 'active'
+          || userDoc(request.auth.uid).accountStatus == 'restricted'
+        );
+    }
+
+    function accountParticipates() {
+      return isSignedIn()
+        && firestore.exists(/databases/(default)/documents/users/$(request.auth.uid))
+        && userDoc(request.auth.uid).active != false
+        && (
+          !('accountStatus' in userDoc(request.auth.uid))
+          || userDoc(request.auth.uid).accountStatus == 'active'
+        );
     }
 
     function contractDoc(contractId) {
@@ -65,14 +91,12 @@ service firebase.storage {
 
     match /users/{userId}/{allPaths=**} {
       allow read: if isOwner(userId);
-      allow create, update: if isOwner(userId) && isValidImageWrite();
-      allow delete: if isOwner(userId);
+      allow write: if false;
     }
 
     match /profile-photos/{slug}/{fileId} {
       allow read: if true;
-      allow create, update: if isSignedIn()
-        && firestore.exists(/databases/(default)/documents/users/$(request.auth.uid))
+      allow create, update: if accountCanSignIn()
         && userDoc(request.auth.uid).profileSlug == slug
         && isValidImageWrite();
       allow delete: if (
@@ -92,7 +116,8 @@ service firebase.storage {
     // Only the contract learner may upload under their own uid segment.
     match /evidence/{contractId}/{milestoneId}/{userId}/{fileId} {
       allow read: if isContractMember(contractId);
-      allow create, update: if isContractLearner(contractId)
+      allow create, update: if accountParticipates()
+        && isContractLearner(contractId)
         && request.auth.uid == userId
         && isValidEvidenceWrite();
       allow delete: if isOwner(userId) || isAdmin();

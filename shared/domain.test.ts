@@ -20,6 +20,8 @@ import {
   canEndRelationship,
   canPauseRelationship,
   canReadEvidenceObject,
+  canResumeRelationship,
+  canSendMessage,
   canStartLearningJourney,
   canWriteEvidenceObject,
   buildAuditLog,
@@ -241,6 +243,30 @@ describe('domain permissions and validation', () => {
       canAcceptApplication(learner, { mentorId: 'mentor-1', status: APPLICATION_STATUS.pending }),
       false,
     );
+  });
+
+  it('blocks restricted accounts from messaging and resuming, not from pausing', () => {
+    const relationship = {
+      id: 'rel-1',
+      learnerId: 'learner-1',
+      mentorId: 'mentor-1',
+      status: RELATIONSHIP_STATUS.active,
+      createdAt: '2026-09-01T00:00:00.000Z',
+      updatedAt: '2026-09-01T00:00:00.000Z',
+    };
+    const restricted = {
+      uid: 'learner-1',
+      role: USER_ROLE.learner,
+      active: true,
+      accountStatus: ACCOUNT_STATUS.restricted,
+    };
+    assert.equal(canSendMessage(restricted, relationship, 'Hello there'), false);
+    assert.equal(canPauseRelationship(restricted, relationship), true);
+    assert.equal(
+      canResumeRelationship(restricted, { ...relationship, status: RELATIONSHIP_STATUS.paused }),
+      false,
+    );
+    assert.equal(canStartLearningJourney(restricted, relationship), false);
   });
 
   it('lets only the learner start a journey on an active relationship', () => {
