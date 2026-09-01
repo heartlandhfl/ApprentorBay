@@ -46,7 +46,7 @@ export function ApplicationsPage() {
     setError(null);
     try {
       const relationshipId = await acceptApplication(row);
-      navigate(`/dashboard/messages/${relationshipId}`);
+      navigate(`/dashboard/mentorships/${relationshipId}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not accept');
     } finally {

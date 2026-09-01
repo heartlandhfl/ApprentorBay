@@ -2,7 +2,12 @@ import { APPLICATION_STATUS, RELATIONSHIP_STATUS, VERIFICATION_STATUS } from './
 import { USER_ROLE } from './identities.js';
 import { isAccountActive, type MentorProfile, type User } from './users.js';
 import { isPendingApplication, type MentorshipApplication } from './applications.js';
-import { isPairingMember, type MentorshipRelationship, type PairingMemberIds } from './relationships.js';
+import {
+  isOpenRelationship,
+  isPairingMember,
+  type MentorshipRelationship,
+  type PairingMemberIds,
+} from './relationships.js';
 import { validateApplicationMessage, validateMessageText } from './validation.js';
 
 export type PermissionActor = Pick<User, 'uid' | 'role' | 'active'>;
@@ -70,13 +75,42 @@ export function canStartLearningJourney(
   return relationship.status === RELATIONSHIP_STATUS.active;
 }
 
-export function canEndRelationship(
+export function canPauseRelationship(
   actor: PermissionActor | null | undefined,
   relationship: MentorshipRelationship,
 ): boolean {
   if (!actor || !isAccountActive(actor)) return false;
   if (relationship.status !== RELATIONSHIP_STATUS.active) return false;
+  if (actor.role === USER_ROLE.admin) return true;
   return isPairingMember(actor.uid, relationship);
+}
+
+export function canResumeRelationship(
+  actor: PermissionActor | null | undefined,
+  relationship: MentorshipRelationship,
+): boolean {
+  if (!actor || !isAccountActive(actor)) return false;
+  if (relationship.status !== RELATIONSHIP_STATUS.paused) return false;
+  if (actor.role === USER_ROLE.admin) return true;
+  return isPairingMember(actor.uid, relationship);
+}
+
+export function canEndRelationship(
+  actor: PermissionActor | null | undefined,
+  relationship: MentorshipRelationship,
+): boolean {
+  if (!actor || !isAccountActive(actor)) return false;
+  if (!isOpenRelationship(relationship)) return false;
+  if (actor.role === USER_ROLE.admin) return true;
+  return isPairingMember(actor.uid, relationship);
+}
+
+export function canTerminateRelationship(
+  actor: PermissionActor | null | undefined,
+  relationship: MentorshipRelationship,
+): boolean {
+  if (!canAdminister(actor)) return false;
+  return relationship.status !== RELATIONSHIP_STATUS.terminated;
 }
 
 export function canDecideVerification(actor: PermissionActor | null | undefined): boolean {

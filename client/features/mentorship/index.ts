@@ -5,6 +5,7 @@ export {
   declineApplication,
   firestoreDenied,
   sendMessage,
+  watchAccountRelationships,
   watchActiveRelationships,
   watchMessages,
   watchPairing,

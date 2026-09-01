@@ -6,21 +6,25 @@ import {
   onSnapshot,
   orderBy,
   query,
-  runTransaction,
   setDoc,
-  updateDoc,
   where,
 } from 'firebase/firestore';
 import {
   APPLICATION_STATUS,
   COLLECTIONS,
   RELATIONSHIP_STATUS,
+  isOpenRelationship,
+  normalizeRelationship,
   pairingIdFieldForRole,
   type MentorshipApplication,
   type MentorshipRelationship,
   type Message,
 } from '@apprentorbay/shared';
 import { getFirebaseDb } from '../../lib/firebase';
+import {
+  acceptMentorshipApplication,
+  declineMentorshipApplication,
+} from '../../lib/api';
 
 function dbOrThrow() {
   const db = getFirebaseDb();
@@ -41,12 +45,44 @@ export function firestoreDenied(error: unknown): boolean {
   return isDenied(error);
 }
 
+function asRelationship(data: MentorshipRelationship | undefined, id: string): MentorshipRelationship | null {
+  if (!data) return null;
+  return normalizeRelationship({ ...data, id: data.id || id });
+}
+
 export async function createApplication(input: {
   learnerId: string;
   mentorId: string;
   message: string;
 }): Promise<MentorshipApplication> {
   const db = dbOrThrow();
+
+  const pending = await getDocs(
+    query(
+      collection(db, COLLECTIONS.applications),
+      where('learnerId', '==', input.learnerId),
+      where('mentorId', '==', input.mentorId),
+    ),
+  );
+  if (pending.docs.some((item) => (item.data() as MentorshipApplication).status === APPLICATION_STATUS.pending)) {
+    throw new Error('You already have a pending application with this mentor');
+  }
+
+  const open = await getDocs(
+    query(
+      collection(db, COLLECTIONS.relationships),
+      where('learnerId', '==', input.learnerId),
+      where('mentorId', '==', input.mentorId),
+    ),
+  );
+  if (
+    open.docs.some((item) =>
+      isOpenRelationship(normalizeRelationship({ ...(item.data() as MentorshipRelationship), id: item.id })),
+    )
+  ) {
+    throw new Error('You already have an active mentorship with this mentor');
+  }
+
   const ref = doc(collection(db, COLLECTIONS.applications));
   const application: MentorshipApplication = {
     id: ref.id,
@@ -102,11 +138,13 @@ export function watchPairing(
       collection(db, COLLECTIONS.relationships),
       where('learnerId', '==', learnerId),
       where('mentorId', '==', mentorId),
-      where('status', '==', RELATIONSHIP_STATUS.active),
-      limit(1),
+      limit(8),
     ),
     (snap) => {
-      relationship = snap.docs[0]?.data() as MentorshipRelationship | undefined ?? null;
+      const rows = snap.docs
+        .map((item) => asRelationship(item.data() as MentorshipRelationship, item.id))
+        .filter((row): row is MentorshipRelationship => row !== null);
+      relationship = rows.find((row) => isOpenRelationship(row)) ?? rows[0] ?? null;
       emit();
     },
     (error) => onError?.(error),
@@ -145,6 +183,16 @@ export function watchActiveRelationships(
   onNext: (rows: MentorshipRelationship[]) => void,
   onError?: (error: Error) => void,
 ): () => void {
+  return watchAccountRelationships(account, (rows) => {
+    onNext(rows.filter((row) => row.status === RELATIONSHIP_STATUS.active));
+  }, onError);
+}
+
+export function watchAccountRelationships(
+  account: { uid: string; role: string },
+  onNext: (rows: MentorshipRelationship[]) => void,
+  onError?: (error: Error) => void,
+): () => void {
   const db = getFirebaseDb();
   if (!db) {
     onError?.(new Error('Firebase is not initialized'));
@@ -154,12 +202,14 @@ export function watchActiveRelationships(
   const field = pairingIdFieldForRole(account.role);
 
   return onSnapshot(
-    query(
-      collection(db, COLLECTIONS.relationships),
-      where(field, '==', account.uid),
-      where('status', '==', RELATIONSHIP_STATUS.active),
-    ),
-    (snap) => onNext(snap.docs.map((item) => item.data() as MentorshipRelationship)),
+    query(collection(db, COLLECTIONS.relationships), where(field, '==', account.uid)),
+    (snap) => {
+      const rows = snap.docs
+        .map((item) => asRelationship(item.data() as MentorshipRelationship, item.id))
+        .filter((row): row is MentorshipRelationship => row !== null)
+        .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+      onNext(rows);
+    },
     (error) => onError?.(error),
   );
 }
@@ -177,7 +227,10 @@ export function watchRelationship(
 
   return onSnapshot(
     doc(db, COLLECTIONS.relationships, relationshipId),
-    (snap) => onNext(snap.exists() ? (snap.data() as MentorshipRelationship) : null),
+    (snap) =>
+      onNext(
+        snap.exists() ? asRelationship(snap.data() as MentorshipRelationship, snap.id) : null,
+      ),
     (error) => onError?.(error),
   );
 }
@@ -205,55 +258,14 @@ export function watchMessages(
 }
 
 export async function declineApplication(applicationId: string): Promise<void> {
-  const db = dbOrThrow();
-  await updateDoc(doc(db, COLLECTIONS.applications, applicationId), {
-    status: APPLICATION_STATUS.declined,
-  });
+  await declineMentorshipApplication(applicationId);
 }
 
 export async function acceptApplication(
   application: MentorshipApplication,
 ): Promise<string> {
-  const db = dbOrThrow();
-
-  const existing = await getDocs(
-    query(
-      collection(db, COLLECTIONS.relationships),
-      where('learnerId', '==', application.learnerId),
-      where('mentorId', '==', application.mentorId),
-      where('status', '==', RELATIONSHIP_STATUS.active),
-      limit(1),
-    ),
-  );
-  if (!existing.empty) {
-    await updateDoc(doc(db, COLLECTIONS.applications, application.id), {
-      status: APPLICATION_STATUS.accepted,
-    });
-    return existing.docs[0].id;
-  }
-
-  const relRef = doc(collection(db, COLLECTIONS.relationships));
-  await runTransaction(db, async (tx) => {
-    const appRef = doc(db, COLLECTIONS.applications, application.id);
-    const appSnap = await tx.get(appRef);
-    if (!appSnap.exists()) throw new Error('Application is gone');
-    const current = appSnap.data() as MentorshipApplication;
-    if (current.status !== APPLICATION_STATUS.pending) {
-      throw new Error('This application is no longer pending');
-    }
-
-    tx.update(appRef, { status: APPLICATION_STATUS.accepted });
-    const relationship: MentorshipRelationship = {
-      id: relRef.id,
-      learnerId: current.learnerId,
-      mentorId: current.mentorId,
-      status: RELATIONSHIP_STATUS.active,
-      createdAt: new Date().toISOString(),
-    };
-    tx.set(relRef, relationship);
-  });
-
-  return relRef.id;
+  const relationship = await acceptMentorshipApplication(application.id);
+  return relationship.id;
 }
 
 export async function sendMessage(input: {

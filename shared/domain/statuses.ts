@@ -24,7 +24,9 @@ export type ApplicationStatus =
 
 export const RELATIONSHIP_STATUS = {
   active: 'active',
+  paused: 'paused',
   ended: 'ended',
+  terminated: 'terminated',
 } as const;
 
 export type RelationshipStatus =
@@ -110,7 +112,12 @@ export function isApplicationStatus(value: unknown): value is ApplicationStatus 
 }
 
 export function isRelationshipStatus(value: unknown): value is RelationshipStatus {
-  return value === RELATIONSHIP_STATUS.active || value === RELATIONSHIP_STATUS.ended;
+  return (
+    value === RELATIONSHIP_STATUS.active ||
+    value === RELATIONSHIP_STATUS.paused ||
+    value === RELATIONSHIP_STATUS.ended ||
+    value === RELATIONSHIP_STATUS.terminated
+  );
 }
 
 export function isLearningContractStatus(value: unknown): value is LearningContractStatus {

@@ -1,7 +1,7 @@
 rules_version = '2';
 
-// Deny-by-default. Messaging is scoped to active relationship members.
-// Never ship `allow read, write: if true`.
+// Deny-by-default. Pairing workspace reads are for members (or admin).
+// Relationship create/update and application decisions go through Express.
 service cloud.firestore {
   match /databases/{database}/documents {
     function isSignedIn() {
@@ -32,14 +32,22 @@ service cloud.firestore {
       return /databases/$(database)/documents/mentorshipRelationships/$(relationshipId);
     }
 
-    function isActiveRelationshipMember(relationshipId) {
+    function relationshipData(relationshipId) {
+      return get(relationshipPath(relationshipId)).data;
+    }
+
+    function isRelationshipMember(relationshipId) {
       return isSignedIn()
         && exists(relationshipPath(relationshipId))
-        && get(relationshipPath(relationshipId)).data.status == 'active'
         && (
-          get(relationshipPath(relationshipId)).data.learnerId == request.auth.uid
-          || get(relationshipPath(relationshipId)).data.mentorId == request.auth.uid
+          relationshipData(relationshipId).learnerId == request.auth.uid
+          || relationshipData(relationshipId).mentorId == request.auth.uid
         );
+    }
+
+    function isActiveRelationshipMember(relationshipId) {
+      return isRelationshipMember(relationshipId)
+        && relationshipData(relationshipId).status == 'active';
     }
 
     function isPairingMember() {
@@ -47,6 +55,11 @@ service cloud.firestore {
         resource.data.learnerId == request.auth.uid
         || resource.data.mentorId == request.auth.uid
       );
+    }
+
+    function mentorIsApproved(mentorId) {
+      return exists(/databases/$(database)/documents/mentorProfiles/$(mentorId))
+        && get(/databases/$(database)/documents/mentorProfiles/$(mentorId)).data.verificationStatus == 'approved';
     }
 
     match /users/{userId} {
@@ -97,35 +110,21 @@ service cloud.firestore {
         && request.resource.data.learnerId == request.auth.uid
         && request.resource.data.status == 'pending'
         && request.resource.data.mentorId is string
+        && request.resource.data.mentorId != request.auth.uid
         && request.resource.data.message is string
         && request.resource.data.message.size() > 0
         && request.resource.data.message.size() <= 1000
-        && exists(/databases/$(database)/documents/mentorProfiles/$(request.resource.data.mentorId));
-      allow update: if resource.data.mentorId == request.auth.uid
-        && resource.data.status == 'pending'
-        && request.resource.data.status in ['accepted', 'declined']
-        && request.resource.data.learnerId == resource.data.learnerId
-        && request.resource.data.mentorId == resource.data.mentorId
-        && request.resource.data.message == resource.data.message;
-      allow delete: if false;
+        && mentorIsApproved(request.resource.data.mentorId);
+      allow update, delete: if false;
     }
 
     match /mentorshipRelationships/{relationshipId} {
       allow read: if isPairingMember() || isAdmin();
-      allow create: if isSignedIn()
-        && request.resource.data.mentorId == request.auth.uid
-        && request.resource.data.status == 'active'
-        && request.resource.data.learnerId is string
-        && request.resource.data.learnerId != request.auth.uid;
-      allow update: if isPairingMember()
-        && request.resource.data.learnerId == resource.data.learnerId
-        && request.resource.data.mentorId == resource.data.mentorId
-        && request.resource.data.status in ['active', 'ended'];
-      allow delete: if false;
+      allow create, update, delete: if false;
     }
 
     match /messages/{messageId} {
-      allow read: if isActiveRelationshipMember(resource.data.relationshipId);
+      allow read: if isRelationshipMember(resource.data.relationshipId) || isAdmin();
       allow create: if isActiveRelationshipMember(request.resource.data.relationshipId)
         && request.resource.data.senderId == request.auth.uid
         && request.resource.data.text is string
@@ -135,16 +134,17 @@ service cloud.firestore {
     }
 
     match /mentorships/{mentorshipId} {
-      allow read: if isPairingMember() || isAdmin();
-      allow create: if isSignedIn()
-        && request.resource.data.learnerId == request.auth.uid;
-      allow update: if isPairingMember() || isAdmin();
-      allow delete: if false;
+      allow read, write: if false;
     }
 
     match /learningContracts/{contractId} {
       allow get: if isPairingMember() || isAdmin();
-      allow list: if isActiveRelationshipMember(resource.data.relationshipId) || isAdmin();
+      allow list: if isRelationshipMember(resource.data.relationshipId) || isAdmin();
+      allow create, update, delete: if false;
+    }
+
+    match /adminAuditLogs/{logId} {
+      allow read: if isAdmin();
       allow create, update, delete: if false;
     }
 

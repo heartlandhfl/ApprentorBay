@@ -35,9 +35,14 @@ export function Header() {
                   Applications
                 </Button>
               ) : null}
-              {account.role === USER_ROLE.learner || account.role === USER_ROLE.mentor ? (
-                <Button variant="ghost" size="sm" to="/dashboard/messages">
-                  Messages
+              {account.role === USER_ROLE.learner ? (
+                <Button variant="ghost" size="sm" to="/dashboard/mentorships">
+                  My Mentors
+                </Button>
+              ) : null}
+              {account.role === USER_ROLE.mentor ? (
+                <Button variant="ghost" size="sm" to="/dashboard/mentorships">
+                  My Learners
                 </Button>
               ) : null}
               {account.role !== USER_ROLE.admin ? (

@@ -4,7 +4,10 @@ import type {
   ApiError,
   ClientContractAction,
   LearningContract,
+  MentorshipApplication,
+  MentorshipRelationship,
   PendingMentorRow,
+  RelationshipStatus,
   User,
   VerificationStatus,
 } from '@apprentorbay/shared';
@@ -78,6 +81,43 @@ export async function setAccountActive(userId: string, active: boolean): Promise
   });
   const body = await readJson<{ user: User }>(response);
   return body.user;
+}
+
+export async function acceptMentorshipApplication(
+  applicationId: string,
+): Promise<MentorshipRelationship> {
+  const response = await fetch(`/api/applications/${applicationId}/accept`, {
+    method: 'POST',
+    headers: await authHeaders(),
+    body: JSON.stringify({}),
+  });
+  const body = await readJson<{ relationship: MentorshipRelationship }>(response);
+  return body.relationship;
+}
+
+export async function declineMentorshipApplication(
+  applicationId: string,
+): Promise<MentorshipApplication> {
+  const response = await fetch(`/api/applications/${applicationId}/decline`, {
+    method: 'POST',
+    headers: await authHeaders(),
+    body: JSON.stringify({}),
+  });
+  const body = await readJson<{ application: MentorshipApplication }>(response);
+  return body.application;
+}
+
+export async function setRelationshipStatus(
+  relationshipId: string,
+  status: RelationshipStatus,
+): Promise<MentorshipRelationship> {
+  const response = await fetch(`/api/relationships/${relationshipId}/status`, {
+    method: 'POST',
+    headers: await authHeaders(),
+    body: JSON.stringify({ status }),
+  });
+  const body = await readJson<{ relationship: MentorshipRelationship }>(response);
+  return body.relationship;
 }
 
 export async function startLearningJourney(relationshipId: string): Promise<LearningContract> {

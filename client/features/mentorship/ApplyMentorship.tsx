@@ -1,5 +1,11 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { APPLICATION_STATUS, USER_ROLE, VERIFICATION_STATUS, type MentorProfile } from '@apprentorbay/shared';
+import {
+  APPLICATION_STATUS,
+  USER_ROLE,
+  VERIFICATION_STATUS,
+  isOpenRelationship,
+  type MentorProfile,
+} from '@apprentorbay/shared';
 import {
   Badge,
   Button,
@@ -23,6 +29,7 @@ export function ApplyMentorship({ profile }: ApplyMentorshipProps) {
   const [error, setError] = useState<string | null>(null);
   const [applicationStatus, setApplicationStatus] = useState<string | null>(null);
   const [relationshipId, setRelationshipId] = useState<string | null>(null);
+  const [relationshipOpen, setRelationshipOpen] = useState(false);
 
   useEffect(() => {
     if (!account || account.role !== USER_ROLE.learner || account.uid === profile.userId) {
@@ -31,6 +38,7 @@ export function ApplyMentorship({ profile }: ApplyMentorshipProps) {
     return watchPairing(account.uid, profile.userId, (state) => {
       setApplicationStatus(state.application?.status ?? null);
       setRelationshipId(state.relationship?.id ?? null);
+      setRelationshipOpen(Boolean(state.relationship && isOpenRelationship(state.relationship)));
     });
   }, [account, profile.userId]);
 
@@ -46,9 +54,9 @@ export function ApplyMentorship({ profile }: ApplyMentorshipProps) {
   if (account.role !== USER_ROLE.learner) return null;
   if (account.uid === profile.userId) return null;
 
-  if (relationshipId) {
+  if (relationshipId && relationshipOpen) {
     return (
-      <Button to={`/dashboard/messages/${relationshipId}`}>Open conversation</Button>
+      <Button to={`/dashboard/mentorships/${relationshipId}`}>Open mentorship</Button>
     );
   }
 

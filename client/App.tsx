@@ -14,6 +14,8 @@ import { LoginPage } from './routes/LoginPage';
 import { MentorProfilePage } from './routes/MentorProfilePage';
 import { MessagesInboxPage } from './routes/MessagesInboxPage';
 import { MessagesPage } from './routes/MessagesPage';
+import { MentorshipsPage } from './routes/MentorshipsPage';
+import { RelationshipWorkspacePage } from './routes/RelationshipWorkspacePage';
 import { RequireAdmin } from './routes/RequireAdmin';
 import { RequireAuth } from './routes/RequireAuth';
 import { SignupPage } from './routes/SignupPage';
@@ -54,6 +56,22 @@ export function App() {
             element={
               <RequireAuth role={USER_ROLE.mentor}>
                 <ApplicationsPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/dashboard/mentorships"
+            element={
+              <RequireAuth>
+                <MentorshipsPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/dashboard/mentorships/:relationshipId"
+            element={
+              <RequireAuth>
+                <RelationshipWorkspacePage />
               </RequireAuth>
             }
           />

@@ -71,11 +71,17 @@ export { APPLICATION_MESSAGE, isPendingApplication } from './applications.js';
 export type { MentorApplication, MentorshipApplication } from './applications.js';
 
 export {
+  RELATIONSHIP_STATUS_LABEL,
+  buildActiveRelationship,
   counterpartField,
   isActiveRelationship,
+  isClosedRelationship,
+  isOpenRelationship,
   isPairingMember,
+  normalizeRelationship,
   otherPartyId,
   pairingIdForAccount,
+  relationshipDocId,
 } from './relationships.js';
 export type { MentorshipRelationship, PairingMemberIds } from './relationships.js';
 
@@ -116,8 +122,8 @@ export type { ShowcaseItem, ShowcaseSource } from './showcases.js';
 export { NOTIFICATION_TYPE, isUnreadNotification } from './notifications.js';
 export type { Notification, NotificationType } from './notifications.js';
 
-export { ADMIN_AUDIT_ACTION } from './auditLog.js';
-export type { AdminAuditAction, AdminAuditLog } from './auditLog.js';
+export { ADMIN_AUDIT_ACTION, AUDIT_EVENT, buildAuditLog } from './auditLog.js';
+export type { AdminAuditAction, AdminAuditLog, AuditEvent } from './auditLog.js';
 
 export type { Mentorship } from './legacy.js';
 
@@ -128,10 +134,13 @@ export {
   canDecideVerification,
   canDeclineApplication,
   canEndRelationship,
+  canPauseRelationship,
   canReadPairing,
+  canResumeRelationship,
   canSendMessage,
   canStartLearningJourney,
   canSuspendAccount,
+  canTerminateRelationship,
 } from './permissions.js';
 export type { PermissionActor } from './permissions.js';
 

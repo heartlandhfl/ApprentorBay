@@ -8,8 +8,10 @@ import { getAdminFirebase } from './lib/firebase.js';
 import { seedAdmin } from './lib/seedAdmin.js';
 import { errorHandler, notFound } from './middleware/errorHandler.js';
 import { adminRouter } from './routes/admin.js';
+import { applicationsRouter } from './routes/applications.js';
 import { contractsRouter } from './routes/contracts.js';
 import { healthRouter } from './routes/health.js';
+import { relationshipsRouter } from './routes/relationships.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 
@@ -47,6 +49,8 @@ app.use(express.json());
 
 app.use('/api/health', healthRouter);
 app.use('/api/admin', adminRouter);
+app.use('/api/applications', applicationsRouter);
+app.use('/api/relationships', relationshipsRouter);
 app.use('/api/contracts', contractsRouter);
 app.use('/api', notFound);
 
