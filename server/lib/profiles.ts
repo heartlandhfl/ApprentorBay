@@ -1,6 +1,7 @@
 import {
   COLLECTIONS,
   USER_ROLE,
+  canParticipate,
   buildPublicLearnerProfile,
   buildPublicMentorProfile,
   isPublicPhotoPath,
@@ -114,8 +115,15 @@ export async function writePublicProfile(userId: string, role: UserRole) {
   const slug = loaded?.profile.slug;
   if (!slug || !publicProfile) return null;
 
+  const userSnap = await adminDb().collection(COLLECTIONS.users).doc(userId).get();
+  const account = userSnap.data() as User | undefined;
+  const listedAllowed = Boolean(account && canParticipate(account));
+  const projected = listedAllowed
+    ? publicProfile
+    : { ...publicProfile, published: false, listed: false };
+
   const ref = adminDb().collection(COLLECTIONS.publicProfiles).doc(slug);
-  const stored = toStoredPublicProfile(publicProfile);
+  const stored = toStoredPublicProfile(projected);
   if (publicProfileOmitsPrivateFields(stored as unknown as Record<string, unknown>).length > 0) {
     throw new Error('Refusing to write private fields to a public profile');
   }

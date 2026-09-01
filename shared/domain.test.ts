@@ -10,6 +10,9 @@ import {
   RELATIONSHIP_STATUS,
   RESERVED_COLLECTIONS,
   USER_ROLE,
+  ACCOUNT_STATUS,
+  ADMIN_ACTION,
+  VERIFICATION_CASE_STATUS,
   VERIFICATION_STATUS,
   buildActiveRelationship,
   canAcceptApplication,
@@ -19,10 +22,13 @@ import {
   canReadEvidenceObject,
   canStartLearningJourney,
   canWriteEvidenceObject,
+  buildAuditLog,
   canTransitionApplication,
   canTransitionContract,
   canTransitionMilestone,
   canTransitionRelationship,
+  canTransitionVerification,
+  validateAdminReason,
   evidenceStoragePath,
   isAccountActive,
   isLearnerRole,
@@ -38,7 +44,13 @@ import {
   buildPublicLearnerProfile,
   buildPublicMentorProfile,
   canListPublicMentor,
+  canChangeAccountStatus,
+  canChangeOwnRole,
+  canGovernAccounts,
+  canParticipate,
   canReadPrivateProfile,
+  canSelfApprove,
+  deriveVerificationCase,
   emptyLearnerProfile,
   emptyMentorProfile,
   isPublicPhotoPath,
@@ -77,6 +89,7 @@ describe('domain identities', () => {
     assert.equal(COLLECTIONS.publicProfiles, 'publicProfiles');
     assert.equal(COLLECTIONS.profileSlugs, 'profileSlugs');
     assert.equal(COLLECTIONS.auditLogs, 'adminAuditLogs');
+    assert.equal(COLLECTIONS.supportIssues, 'supportIssues');
     assert.equal(RESERVED_COLLECTIONS.legacyMentorships, 'mentorships');
     assert.equal(RESERVED_COLLECTIONS.notifications, 'notifications');
     assert.equal(RESERVED_COLLECTIONS.adminAuditLogs, 'adminAuditLogs');
@@ -484,6 +497,84 @@ describe('public profile system', () => {
     assert.equal(listed.verifiedClaims.length, 1);
     assert.equal(listed.verifiedClaims[0]?.type, VERIFIED_CLAIM_TYPE.identity);
     assert.notEqual(APPROVAL_STATUS_LABEL[APPROVAL_STATUS.approved], 'Verified');
+  });
+
+  it('keeps approval separate from verification and blocks self-governance', () => {
+    assert.equal(APPROVAL_STATUS_LABEL[VERIFICATION_STATUS.approved], 'Approved');
+    assert.notEqual(APPROVAL_STATUS_LABEL[VERIFICATION_STATUS.approved], 'Verified');
+    assert.equal(VERIFICATION_CASE_STATUS.verified, 'verified');
+    assert.equal(
+      deriveVerificationCase([]),
+      VERIFICATION_CASE_STATUS.notSubmitted,
+    );
+    assert.equal(
+      deriveVerificationCase([
+        { type: VERIFIED_CLAIM_TYPE.identity, verified: true, verifiedAt: '2026-09-01T00:00:00.000Z' },
+      ]),
+      VERIFICATION_CASE_STATUS.partiallyVerified,
+    );
+    const admin = { uid: 'admin-1', role: USER_ROLE.admin, active: true, accountStatus: ACCOUNT_STATUS.active };
+    const learner = { uid: 'learner-1', role: USER_ROLE.learner, active: true, accountStatus: ACCOUNT_STATUS.active };
+    const restricted = { ...learner, accountStatus: ACCOUNT_STATUS.restricted as const };
+    assert.equal(canGovernAccounts(admin), true);
+    assert.equal(canGovernAccounts(learner), false);
+    assert.equal(canChangeOwnRole(learner), false);
+    assert.equal(canSelfApprove(learner), false);
+    assert.equal(canParticipate(restricted), false);
+    assert.equal(isAccountActive(restricted), true);
+    assert.equal(
+      canChangeAccountStatus(admin, learner, ACCOUNT_STATUS.suspended),
+      true,
+    );
+    assert.equal(
+      canChangeAccountStatus(learner, admin, ACCOUNT_STATUS.suspended),
+      false,
+    );
+    assert.equal(canChangeAccountStatus(admin, admin, ACCOUNT_STATUS.suspended), false);
+    assert.equal(ADMIN_ACTION.approveMentor, 'APPROVE_MENTOR');
+  });
+
+  it('refuses ordinary users every administrative privilege', () => {
+    const learner = { uid: 'learner-1', role: USER_ROLE.learner, active: true, accountStatus: ACCOUNT_STATUS.active };
+    const mentor = { uid: 'mentor-1', role: USER_ROLE.mentor, active: true, accountStatus: ACCOUNT_STATUS.active };
+    const admin = { uid: 'admin-1', role: USER_ROLE.admin, active: true, accountStatus: ACCOUNT_STATUS.active };
+    const restrictedAdmin = { ...admin, accountStatus: ACCOUNT_STATUS.restricted as const };
+    const terminated = { ...learner, accountStatus: ACCOUNT_STATUS.terminated as const, active: false };
+
+    assert.equal(canGovernAccounts(learner), false);
+    assert.equal(canGovernAccounts(mentor), false);
+    assert.equal(canGovernAccounts(restrictedAdmin), false);
+    assert.equal(canChangeOwnRole(learner), false);
+    assert.equal(canChangeOwnRole(mentor), false);
+    assert.equal(canChangeOwnRole(admin), false);
+    assert.equal(canSelfApprove(mentor), false);
+    assert.equal(canSelfApprove(admin), false);
+    assert.equal(canChangeAccountStatus(learner, mentor, ACCOUNT_STATUS.suspended), false);
+    assert.equal(canChangeAccountStatus(mentor, learner, ACCOUNT_STATUS.restricted), false);
+    assert.equal(canChangeAccountStatus(learner, learner, ACCOUNT_STATUS.terminated), false);
+    assert.equal(canChangeAccountStatus(admin, { ...admin, uid: 'admin-2' }, ACCOUNT_STATUS.suspended), false);
+    assert.equal(canChangeAccountStatus(admin, terminated, ACCOUNT_STATUS.active), false);
+    assert.equal(canTransitionVerification(VERIFICATION_STATUS.pending, VERIFICATION_STATUS.suspended), true);
+    assert.equal(canTransitionVerification(VERIFICATION_STATUS.approved, VERIFICATION_STATUS.pending), false);
+
+    const reason = validateAdminReason('', true);
+    assert.equal(reason.ok, false);
+    const optional = validateAdminReason('', false);
+    assert.equal(optional.ok, true);
+
+    const log = buildAuditLog({
+      id: 'log-1',
+      actorId: 'admin-1',
+      action: ADMIN_ACTION.approveMentor,
+      targetUserId: 'mentor-1',
+      reason: 'Looks complete',
+      now: '2026-09-01T00:00:00.000Z',
+    });
+    assert.equal(log.adminId, 'admin-1');
+    assert.equal(log.action, 'APPROVE_MENTOR');
+    assert.equal(log.targetUserId, 'mentor-1');
+    assert.equal(log.reason, 'Looks complete');
+    assert.equal(log.timestamp, '2026-09-01T00:00:00.000Z');
   });
 
   it('keeps private profiles to the owner, pairing, or admin', () => {

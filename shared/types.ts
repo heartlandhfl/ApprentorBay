@@ -15,6 +15,8 @@ export {
 
 export type {
   AccountRow,
+  AccountStatus,
+  AdminAction,
   AdminCounts,
   ApplicationStatus,
   CompetencyGoal,
@@ -42,8 +44,10 @@ export type {
   Review,
   SignupRole,
   StepOwner,
+  SupportIssue,
   User,
   UserRole,
+  VerificationCaseStatus,
   VerificationDecision,
   VerificationStatus,
   VerifiedClaim,

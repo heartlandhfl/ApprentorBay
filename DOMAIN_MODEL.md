@@ -23,7 +23,8 @@
 | Deliverable | `Deliverable` / `DeliverableRef` | Deliverable | Contract field + profile array |
 | Showcase | `Showcase` | Showcase / completed work | `showcases/{contractId}` |
 | Notification | `Notification` | Notification | Reserved: `notifications` (not written) |
-| Admin Audit Log | `AdminAuditLog` | — | Reserved: `adminAuditLogs` (not written) |
+| Admin Audit Log | `AdminAuditLog` | — | `adminAuditLogs` (server writes only) |
+| Support Issue | `SupportIssue` | Support | `supportIssues` |
 
 ---
 
@@ -31,13 +32,11 @@
 
 ### User
 
-Account document. One role at signup. Admin is seeded, never self-assigned.
+Account document. One role at signup. Admin is seeded, never self-assigned. `accountStatus` is `active` | `restricted` | `suspended` | `terminated`. See `ADMINISTRATION_SYSTEM.md`.
 
 ### LearnerProfile / MentorProfile
 
-### LearnerProfile / MentorProfile
-
-**Private** records keyed by `uid`. Visitors do not read these. Public pages read `publicProfiles/{slug}`. Mentor `verificationStatus` is participation **approval**, not a background check. Verified claims are separate. See `PUBLIC_PROFILE_SYSTEM.md`.
+**Private** records keyed by `uid`. Visitors do not read these. Public pages read `publicProfiles/{slug}`. Mentor `verificationStatus` is participation **approval**, not a background check. Verification cases (`verificationCaseStatus` + `verifiedClaims[]`) are separate. See `PUBLIC_PROFILE_SYSTEM.md` and `ADMINISTRATION_SYSTEM.md`.
 
 ### Mentor Application (`MentorshipApplication`)
 
@@ -67,9 +66,17 @@ Nested on the contract. Evidence is two strings on the milestone. Deliverable co
 
 Read model: `{ id, contractId, title, description, source: 'profile_deliverable_ref' }`.
 
-### Notification / AdminAuditLog
+### AdminAuditLog
 
-Typed for future writes. No current repository or API creates them.
+Server-written `adminAuditLogs/{id}` on every major admin action: `adminId`, `action`, `targetUserId`, `reason`, `timestamp`. Clients cannot write this collection.
+
+### SupportIssue
+
+Signed-in users file `supportIssues/{id}`. Admins resolve them from the dashboard. Clients cannot update or delete.
+
+### Notification
+
+Typed for future writes. No current repository writes this collection.
 
 ### Legacy `Mentorship`
 
@@ -83,9 +90,9 @@ Shapes match existing production documents. New optional fields were **not** add
 
 ### `users/{uid}`
 
-`uid`, `role`, `email`, `displayName`, `active`, `createdAt`, `termsAcceptedAt`, `termsVersion`
+`uid`, `role`, `email`, `displayName`, `active`, `accountStatus?`, `createdAt`, `termsAcceptedAt`, `termsVersion`, `profileSlug`
 
-Missing `active` is treated as `true` (`isAccountActive`).
+Missing `active` is treated as `true` (`isAccountActive`). Missing `accountStatus` follows `active` (`active` / `suspended`).
 
 ### `learnerProfiles/{uid}`
 
@@ -93,7 +100,7 @@ Private. `userId`, `slug`, `displayName`, `photoPath`, `professionalIdentity`, `
 
 ### `mentorProfiles/{uid}`
 
-Private. Learner fields plus `expertise`, `areasOfExpertise[]`, `experience[]`, `professionalGoals`, `mentoringInterests`, `reviews[]`, `verificationStatus` (approval), `verifiedClaims[]`
+Private. Learner fields plus `expertise`, `areasOfExpertise[]`, `experience[]`, `professionalGoals`, `mentoringInterests`, `reviews[]`, `verificationStatus` (approval: pending / approved / rejected / suspended), `previousVerificationStatus`, `verificationCaseStatus`, `verifiedClaims[]`
 
 ### `publicProfiles/{slug}`
 
@@ -122,6 +129,14 @@ Server-only uniqueness index: `userId`, `role`.
 ### `learningContracts/{id}`
 
 `id`, `relationshipId`, `learnerId`, `mentorId`, `status`, `currentStepOwner`, `createdAt`, `updatedAt`, `goal`, `goalHistory`, `objectives`, `milestones`, `deliverable`, `changeRequestReason`
+
+### `adminAuditLogs/{id}`
+
+`id`, `adminId`, `actorId`, `action`, `targetUserId`, `reason`, `timestamp`, `metadata`, `createdAt`
+
+### `supportIssues/{id}`
+
+`id`, `reporterId`, `reporterRole`, `reporterName`, `subject`, `body`, `status`, `createdAt`, `resolvedAt`, `resolvedBy`
 
 ### Nested
 
@@ -181,7 +196,7 @@ These are binding. See also the report at the bottom of this file.
 6. **`Mentorship` / `MentorshipStatus` / `mentorships` are legacy.** Types remain, marked deprecated. No writes.
 7. **`LearningContractStatus.agreed` remains in the union** because existing TypeScript and `journeyStepIndex` already treat it. The machine still does not write it. `LEARNING_CONTRACT_TRANSITIONS` documents `agreed → in_progress` for a future signing step.
 8. **Showcase is not a new collection.** It is derived from profile `deliverables`.
-9. **Notification and audit log types do not create documents.** Existing users are unaffected.
+9. **Notification types do not create documents.** Admin audit logs and support issues are written by the server. Existing users are unaffected.
 10. **Evidence stays on the milestone.** No `evidence` collection.
 11. **Learning Goal Builder is a view**, not a document.
 12. **Firestore rules and routes are unchanged** by this work.
@@ -197,7 +212,10 @@ All values live in `shared/domain/statuses.ts`. Use the const objects; do not re
 | Vocabulary | Const | Values |
 | --- | --- | --- |
 | Account role | `USER_ROLE` | `learner`, `mentor`, `admin` |
-| Mentor verification | `VERIFICATION_STATUS` | `pending`, `approved`, `rejected` |
+| Account governance | `ACCOUNT_STATUS` | `active`, `restricted`, `suspended`, `terminated` |
+| Mentor approval | `VERIFICATION_STATUS` | `pending`, `approved`, `rejected`, `suspended` |
+| Mentor verification case | `VERIFICATION_CASE_STATUS` | `not_submitted`, `submitted`, `under_review`, `verified`, `partially_verified` |
+| Support issue | `SUPPORT_ISSUE_STATUS` | `open`, `in_progress`, `resolved` |
 | Application | `APPLICATION_STATUS` | `pending`, `accepted`, `declined` |
 | Relationship | `RELATIONSHIP_STATUS` | `active`, `ended` |
 | Contract | `LEARNING_CONTRACT_STATUS` | `draft`, `under_mentor_review`, `under_learner_review`, `agreed` (unused write), `in_progress`, `completed` |
@@ -215,14 +233,16 @@ Type guards: `isUserRole`, `isApplicationStatus`, `isRelationshipStatus`, `isLea
 
 Implemented in `shared/domain/transitions.ts`. Contract *behavior* remains `reduceContract` in `learningContractMachine.ts` — the tables below are the domain map of what that machine (or the pairing flow) allows.
 
-### Mentor verification
+### Mentor approval (`verificationStatus`)
 
 ```
-pending → approved
-pending → rejected
-approved → (terminal)
-rejected → (terminal)
+pending → approved | rejected | suspended
+approved → rejected | suspended
+rejected → approved | pending
+suspended → approved | rejected
 ```
+
+Verification cases (`verificationCaseStatus`) are a separate evidence process and are not this map. See `ADMINISTRATION_SYSTEM.md`.
 
 ### Mentor application
 

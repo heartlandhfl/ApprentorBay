@@ -2,6 +2,7 @@ import { Router } from 'express';
 import {
   COLLECTIONS,
   USER_ROLE,
+  VERIFICATION_CASE_STATUS,
   type MentorshipApplication,
   type PublicProfile,
 } from '@apprentorbay/shared';
@@ -72,6 +73,30 @@ profilesRouter.put('/me', requireAccount, async (req: AccountRequest, res, next)
       sendApiError(res, status, status === 409 ? 'conflict' : 'invalid', (error as Error).message);
       return;
     }
+    next(error);
+  }
+});
+
+profilesRouter.post('/me/verification/submit', requireAccount, async (req: AccountRequest, res, next) => {
+  try {
+    const account = req.account;
+    if (!account) {
+      sendApiError(res, 401, 'unauthenticated', 'Sign in required');
+      return;
+    }
+    if (account.role !== USER_ROLE.mentor) {
+      sendApiError(res, 403, 'forbidden', 'Only a mentor can submit verification');
+      return;
+    }
+    const ref = adminDb().collection(COLLECTIONS.mentorProfiles).doc(account.uid);
+    const snap = await ref.get();
+    if (!snap.exists) {
+      sendApiError(res, 404, 'not_found', 'Profile not found');
+      return;
+    }
+    await ref.update({ verificationCaseStatus: VERIFICATION_CASE_STATUS.submitted });
+    res.json({ verificationCaseStatus: VERIFICATION_CASE_STATUS.submitted });
+  } catch (error) {
     next(error);
   }
 });

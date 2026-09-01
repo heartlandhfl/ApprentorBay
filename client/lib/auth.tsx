@@ -16,6 +16,7 @@ import {
 import { doc, getDoc, onSnapshot, runTransaction, updateDoc } from 'firebase/firestore';
 import {
   COLLECTIONS,
+  ACCOUNT_STATUS,
   TERMS_VERSION,
   USER_ROLE,
   emptyLearnerProfile,
@@ -151,6 +152,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           email: input.email.trim(),
           displayName,
           active: true,
+          accountStatus: ACCOUNT_STATUS.active,
           createdAt,
           termsAcceptedAt: createdAt,
           termsVersion: TERMS_VERSION,

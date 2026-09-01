@@ -19,7 +19,12 @@ service cloud.firestore {
     function isAdmin() {
       return isSignedIn()
         && exists(/databases/$(database)/documents/users/$(request.auth.uid))
-        && userDoc(request.auth.uid).role == 'admin';
+        && userDoc(request.auth.uid).role == 'admin'
+        && userDoc(request.auth.uid).active != false
+        && (
+          !('accountStatus' in userDoc(request.auth.uid))
+          || userDoc(request.auth.uid).accountStatus == 'active'
+        );
     }
 
     function isLearner() {
@@ -75,6 +80,10 @@ service cloud.firestore {
         && request.resource.data.uid == userId
         && request.resource.data.role in ['learner', 'mentor']
         && request.resource.data.active == true
+        && (
+          !('accountStatus' in request.resource.data)
+          || request.resource.data.accountStatus == 'active'
+        )
         && request.resource.data.termsVersion is string
         && request.resource.data.termsVersion.size() > 0
         && request.resource.data.termsAcceptedAt is string
@@ -87,6 +96,14 @@ service cloud.firestore {
         && request.resource.data.uid == resource.data.uid
         && request.resource.data.role == resource.data.role
         && request.resource.data.active == resource.data.active
+        && (
+          !('accountStatus' in request.resource.data)
+          || request.resource.data.accountStatus == resource.data.accountStatus
+          || (
+            !('accountStatus' in resource.data)
+            && request.resource.data.accountStatus == 'active'
+          )
+        )
         && (
           request.resource.data.termsVersion == resource.data.termsVersion
           || request.resource.data.termsVersion is string
@@ -177,6 +194,19 @@ service cloud.firestore {
     match /adminAuditLogs/{logId} {
       allow read: if isAdmin();
       allow create, update, delete: if false;
+    }
+
+    match /supportIssues/{issueId} {
+      allow read: if isAdmin()
+        || (isSignedIn() && resource.data.reporterId == request.auth.uid);
+      allow create: if isSignedIn()
+        && request.resource.data.reporterId == request.auth.uid
+        && request.resource.data.status == 'open'
+        && request.resource.data.subject is string
+        && request.resource.data.subject.size() >= 3
+        && request.resource.data.body is string
+        && request.resource.data.body.size() >= 8;
+      allow update, delete: if false;
     }
 
     match /{document=**} {

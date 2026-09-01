@@ -1,5 +1,12 @@
 import type { NextFunction, Request, RequestHandler, Response } from 'express';
-import { COLLECTIONS, isAccountActive, type ApiError, type User } from '@apprentorbay/shared';
+import {
+  ACCOUNT_STATUS,
+  COLLECTIONS,
+  accountStatusOf,
+  isAccountActive,
+  type ApiError,
+  type User,
+} from '@apprentorbay/shared';
 import { adminAuth, adminDb, getAdminFirebase } from '../lib/firebase.js';
 
 export type AccountRequest = Request & {
@@ -38,7 +45,15 @@ export const requireAccount: RequestHandler = async (
       return;
     }
     if (!isAccountActive(account)) {
-      sendApiError(res, 403, 'suspended', 'This account has been suspended.');
+      const status = accountStatusOf(account);
+      sendApiError(
+        res,
+        403,
+        status === ACCOUNT_STATUS.terminated ? 'terminated' : 'suspended',
+        status === ACCOUNT_STATUS.terminated
+          ? 'This account has been terminated.'
+          : 'This account has been suspended.',
+      );
       return;
     }
 

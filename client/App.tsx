@@ -19,6 +19,7 @@ import { RelationshipWorkspacePage } from './routes/RelationshipWorkspacePage';
 import { RequireAdmin } from './routes/RequireAdmin';
 import { RequireAuth } from './routes/RequireAuth';
 import { SignupPage } from './routes/SignupPage';
+import { SupportPage } from './routes/SupportPage';
 import { VerificationPage } from './routes/VerificationPage';
 
 export function App() {
@@ -32,6 +33,7 @@ export function App() {
           <Route path="/signup" element={<SignupPage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/legal/terms" element={<TermsPage />} />
+          <Route path="/support" element={<SupportPage />} />
           <Route path="/learners/:id" element={<LearnerProfilePage />} />
           <Route path="/mentors" element={<MentorsPage />} />
           <Route path="/mentors/:id" element={<MentorProfilePage />} />

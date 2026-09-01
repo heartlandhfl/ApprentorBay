@@ -5,6 +5,7 @@ import {
   VERIFICATION_STATUS,
 } from './statuses.js';
 import { USER_ROLE } from './identities.js';
+import { canParticipate } from './administration.js';
 import { isAccountActive, type MentorProfile, type User } from './users.js';
 import { isPendingApplication, type MentorshipApplication } from './applications.js';
 import {
@@ -16,7 +17,7 @@ import {
 import type { LearningContract } from './learningContracts.js';
 import { validateApplicationMessage, validateMessageText } from './validation.js';
 
-export type PermissionActor = Pick<User, 'uid' | 'role' | 'active'>;
+export type PermissionActor = Pick<User, 'uid' | 'role' | 'active' | 'accountStatus'>;
 
 export function canAdminister(actor: PermissionActor | null | undefined): boolean {
   return Boolean(actor && actor.role === USER_ROLE.admin && isAccountActive(actor));
@@ -27,7 +28,7 @@ export function canApplyForMentorship(
   mentor: Pick<MentorProfile, 'userId' | 'verificationStatus'>,
   message: string,
 ): boolean {
-  if (!actor || !isAccountActive(actor)) return false;
+  if (!actor || !canParticipate(actor)) return false;
   if (actor.role !== USER_ROLE.learner) return false;
   if (actor.uid === mentor.userId) return false;
   if (mentor.verificationStatus !== VERIFICATION_STATUS.approved) return false;
@@ -38,7 +39,7 @@ export function canAcceptApplication(
   actor: PermissionActor | null | undefined,
   application: Pick<MentorshipApplication, 'mentorId' | 'status'>,
 ): boolean {
-  if (!actor || !isAccountActive(actor)) return false;
+  if (!actor || !canParticipate(actor)) return false;
   if (actor.role !== USER_ROLE.mentor) return false;
   if (actor.uid !== application.mentorId) return false;
   return isPendingApplication(application);
@@ -112,7 +113,7 @@ export function canStartLearningJourney(
   actor: PermissionActor | null | undefined,
   relationship: MentorshipRelationship,
 ): boolean {
-  if (!actor || !isAccountActive(actor)) return false;
+  if (!actor || !canParticipate(actor)) return false;
   if (actor.role !== USER_ROLE.learner) return false;
   if (relationship.learnerId !== actor.uid) return false;
   return relationship.status === RELATIONSHIP_STATUS.active;
@@ -186,4 +187,26 @@ export function canSuspendAccount(
   if (!canAdminister(actor) || !actor) return false;
   if (actor.uid === target.uid) return false;
   return target.role !== USER_ROLE.admin;
+}
+
+export function canRestrictAccount(
+  actor: PermissionActor | null | undefined,
+  target: Pick<User, 'uid' | 'role'>,
+): boolean {
+  return canSuspendAccount(actor, target);
+}
+
+export function canTerminateAccount(
+  actor: PermissionActor | null | undefined,
+  target: Pick<User, 'uid' | 'role'>,
+): boolean {
+  return canSuspendAccount(actor, target);
+}
+
+export function canChangeOwnRole(_actor: PermissionActor | null | undefined): boolean {
+  return false;
+}
+
+export function canSelfApprove(_actor: PermissionActor | null | undefined): boolean {
+  return false;
 }
