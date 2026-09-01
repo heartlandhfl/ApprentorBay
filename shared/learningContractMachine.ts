@@ -4,8 +4,23 @@ import {
   MILESTONE_STATUS,
   STEP_OWNER,
   USER_ROLE,
+  canTransitionContract,
+  combineGoalText,
+  isLearnerReviewStatus,
+  isMentorReviewStatus,
+  normalizeContract,
+  normalizeDeliverable,
+  normalizeGoal,
+  normalizeMilestone,
+  normalizeObjective,
+  restLines,
+  firstLine,
+  validateChangeRequestReason,
+  validateGoalDraft,
+  validateMentorPlan,
 } from './domain/index.js';
 import type {
+  ContractRevision,
   Deliverable,
   Goal,
   LearningContract,
@@ -24,27 +39,39 @@ export type ContractAction =
   | {
       type: 'SAVE_DRAFT';
       goalText: string;
+      goalTitle?: string;
+      goalDescription?: string;
+      context?: string;
       deliverableTitle: string;
       deliverableDescription: string;
+      expectedEvidence?: string;
       now: IsoNow;
     }
   | { type: 'SEND_TO_MENTOR'; now: IsoNow }
   | {
       type: 'SAVE_MENTOR_REVIEW';
       goalText: string;
-      objectives: { text: string }[];
+      goalTitle?: string;
+      goalDescription?: string;
+      objectives: { text?: string; title?: string; description?: string }[];
       milestones: {
         title: string;
         description: string;
-        evidenceRequired: string;
+        evidenceRequired?: string;
+        successCriteria?: string;
       }[];
       deliverableTitle: string;
       deliverableDescription: string;
+      expectedEvidence?: string;
+      comment?: string;
       now: IsoNow;
     }
   | { type: 'SEND_TO_LEARNER'; now: IsoNow }
   | { type: 'APPROVE_PLAN'; now: IsoNow }
   | { type: 'REQUEST_CHANGES'; reason: string; now: IsoNow }
+  | { type: 'ACTIVATE'; now: IsoNow }
+  | { type: 'REJECT_PROPOSAL'; reason: string; now: IsoNow }
+  | { type: 'CANCEL'; reason?: string; now: IsoNow }
   | { type: 'SUBMIT_EVIDENCE'; text: string; link: string; now: IsoNow }
   | { type: 'APPROVE_MILESTONE'; now: IsoNow }
   | { type: 'REJECT_MILESTONE'; feedback: string; now: IsoNow };
@@ -66,23 +93,28 @@ type IsoNow = string;
 export const LEARNING_JOURNEY_STEPS = [
   {
     id: LEARNING_CONTRACT_STATUS.draft,
-    label: 'Draft',
-    description: 'Learner writes the goal and deliverable.',
+    label: 'Learner proposal',
+    description: 'Learner writes the draft goal and deliverable.',
   },
   {
     id: LEARNING_CONTRACT_STATUS.underMentorReview,
     label: 'Mentor review',
-    description: 'Mentor adds objectives and an ordered milestone list.',
+    description: 'Mentor revises the plan and adds objectives and milestones.',
   },
   {
     id: LEARNING_CONTRACT_STATUS.underLearnerReview,
     label: 'Learner review',
-    description: 'Learner approves the plan or requests changes.',
+    description: 'Learner approves or requests a revision.',
+  },
+  {
+    id: LEARNING_CONTRACT_STATUS.mutuallyApproved,
+    label: 'Mutual approval',
+    description: 'Both sides agreed. The contract is not active yet.',
   },
   {
     id: LEARNING_CONTRACT_STATUS.inProgress,
-    label: 'In progress',
-    description: 'One milestone is active at a time.',
+    label: 'Active',
+    description: 'The agreed contract is active. One milestone at a time.',
   },
   {
     id: LEARNING_CONTRACT_STATUS.completed,
@@ -92,8 +124,18 @@ export const LEARNING_JOURNEY_STEPS = [
 ] as const;
 
 export function journeyStepIndex(status: LearningContractStatus): number {
-  if (status === LEARNING_CONTRACT_STATUS.agreed) return 3;
-  return LEARNING_JOURNEY_STEPS.findIndex((step) => step.id === status);
+  if (status === LEARNING_CONTRACT_STATUS.draft) return 0;
+  if (isMentorReviewStatus(status)) return 1;
+  if (isLearnerReviewStatus(status)) return 2;
+  if (
+    status === LEARNING_CONTRACT_STATUS.mutuallyApproved ||
+    status === LEARNING_CONTRACT_STATUS.agreed
+  ) {
+    return 3;
+  }
+  if (status === LEARNING_CONTRACT_STATUS.inProgress) return 4;
+  if (status === LEARNING_CONTRACT_STATUS.completed) return 5;
+  return 1;
 }
 
 export function createDraftContract(input: {
@@ -118,6 +160,20 @@ export function createDraftContract(input: {
     milestones: [],
     deliverable: null,
     changeRequestReason: null,
+    context: null,
+    mentorComment: null,
+    revisionHistory: [
+      {
+        id: newId(),
+        actorId: input.learnerId,
+        actorRole: USER_ROLE.learner,
+        stage: LEARNING_CONTRACT_STATUS.draft,
+        action: 'CONTRACT_CREATED',
+        timestamp: input.now,
+        comment: null,
+        summary: 'Learner opened the Learning Goal Builder.',
+      },
+    ],
   };
 }
 
@@ -126,25 +182,32 @@ export function reduceContract(
   action: ContractAction,
   actor: ContractActor,
 ): ReduceResult {
+  const current = normalizeContract(contract);
   switch (action.type) {
     case 'SAVE_DRAFT':
-      return saveDraft(contract, action, actor);
+      return saveDraft(current, action, actor);
     case 'SEND_TO_MENTOR':
-      return sendToMentor(contract, action, actor);
+      return sendToMentor(current, action, actor);
     case 'SAVE_MENTOR_REVIEW':
-      return saveMentorReview(contract, action, actor);
+      return saveMentorReview(current, action, actor);
     case 'SEND_TO_LEARNER':
-      return sendToLearner(contract, action, actor);
+      return sendToLearner(current, action, actor);
     case 'APPROVE_PLAN':
-      return approvePlan(contract, action, actor);
+      return approvePlan(current, action, actor);
     case 'REQUEST_CHANGES':
-      return requestChanges(contract, action, actor);
+      return requestChanges(current, action, actor);
+    case 'ACTIVATE':
+      return activateContract(current, action, actor);
+    case 'REJECT_PROPOSAL':
+      return rejectProposal(current, action, actor);
+    case 'CANCEL':
+      return cancelContract(current, action, actor);
     case 'SUBMIT_EVIDENCE':
-      return submitEvidence(contract, action, actor);
+      return submitEvidence(current, action, actor);
     case 'APPROVE_MILESTONE':
-      return approveMilestone(contract, action, actor);
+      return approveMilestone(current, action, actor);
     case 'REJECT_MILESTONE':
-      return rejectMilestone(contract, action, actor);
+      return rejectMilestone(current, action, actor);
   }
 }
 
@@ -152,30 +215,46 @@ export function availableActions(
   contract: LearningContract,
   actor: ContractActor,
 ): ContractActionType[] {
-  if (!isStepActor(contract, actor)) return [];
+  const current = normalizeContract(contract);
+  if (!isStepActor(current, actor)) {
+    if (
+      current.status === LEARNING_CONTRACT_STATUS.mutuallyApproved &&
+      isPairingActor(current, actor)
+    ) {
+      return ['ACTIVATE'];
+    }
+    return [];
+  }
 
-  switch (contract.status) {
+  switch (current.status) {
     case LEARNING_CONTRACT_STATUS.draft:
-      return ['SAVE_DRAFT', 'SEND_TO_MENTOR'];
+      return ['SAVE_DRAFT', 'SEND_TO_MENTOR', 'CANCEL'];
+    case LEARNING_CONTRACT_STATUS.submittedByLearner:
     case LEARNING_CONTRACT_STATUS.underMentorReview:
-      return ['SAVE_MENTOR_REVIEW', 'SEND_TO_LEARNER'];
+    case LEARNING_CONTRACT_STATUS.revisionRequested:
+      return ['SAVE_MENTOR_REVIEW', 'SEND_TO_LEARNER', 'REJECT_PROPOSAL', 'CANCEL'];
+    case LEARNING_CONTRACT_STATUS.proposedByMentor:
     case LEARNING_CONTRACT_STATUS.underLearnerReview:
-      return ['APPROVE_PLAN', 'REQUEST_CHANGES'];
+      return ['APPROVE_PLAN', 'REQUEST_CHANGES', 'CANCEL'];
+    case LEARNING_CONTRACT_STATUS.mutuallyApproved:
+    case LEARNING_CONTRACT_STATUS.agreed:
+      return ['ACTIVATE'];
     case LEARNING_CONTRACT_STATUS.inProgress:
       if (
         actor.role === USER_ROLE.learner &&
-        actionableMilestone(contract, [MILESTONE_STATUS.active, MILESTONE_STATUS.rejected])
+        actionableMilestone(current, [MILESTONE_STATUS.active, MILESTONE_STATUS.rejected])
       ) {
         return ['SUBMIT_EVIDENCE'];
       }
       if (
         actor.role === USER_ROLE.mentor &&
-        actionableMilestone(contract, [MILESTONE_STATUS.submitted])
+        actionableMilestone(current, [MILESTONE_STATUS.submitted])
       ) {
         return ['APPROVE_MILESTONE', 'REJECT_MILESTONE'];
       }
       return [];
-    case LEARNING_CONTRACT_STATUS.agreed:
+    case LEARNING_CONTRACT_STATUS.rejected:
+    case LEARNING_CONTRACT_STATUS.cancelled:
     case LEARNING_CONTRACT_STATUS.completed:
       return [];
   }
@@ -205,14 +284,20 @@ function fail(error: string): ReduceResult {
 }
 
 function ok(contract: LearningContract, effects: ContractEffect[] = []): ReduceResult {
-  return { ok: true, contract, effects };
+  return { ok: true, contract: normalizeContract(contract), effects };
 }
 
-function requireStatus(
+function isPairingActor(contract: LearningContract, actor: ContractActor): boolean {
+  if (actor.role === USER_ROLE.learner) return actor.uid === contract.learnerId;
+  if (actor.role === USER_ROLE.mentor) return actor.uid === contract.mentorId;
+  return false;
+}
+
+function requireStatuses(
   contract: LearningContract,
-  status: LearningContractStatus,
+  statuses: LearningContractStatus[],
 ): ReduceResult | null {
-  if (contract.status !== status) {
+  if (!statuses.includes(contract.status)) {
     return fail(`This action is not available in the ${contract.status} state`);
   }
   return null;
@@ -233,24 +318,79 @@ function requireActor(
   return null;
 }
 
+function moveTo(
+  contract: LearningContract,
+  next: LearningContractStatus,
+): ReduceResult | null {
+  if (contract.status === next) return null;
+  if (!canTransitionContract(contract.status, next)) {
+    return fail(`Cannot move from ${contract.status} to ${next}`);
+  }
+  return null;
+}
+
+function appendRevision(
+  contract: LearningContract,
+  input: {
+    actor: ContractActor;
+    action: string;
+    now: string;
+    comment?: string | null;
+    summary: string;
+    stage?: LearningContractStatus;
+  },
+): ContractRevision[] {
+  const entry: ContractRevision = {
+    id: newId(),
+    actorId: input.actor.uid,
+    actorRole: input.actor.role,
+    stage: input.stage ?? contract.status,
+    action: input.action,
+    timestamp: input.now,
+    comment: input.comment?.trim() || null,
+    summary: input.summary,
+  };
+  return [...contract.revisionHistory, entry];
+}
+
+function resolveGoalFields(input: {
+  goalText?: string;
+  goalTitle?: string;
+  goalDescription?: string;
+}): { title: string; description: string; text: string } {
+  const title = (input.goalTitle ?? '').trim() || firstLine(input.goalText ?? '');
+  const description = (input.goalDescription ?? '').trim() || restLines(input.goalText ?? '');
+  const text = (input.goalText ?? '').trim() || combineGoalText(title, description);
+  return { title, description, text };
+}
+
 function saveDraft(
   contract: LearningContract,
   action: Extract<ContractAction, { type: 'SAVE_DRAFT' }>,
   actor: ContractActor,
 ): ReduceResult {
   const blocked =
-    requireStatus(contract, LEARNING_CONTRACT_STATUS.draft) ??
+    requireStatuses(contract, [LEARNING_CONTRACT_STATUS.draft]) ??
     requireActor(contract, actor, STEP_OWNER.learner);
   if (blocked) return blocked;
 
+  const goalFields = resolveGoalFields(action);
   return ok({
     ...contract,
     updatedAt: action.now,
-    goal: upsertGoal(contract.goal, action.goalText, contract.goalHistory),
+    context: action.context?.trim() || contract.context,
+    goal: upsertGoal(contract.goal, goalFields),
     deliverable: upsertDeliverable(contract.deliverable, {
       title: action.deliverableTitle,
       description: action.deliverableDescription,
+      expectedEvidence: action.expectedEvidence ?? contract.deliverable?.expectedEvidence ?? '',
       status: DELIVERABLE_STATUS.draft,
+    }),
+    revisionHistory: appendRevision(contract, {
+      actor,
+      action: 'SAVE_DRAFT',
+      now: action.now,
+      summary: 'Learner saved a draft goal and deliverable.',
     }),
   });
 }
@@ -261,20 +401,33 @@ function sendToMentor(
   actor: ContractActor,
 ): ReduceResult {
   const blocked =
-    requireStatus(contract, LEARNING_CONTRACT_STATUS.draft) ??
-    requireActor(contract, actor, STEP_OWNER.learner);
+    requireStatuses(contract, [LEARNING_CONTRACT_STATUS.draft]) ??
+    requireActor(contract, actor, STEP_OWNER.learner) ??
+    moveTo(contract, LEARNING_CONTRACT_STATUS.submittedByLearner);
   if (blocked) return blocked;
-  if (!contract.goal?.text.trim()) return fail('Write a draft goal before sending');
-  if (!contract.deliverable?.title.trim() || !contract.deliverable.description.trim()) {
-    return fail('Write a draft deliverable before sending');
-  }
+
+  const check = validateGoalDraft({
+    goalText: contract.goal?.text ?? '',
+    goalTitle: contract.goal?.title ?? '',
+    goalDescription: contract.goal?.description ?? '',
+    deliverableTitle: contract.deliverable?.title ?? '',
+    deliverableDescription: contract.deliverable?.description ?? '',
+  });
+  if (!check.ok) return fail(check.error);
 
   return ok({
     ...contract,
-    status: LEARNING_CONTRACT_STATUS.underMentorReview,
+    status: LEARNING_CONTRACT_STATUS.submittedByLearner,
     currentStepOwner: STEP_OWNER.mentor,
     updatedAt: action.now,
     changeRequestReason: null,
+    revisionHistory: appendRevision(contract, {
+      actor,
+      action: 'SUBMITTED_BY_LEARNER',
+      now: action.now,
+      comment: contract.context,
+      summary: 'Learner submitted the draft goal and deliverable.',
+    }),
   });
 }
 
@@ -284,27 +437,59 @@ function saveMentorReview(
   actor: ContractActor,
 ): ReduceResult {
   const blocked =
-    requireStatus(contract, LEARNING_CONTRACT_STATUS.underMentorReview) ??
-    requireActor(contract, actor, STEP_OWNER.mentor);
+    requireStatuses(contract, [
+      LEARNING_CONTRACT_STATUS.submittedByLearner,
+      LEARNING_CONTRACT_STATUS.underMentorReview,
+      LEARNING_CONTRACT_STATUS.revisionRequested,
+    ]) ?? requireActor(contract, actor, STEP_OWNER.mentor);
   if (blocked) return blocked;
 
-  const nextGoal = reviseGoal(contract, action.goalText);
+  const nextStatus =
+    contract.status === LEARNING_CONTRACT_STATUS.submittedByLearner
+      ? LEARNING_CONTRACT_STATUS.underMentorReview
+      : contract.status === LEARNING_CONTRACT_STATUS.revisionRequested
+        ? LEARNING_CONTRACT_STATUS.underMentorReview
+        : contract.status;
+  const transitionBlock = moveTo(contract, nextStatus);
+  if (nextStatus !== contract.status && transitionBlock) return transitionBlock;
+
+  const goalFields = resolveGoalFields(action);
+  const nextGoal = reviseGoal(contract, goalFields);
   return ok({
     ...contract,
+    status: nextStatus,
     updatedAt: action.now,
+    mentorComment: action.comment?.trim() || contract.mentorComment,
     goal: nextGoal.goal,
     goalHistory: nextGoal.goalHistory,
-    objectives: action.objectives.map((item, index) => ({
-      id: contract.objectives[index]?.id ?? newId(),
-      text: item.text.trim(),
-    })),
+    objectives: action.objectives.map((item, index) =>
+      normalizeObjective(
+        {
+          id: contract.objectives[index]?.id ?? newId(),
+          title: item.title,
+          description: item.description,
+          text: item.text,
+          order: index,
+        },
+        index,
+      ),
+    ),
     milestones: action.milestones.map((item, index) =>
       mergeMilestone(contract.milestones[index], item, index),
     ),
     deliverable: upsertDeliverable(contract.deliverable, {
       title: action.deliverableTitle,
       description: action.deliverableDescription,
+      expectedEvidence:
+        action.expectedEvidence ?? contract.deliverable?.expectedEvidence ?? '',
       status: DELIVERABLE_STATUS.draft,
+    }),
+    revisionHistory: appendRevision(contract, {
+      actor,
+      action: 'MENTOR_REVISED',
+      now: action.now,
+      comment: action.comment,
+      summary: 'Mentor revised the goal, objectives, milestones, or deliverable.',
     }),
   });
 }
@@ -315,27 +500,25 @@ function sendToLearner(
   actor: ContractActor,
 ): ReduceResult {
   const blocked =
-    requireStatus(contract, LEARNING_CONTRACT_STATUS.underMentorReview) ??
-    requireActor(contract, actor, STEP_OWNER.mentor);
+    requireStatuses(contract, [
+      LEARNING_CONTRACT_STATUS.submittedByLearner,
+      LEARNING_CONTRACT_STATUS.underMentorReview,
+      LEARNING_CONTRACT_STATUS.revisionRequested,
+    ]) ?? requireActor(contract, actor, STEP_OWNER.mentor);
   if (blocked) return blocked;
-  if (!contract.goal?.text.trim()) return fail('The goal cannot be empty');
-  if (!contract.deliverable?.description.trim()) {
-    return fail('The deliverable description cannot be empty');
-  }
-  if (contract.objectives.filter((item) => item.text.trim()).length === 0) {
-    return fail('Add at least one objective');
-  }
-  if (contract.milestones.length === 0) {
-    return fail('Add at least one milestone');
-  }
-  if (
-    contract.milestones.some(
-      (item) =>
-        !item.title.trim() || !item.description.trim() || !item.evidenceRequired.trim(),
-    )
-  ) {
-    return fail('Every milestone needs a title, description, and required evidence');
-  }
+
+  const check = validateMentorPlan({
+    goalText: contract.goal?.text ?? '',
+    goalTitle: contract.goal?.title ?? '',
+    goalDescription: contract.goal?.description ?? '',
+    deliverableDescription: contract.deliverable?.description ?? '',
+    objectives: contract.objectives,
+    milestones: contract.milestones,
+  });
+  if (!check.ok) return fail(check.error);
+
+  const viaProposed = moveTo(contract, LEARNING_CONTRACT_STATUS.proposedByMentor);
+  if (viaProposed) return viaProposed;
 
   const ordered = [...contract.milestones]
     .sort((a, b) => a.order - b.order)
@@ -347,10 +530,17 @@ function sendToLearner(
 
   return ok({
     ...contract,
-    status: LEARNING_CONTRACT_STATUS.underLearnerReview,
+    status: LEARNING_CONTRACT_STATUS.proposedByMentor,
     currentStepOwner: STEP_OWNER.learner,
     updatedAt: action.now,
     milestones: ordered,
+    revisionHistory: appendRevision(contract, {
+      actor,
+      action: 'PROPOSED_BY_MENTOR',
+      now: action.now,
+      comment: contract.mentorComment,
+      summary: 'Mentor proposed the learning contract for learner review.',
+    }),
   });
 }
 
@@ -360,12 +550,85 @@ function approvePlan(
   actor: ContractActor,
 ): ReduceResult {
   const blocked =
-    requireStatus(contract, LEARNING_CONTRACT_STATUS.underLearnerReview) ??
-    requireActor(contract, actor, STEP_OWNER.learner);
+    requireStatuses(contract, [
+      LEARNING_CONTRACT_STATUS.proposedByMentor,
+      LEARNING_CONTRACT_STATUS.underLearnerReview,
+    ]) ?? requireActor(contract, actor, STEP_OWNER.learner);
   if (blocked) return blocked;
   if (contract.milestones.length === 0) return fail('This plan has no milestones');
 
-  const started = contract.milestones
+  const toApproved = moveTo(contract, LEARNING_CONTRACT_STATUS.mutuallyApproved);
+  if (toApproved) return toApproved;
+
+  return ok({
+    ...contract,
+    status: LEARNING_CONTRACT_STATUS.mutuallyApproved,
+    currentStepOwner: STEP_OWNER.learner,
+    updatedAt: action.now,
+    changeRequestReason: null,
+    revisionHistory: appendRevision(contract, {
+      actor,
+      action: 'MUTUALLY_APPROVED',
+      now: action.now,
+      summary: 'Learner approved the mentor proposal. Both sides have agreed.',
+    }),
+  });
+}
+
+function requestChanges(
+  contract: LearningContract,
+  action: Extract<ContractAction, { type: 'REQUEST_CHANGES' }>,
+  actor: ContractActor,
+): ReduceResult {
+  const blocked =
+    requireStatuses(contract, [
+      LEARNING_CONTRACT_STATUS.proposedByMentor,
+      LEARNING_CONTRACT_STATUS.underLearnerReview,
+    ]) ?? requireActor(contract, actor, STEP_OWNER.learner);
+  if (blocked) return blocked;
+  const reason = validateChangeRequestReason(action.reason);
+  if (!reason.ok) return fail(reason.error);
+
+  const toRevision = moveTo(contract, LEARNING_CONTRACT_STATUS.revisionRequested);
+  if (toRevision) return toRevision;
+
+  return ok({
+    ...contract,
+    status: LEARNING_CONTRACT_STATUS.revisionRequested,
+    currentStepOwner: STEP_OWNER.mentor,
+    updatedAt: action.now,
+    changeRequestReason: action.reason.trim(),
+    revisionHistory: appendRevision(contract, {
+      actor,
+      action: 'REVISION_REQUESTED',
+      now: action.now,
+      comment: action.reason,
+      summary: 'Learner requested a revision.',
+    }),
+  });
+}
+
+function activateContract(
+  contract: LearningContract,
+  action: Extract<ContractAction, { type: 'ACTIVATE' }>,
+  actor: ContractActor,
+): ReduceResult {
+  const allowedStatuses: LearningContractStatus[] = [
+    LEARNING_CONTRACT_STATUS.mutuallyApproved,
+    LEARNING_CONTRACT_STATUS.agreed,
+  ];
+  if (!allowedStatuses.includes(contract.status)) {
+    return fail('A contract cannot become ACTIVE until it is mutually approved');
+  }
+  if (!isPairingActor(contract, actor)) {
+    return fail('You cannot act on this step');
+  }
+  if (contract.milestones.length === 0) return fail('This plan has no milestones');
+
+  const toActive = moveTo(contract, LEARNING_CONTRACT_STATUS.inProgress);
+  if (toActive) return toActive;
+
+  const started = [...contract.milestones]
     .sort((a, b) => a.order - b.order)
     .map((item, index) => ({
       ...item,
@@ -383,26 +646,82 @@ function approvePlan(
     deliverable: contract.deliverable
       ? { ...contract.deliverable, status: DELIVERABLE_STATUS.inProgress }
       : contract.deliverable,
+    revisionHistory: appendRevision(contract, {
+      actor,
+      action: 'ACTIVATED',
+      now: action.now,
+      summary: 'The mutually approved contract is now ACTIVE.',
+    }),
   });
 }
 
-function requestChanges(
+function rejectProposal(
   contract: LearningContract,
-  action: Extract<ContractAction, { type: 'REQUEST_CHANGES' }>,
+  action: Extract<ContractAction, { type: 'REJECT_PROPOSAL' }>,
   actor: ContractActor,
 ): ReduceResult {
   const blocked =
-    requireStatus(contract, LEARNING_CONTRACT_STATUS.underLearnerReview) ??
-    requireActor(contract, actor, STEP_OWNER.learner);
+    requireStatuses(contract, [
+      LEARNING_CONTRACT_STATUS.submittedByLearner,
+      LEARNING_CONTRACT_STATUS.underMentorReview,
+      LEARNING_CONTRACT_STATUS.revisionRequested,
+    ]) ?? requireActor(contract, actor, STEP_OWNER.mentor);
   if (blocked) return blocked;
-  if (!action.reason.trim()) return fail('A reason is required to request changes');
+  if (!action.reason.trim()) return fail('A reason is required to reject the proposal');
+
+  const toRejected = moveTo(contract, LEARNING_CONTRACT_STATUS.rejected);
+  if (toRejected) return toRejected;
 
   return ok({
     ...contract,
-    status: LEARNING_CONTRACT_STATUS.underMentorReview,
+    status: LEARNING_CONTRACT_STATUS.rejected,
     currentStepOwner: STEP_OWNER.mentor,
     updatedAt: action.now,
     changeRequestReason: action.reason.trim(),
+    revisionHistory: appendRevision(contract, {
+      actor,
+      action: 'REJECTED',
+      now: action.now,
+      comment: action.reason,
+      summary: 'Mentor rejected the learning contract proposal.',
+    }),
+  });
+}
+
+function cancelContract(
+  contract: LearningContract,
+  action: Extract<ContractAction, { type: 'CANCEL' }>,
+  actor: ContractActor,
+): ReduceResult {
+  const cancellable: LearningContractStatus[] = [
+    LEARNING_CONTRACT_STATUS.draft,
+    LEARNING_CONTRACT_STATUS.submittedByLearner,
+    LEARNING_CONTRACT_STATUS.underMentorReview,
+    LEARNING_CONTRACT_STATUS.proposedByMentor,
+    LEARNING_CONTRACT_STATUS.underLearnerReview,
+    LEARNING_CONTRACT_STATUS.revisionRequested,
+  ];
+  if (!cancellable.includes(contract.status)) {
+    return fail('This contract can no longer be cancelled');
+  }
+  if (!isPairingActor(contract, actor)) {
+    return fail('You cannot act on this step');
+  }
+
+  const toCancelled = moveTo(contract, LEARNING_CONTRACT_STATUS.cancelled);
+  if (toCancelled) return toCancelled;
+
+  return ok({
+    ...contract,
+    status: LEARNING_CONTRACT_STATUS.cancelled,
+    updatedAt: action.now,
+    revisionHistory: appendRevision(contract, {
+      actor,
+      action: 'CANCELLED',
+      now: action.now,
+      comment: action.reason,
+      summary: `${actor.role} cancelled the Learning Goal Builder.`,
+    }),
   });
 }
 
@@ -412,7 +731,7 @@ function submitEvidence(
   actor: ContractActor,
 ): ReduceResult {
   const blocked =
-    requireStatus(contract, LEARNING_CONTRACT_STATUS.inProgress) ??
+    requireStatuses(contract, [LEARNING_CONTRACT_STATUS.inProgress]) ??
     requireActor(contract, actor, STEP_OWNER.learner);
   if (blocked) return blocked;
   if (!action.text.trim()) return fail('Evidence text is required');
@@ -437,6 +756,12 @@ function submitEvidence(
           }
         : item,
     ),
+    revisionHistory: appendRevision(contract, {
+      actor,
+      action: 'EVIDENCE_SUBMITTED',
+      now: action.now,
+      summary: `Learner submitted evidence for milestone “${current.title}”.`,
+    }),
   });
 }
 
@@ -446,7 +771,7 @@ function approveMilestone(
   actor: ContractActor,
 ): ReduceResult {
   const blocked =
-    requireStatus(contract, LEARNING_CONTRACT_STATUS.inProgress) ??
+    requireStatuses(contract, [LEARNING_CONTRACT_STATUS.inProgress]) ??
     requireActor(contract, actor, STEP_OWNER.mentor);
   if (blocked) return blocked;
 
@@ -479,6 +804,12 @@ function approveMilestone(
         updatedAt: action.now,
         milestones: completedMilestones,
         deliverable,
+        revisionHistory: appendRevision(contract, {
+          actor,
+          action: 'COMPLETED',
+          now: action.now,
+          summary: 'Mentor approved the last milestone. The contract is complete.',
+        }),
       },
       [{ type: 'publish_deliverable_refs' }],
     );
@@ -497,6 +828,12 @@ function approveMilestone(
       }
       return item;
     }),
+    revisionHistory: appendRevision(contract, {
+      actor,
+      action: 'MILESTONE_APPROVED',
+      now: action.now,
+      summary: `Mentor approved milestone “${current.title}”.`,
+    }),
   });
 }
 
@@ -506,7 +843,7 @@ function rejectMilestone(
   actor: ContractActor,
 ): ReduceResult {
   const blocked =
-    requireStatus(contract, LEARNING_CONTRACT_STATUS.inProgress) ??
+    requireStatuses(contract, [LEARNING_CONTRACT_STATUS.inProgress]) ??
     requireActor(contract, actor, STEP_OWNER.mentor);
   if (blocked) return blocked;
   if (!action.feedback.trim()) return fail('Feedback is required to reject a milestone');
@@ -527,6 +864,13 @@ function rejectMilestone(
           }
         : item,
     ),
+    revisionHistory: appendRevision(contract, {
+      actor,
+      action: 'MILESTONE_REJECTED',
+      now: action.now,
+      comment: action.feedback,
+      summary: `Mentor rejected milestone “${current.title}”.`,
+    }),
   });
 }
 
@@ -538,62 +882,93 @@ function actionableMilestone(
   return matches[0] ?? null;
 }
 
-function upsertGoal(current: Goal | null, text: string, _history: Goal[]): Goal {
-  const trimmed = text.trim();
-  if (current && current.text === trimmed) return current;
-  if (current) {
-    return { id: newId(), text: trimmed, revisionOf: current.id };
+function upsertGoal(
+  current: Goal | null,
+  fields: { title: string; description: string; text: string },
+): Goal {
+  if (
+    current &&
+    current.title === fields.title &&
+    current.description === fields.description &&
+    current.text === fields.text
+  ) {
+    return current;
   }
-  return { id: newId(), text: trimmed, revisionOf: null };
+  return normalizeGoal({
+    id: newId(),
+    title: fields.title,
+    description: fields.description,
+    text: fields.text,
+    revisionOf: current?.id ?? null,
+  });
 }
 
 function reviseGoal(
   contract: LearningContract,
-  text: string,
+  fields: { title: string; description: string; text: string },
 ): { goal: Goal; goalHistory: Goal[] } {
-  const trimmed = text.trim();
   const current = contract.goal;
   if (!current) {
-    return { goal: { id: newId(), text: trimmed, revisionOf: null }, goalHistory: [] };
+    return { goal: upsertGoal(null, fields), goalHistory: [] };
   }
-  if (current.text === trimmed) {
+  if (
+    current.title === fields.title &&
+    current.description === fields.description &&
+    current.text === fields.text
+  ) {
     return { goal: current, goalHistory: contract.goalHistory };
   }
   return {
-    goal: { id: newId(), text: trimmed, revisionOf: current.id },
+    goal: upsertGoal(current, fields),
     goalHistory: [...contract.goalHistory, current],
   };
 }
 
 function upsertDeliverable(
   current: Deliverable | null,
-  input: { title: string; description: string; status: Deliverable['status'] },
+  input: {
+    title: string;
+    description: string;
+    expectedEvidence: string;
+    status: Deliverable['status'];
+  },
 ): Deliverable {
-  return {
+  return normalizeDeliverable({
     id: current?.id ?? newId(),
-    title: input.title.trim(),
-    description: input.description.trim(),
+    title: input.title,
+    description: input.description,
+    expectedEvidence: input.expectedEvidence,
     finalEvidenceUrl: current?.finalEvidenceUrl ?? '',
     status: input.status,
-  };
+  }) as Deliverable;
 }
 
 function mergeMilestone(
   current: Milestone | undefined,
-  input: { title: string; description: string; evidenceRequired: string },
+  input: {
+    title: string;
+    description: string;
+    evidenceRequired?: string;
+    successCriteria?: string;
+  },
   order: number,
 ): Milestone {
-  return {
-    id: current?.id ?? newId(),
+  const criteria = (input.successCriteria ?? input.evidenceRequired ?? '').trim();
+  return normalizeMilestone(
+    {
+      id: current?.id ?? newId(),
+      order,
+      title: input.title,
+      description: input.description,
+      evidenceRequired: (input.evidenceRequired ?? criteria).trim(),
+      successCriteria: criteria,
+      status: MILESTONE_STATUS.locked,
+      evidenceText: current?.evidenceText ?? '',
+      evidenceLink: current?.evidenceLink ?? '',
+      lastFeedback: current?.lastFeedback ?? null,
+    },
     order,
-    title: input.title.trim(),
-    description: input.description.trim(),
-    evidenceRequired: input.evidenceRequired.trim(),
-    status: MILESTONE_STATUS.locked,
-    evidenceText: current?.evidenceText ?? '',
-    evidenceLink: current?.evidenceLink ?? '',
-    lastFeedback: current?.lastFeedback ?? null,
-  };
+  );
 }
 
 function newId(): string {

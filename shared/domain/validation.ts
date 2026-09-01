@@ -42,11 +42,15 @@ export function validateEvidenceSubmission(evidence: Pick<Evidence, 'text' | 'li
 }
 
 export function validateGoalDraft(input: {
-  goalText: string;
+  goalText?: string;
+  goalTitle?: string;
+  goalDescription?: string;
   deliverableTitle: string;
   deliverableDescription: string;
 }): ValidationResult {
-  if (!input.goalText.trim()) return fail('Write a draft goal before sending');
+  const title = (input.goalTitle ?? '').trim() || (input.goalText ?? '').trim();
+  const description = (input.goalDescription ?? '').trim();
+  if (!title && !description) return fail('Write a draft goal before sending');
   if (!input.deliverableTitle.trim() || !input.deliverableDescription.trim()) {
     return fail('Write a draft deliverable before sending');
   }
@@ -54,28 +58,46 @@ export function validateGoalDraft(input: {
 }
 
 export function validateMentorPlan(input: {
-  goalText: string;
+  goalText?: string;
+  goalTitle?: string;
+  goalDescription?: string;
   deliverableDescription: string;
-  objectives: { text: string }[];
-  milestones: { title: string; description: string; evidenceRequired: string }[];
+  objectives: { text?: string; title?: string; description?: string }[];
+  milestones: {
+    title: string;
+    description: string;
+    evidenceRequired?: string;
+    successCriteria?: string;
+  }[];
 }): ValidationResult {
-  if (!input.goalText.trim()) return fail('The goal cannot be empty');
+  const goal =
+    (input.goalTitle ?? '').trim() ||
+    (input.goalDescription ?? '').trim() ||
+    (input.goalText ?? '').trim();
+  if (!goal) return fail('The goal cannot be empty');
   if (!input.deliverableDescription.trim()) {
     return fail('The deliverable description cannot be empty');
   }
-  if (input.objectives.filter((item) => item.text.trim()).length === 0) {
+  if (
+    input.objectives.filter(
+      (item) =>
+        (item.title ?? '').trim() ||
+        (item.description ?? '').trim() ||
+        (item.text ?? '').trim(),
+    ).length === 0
+  ) {
     return fail('Add at least one objective');
   }
   if (input.milestones.length === 0) {
     return fail('Add at least one milestone');
   }
   if (
-    input.milestones.some(
-      (item) =>
-        !item.title.trim() || !item.description.trim() || !item.evidenceRequired.trim(),
-    )
+    input.milestones.some((item) => {
+      const criteria = (item.successCriteria ?? item.evidenceRequired ?? '').trim();
+      return !item.title.trim() || !item.description.trim() || !criteria;
+    })
   ) {
-    return fail('Every milestone needs a title, description, and required evidence');
+    return fail('Every milestone needs a title, description, and success criteria');
   }
   return ok;
 }

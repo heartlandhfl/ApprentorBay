@@ -4,6 +4,8 @@ export interface Deliverable {
   id: string;
   title: string;
   description: string;
+  /** What evidence will prove the deliverable. Older docs may omit this. */
+  expectedEvidence: string;
   finalEvidenceUrl: string;
   status: DeliverableStatus;
 }

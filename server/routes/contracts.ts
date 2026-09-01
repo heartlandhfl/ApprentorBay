@@ -5,6 +5,7 @@ import {
   RELATIONSHIP_STATUS,
   USER_ROLE,
   createDraftContract,
+  normalizeContract,
   reduceContract,
   type ApiError,
   type ContractAction,
@@ -67,7 +68,7 @@ contractsRouter.post('/', async (req: AccountRequest, res, next) => {
 
     const existing = await contractByRelationship(relationshipId);
     if (existing) {
-      res.json({ contract: existing.data() });
+      res.json({ contract: normalizeContract(existing.data() as LearningContract) });
       return;
     }
 
@@ -107,7 +108,7 @@ contractsRouter.post('/:id/action', async (req: AccountRequest, res, next) => {
       return;
     }
 
-    const current = snap.data() as LearningContract;
+    const current = normalizeContract(snap.data() as LearningContract);
     const action = { ...(req.body as Omit<ContractAction, 'now'>), now: new Date().toISOString() } as ContractAction;
     const result = reduceContract(current, action, actor);
     if (!result.ok) {

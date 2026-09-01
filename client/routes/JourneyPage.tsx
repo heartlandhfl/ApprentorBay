@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { useParams } from 'react-router-dom';
 import {
+  LEARNING_CONTRACT_STATUS,
+  LEARNING_CONTRACT_STATUS_LABEL,
   LEARNING_JOURNEY_STEPS,
   MILESTONE_STATUS,
   USER_ROLE,
@@ -8,6 +10,7 @@ import {
   isContractCompleted,
   isStepActor,
   journeyStepIndex,
+  nextActionCopy,
   waitingOn,
   type LearningContract,
   type MentorshipRelationship,
@@ -74,8 +77,8 @@ export function JourneyPage() {
     return (
       <Page>
         <EmptyState
-          title="This journey is not yours"
-          description="Only the learner and mentor on the relationship can open it."
+          title="This Learning Goal Builder is not yours"
+          description="Only the learner and mentor on the active relationship can open it."
           action={
             <Button variant="secondary" to="/dashboard/mentorships">
               Back to mentorships
@@ -89,7 +92,7 @@ export function JourneyPage() {
   if (!account || contract === undefined) {
     return (
       <Page>
-        <Text variant="muted">Opening the learning journey…</Text>
+        <Text variant="muted">Opening the Learning Goal Builder…</Text>
       </Page>
     );
   }
@@ -98,7 +101,7 @@ export function JourneyPage() {
     return (
       <Page>
         <EmptyState
-          title="No learning journey yet"
+          title="No Learning Goal Builder yet"
           description="Start it from the relationship page. That is the only entry point."
           action={
             <Button to={relationshipId ? `/dashboard/mentorships/${relationshipId}` : '/dashboard/mentorships'}>
@@ -142,6 +145,7 @@ function JourneyBody({
   const ownsStep = actor ? isStepActor(contract, actor) : false;
   const owner = waitingOn(contract);
   const ownerName = owner === account.role ? 'you' : otherName;
+  const statusLabel = LEARNING_CONTRACT_STATUS_LABEL[contract.status];
 
   return (
     <Page>
@@ -150,12 +154,54 @@ function JourneyBody({
           <Button variant="ghost" size="sm" to={`/dashboard/mentorships/${contract.relationshipId}`}>
             Back to the relationship
           </Button>
-          <Text variant="h1">Learning journey</Text>
+          <Cluster gap={12}>
+            <Text variant="h1">Learning Goal Builder</Text>
+            <Badge
+              tone={
+                contract.status === LEARNING_CONTRACT_STATUS.inProgress ||
+                contract.status === LEARNING_CONTRACT_STATUS.mutuallyApproved
+                  ? 'success'
+                  : contract.status === LEARNING_CONTRACT_STATUS.rejected ||
+                      contract.status === LEARNING_CONTRACT_STATUS.cancelled
+                    ? 'danger'
+                    : 'accent'
+              }
+            >
+              {statusLabel}
+            </Badge>
+          </Cluster>
           <Text variant="muted">
-            One stepper. One owner at a time. Goal, objectives, milestones, and the
-            deliverable stay visible at every stage.
+            A negotiated learning contract. It does not become ACTIVE until both
+            sides have approved the plan.
           </Text>
         </Stack>
+
+        <div className="grid gap-16 md:grid-cols-3">
+          <Card>
+            <Stack gap={8}>
+              <Text variant="caption">Current status</Text>
+              <Text variant="h3">{statusLabel}</Text>
+            </Stack>
+          </Card>
+          <Card>
+            <Stack gap={8}>
+              <Text variant="caption">Next action</Text>
+              <Text>{nextActionCopy(contract)}</Text>
+            </Stack>
+          </Card>
+          <Card>
+            <Stack gap={8}>
+              <Text variant="caption">Waiting for</Text>
+              <Text variant="h3">
+                {isContractCompleted(contract) ||
+                contract.status === LEARNING_CONTRACT_STATUS.rejected ||
+                contract.status === LEARNING_CONTRACT_STATUS.cancelled
+                  ? 'Nobody'
+                  : ownerName}
+              </Text>
+            </Stack>
+          </Card>
+        </div>
 
         <Card padding="lg">
           <Stepper
@@ -164,7 +210,11 @@ function JourneyBody({
           />
         </Card>
 
-        {!isContractCompleted(contract) && !ownsStep ? (
+        {!isContractCompleted(contract) &&
+        contract.status !== LEARNING_CONTRACT_STATUS.rejected &&
+        contract.status !== LEARNING_CONTRACT_STATUS.cancelled &&
+        !ownsStep &&
+        !actions.includes('ACTIVATE') ? (
           <Card>
             <Text variant="h3">Waiting on {ownerName}</Text>
           </Card>
@@ -181,18 +231,25 @@ function JourneyBody({
         {ownsStep && actions.includes('APPROVE_PLAN') ? (
           <LearnerReview contract={contract} onError={onError} />
         ) : null}
+        {actions.includes('ACTIVATE') ? (
+          <ActivateCard contract={contract} onError={onError} />
+        ) : null}
         {ownsStep &&
         (actions.includes('SUBMIT_EVIDENCE') || actions.includes('APPROVE_MILESTONE')) ? (
           <DcmActions contract={contract} actions={actions} onError={onError} />
         ) : null}
 
+        {actions.includes('CANCEL') ? (
+          <CancelRow contract={contract} onError={onError} />
+        ) : null}
+
+        <RevisionHistory contract={contract} />
+
         {isContractCompleted(contract) ? (
           <Card>
             <Stack gap={8}>
-              <Badge tone="success">Completed</Badge>
-              <Text>
-                This deliverable is now on both public profiles.
-              </Text>
+              <Badge tone="success">COMPLETED</Badge>
+              <Text>This deliverable is now on both public profiles.</Text>
             </Stack>
           </Card>
         ) : null}
@@ -209,15 +266,16 @@ function Structure({ contract }: { contract: LearningContract }) {
       <Card>
         <Stack gap={12}>
           <Text variant="h2">Goal</Text>
-          {contract.goal?.text ? (
-            <Text>{contract.goal.text}</Text>
+          {contract.goal?.title || contract.goal?.text ? (
+            <Stack gap={8}>
+              <Text variant="h3">{contract.goal.title || contract.goal.text}</Text>
+              {contract.goal.description ? <Text>{contract.goal.description}</Text> : null}
+            </Stack>
           ) : (
             <EmptyState title="No goal yet" />
           )}
-          {contract.goalHistory.length > 0 ? (
-            <Text variant="small">
-              Revised from: {contract.goalHistory.map((item) => item.text).join(' → ')}
-            </Text>
+          {contract.context ? (
+            <Text variant="small">Learner context: {contract.context}</Text>
           ) : null}
         </Stack>
       </Card>
@@ -228,9 +286,14 @@ function Structure({ contract }: { contract: LearningContract }) {
           {contract.objectives.length === 0 ? (
             <EmptyState title="No objectives yet" />
           ) : (
-            <Stack gap={8}>
+            <Stack gap={12}>
               {contract.objectives.map((item) => (
-                <Text key={item.id}>{item.text}</Text>
+                <Stack key={item.id} gap={4}>
+                  <Text variant="h3">
+                    {item.order + 1}. {item.title || item.text}
+                  </Text>
+                  {item.description ? <Text variant="small">{item.description}</Text> : null}
+                </Stack>
               ))}
             </Stack>
           )}
@@ -255,7 +318,9 @@ function Structure({ contract }: { contract: LearningContract }) {
                       </Text>
                     </Cluster>
                     <Text variant="small">{item.description}</Text>
-                    <Text variant="small">Evidence required: {item.evidenceRequired}</Text>
+                    <Text variant="small">
+                      Success criteria: {item.successCriteria || item.evidenceRequired}
+                    </Text>
                     {item.lastFeedback ? (
                       <Text variant="danger">Feedback: {item.lastFeedback}</Text>
                     ) : null}
@@ -276,6 +341,11 @@ function Structure({ contract }: { contract: LearningContract }) {
             <Stack gap={8}>
               <Text variant="h3">{contract.deliverable.title}</Text>
               <Text>{contract.deliverable.description}</Text>
+              {contract.deliverable.expectedEvidence ? (
+                <Text variant="small">
+                  Expected evidence: {contract.deliverable.expectedEvidence}
+                </Text>
+              ) : null}
             </Stack>
           ) : (
             <EmptyState title="No deliverable yet" />
@@ -293,9 +363,14 @@ function DraftEditor({
   contract: LearningContract;
   onError: (message: string | null) => void;
 }) {
-  const [goalText, setGoalText] = useState(contract.goal?.text ?? '');
+  const [goalTitle, setGoalTitle] = useState(contract.goal?.title ?? '');
+  const [goalDescription, setGoalDescription] = useState(contract.goal?.description ?? '');
+  const [context, setContext] = useState(contract.context ?? '');
   const [title, setTitle] = useState(contract.deliverable?.title ?? '');
   const [description, setDescription] = useState(contract.deliverable?.description ?? '');
+  const [expectedEvidence, setExpectedEvidence] = useState(
+    contract.deliverable?.expectedEvidence ?? '',
+  );
   const [busy, setBusy] = useState(false);
 
   async function saveThen(send: boolean) {
@@ -304,9 +379,13 @@ function DraftEditor({
     try {
       await dispatchContractAction(contract.id, {
         type: 'SAVE_DRAFT',
-        goalText,
+        goalText: `${goalTitle}\n\n${goalDescription}`.trim(),
+        goalTitle,
+        goalDescription,
+        context,
         deliverableTitle: title,
         deliverableDescription: description,
+        expectedEvidence,
       });
       if (send) {
         await dispatchContractAction(contract.id, { type: 'SEND_TO_MENTOR' });
@@ -327,12 +406,24 @@ function DraftEditor({
         }}
       >
         <Stack gap={16}>
-          <Text variant="h3">Write the draft</Text>
-          <TextArea
-            label="Goal"
-            value={goalText}
-            onChange={(event) => setGoalText(event.target.value)}
+          <Text variant="h3">Your proposal</Text>
+          <Input
+            label="Goal title"
+            value={goalTitle}
+            onChange={(event) => setGoalTitle(event.target.value)}
             required
+          />
+          <TextArea
+            label="Goal description"
+            value={goalDescription}
+            onChange={(event) => setGoalDescription(event.target.value)}
+            required
+          />
+          <TextArea
+            label="Optional context"
+            value={context}
+            onChange={(event) => setContext(event.target.value)}
+            hint="Background the mentor should know. Optional."
           />
           <Input
             label="Deliverable title"
@@ -346,15 +437,17 @@ function DraftEditor({
             onChange={(event) => setDescription(event.target.value)}
             required
           />
+          <Input
+            label="Expected evidence"
+            value={expectedEvidence}
+            onChange={(event) => setExpectedEvidence(event.target.value)}
+            hint="What will prove this deliverable exists."
+          />
           <Cluster gap={8}>
             <Button type="submit" loading={busy}>
-              Send to Mentor
+              Submit proposal
             </Button>
-            <Button
-              variant="secondary"
-              loading={busy}
-              onClick={() => void saveThen(false)}
-            >
+            <Button variant="secondary" loading={busy} onClick={() => void saveThen(false)}>
               Save draft
             </Button>
           </Cluster>
@@ -371,22 +464,34 @@ function MentorEditor({
   contract: LearningContract;
   onError: (message: string | null) => void;
 }) {
-  const [goalText, setGoalText] = useState(contract.goal?.text ?? '');
+  const [goalTitle, setGoalTitle] = useState(contract.goal?.title ?? '');
+  const [goalDescription, setGoalDescription] = useState(contract.goal?.description ?? '');
   const [title, setTitle] = useState(contract.deliverable?.title ?? '');
   const [description, setDescription] = useState(contract.deliverable?.description ?? '');
+  const [expectedEvidence, setExpectedEvidence] = useState(
+    contract.deliverable?.expectedEvidence ?? '',
+  );
+  const [comment, setComment] = useState(contract.mentorComment ?? '');
   const [objectives, setObjectives] = useState(
-    contract.objectives.length ? contract.objectives.map((item) => item.text) : [''],
+    contract.objectives.length
+      ? contract.objectives.map((item) => ({
+          title: item.title || item.text,
+          description: item.description,
+        }))
+      : [{ title: '', description: '' }],
   );
   const [milestones, setMilestones] = useState(
     contract.milestones.length
       ? contract.milestones.map((item) => ({
           title: item.title,
           description: item.description,
-          evidenceRequired: item.evidenceRequired,
+          successCriteria: item.successCriteria || item.evidenceRequired,
         }))
-      : [{ title: '', description: '', evidenceRequired: '' }],
+      : [{ title: '', description: '', successCriteria: '' }],
   );
   const [busy, setBusy] = useState(false);
+  const [rejectOpen, setRejectOpen] = useState(false);
+  const [rejectReason, setRejectReason] = useState('');
 
   async function saveThen(send: boolean) {
     setBusy(true);
@@ -394,17 +499,47 @@ function MentorEditor({
     try {
       await dispatchContractAction(contract.id, {
         type: 'SAVE_MENTOR_REVIEW',
-        goalText,
-        objectives: objectives.map((text) => ({ text })),
-        milestones,
+        goalText: `${goalTitle}\n\n${goalDescription}`.trim(),
+        goalTitle,
+        goalDescription,
+        objectives: objectives.map((item) => ({
+          title: item.title,
+          description: item.description,
+          text: item.title,
+        })),
+        milestones: milestones.map((item) => ({
+          title: item.title,
+          description: item.description,
+          evidenceRequired: item.successCriteria,
+          successCriteria: item.successCriteria,
+        })),
         deliverableTitle: title,
         deliverableDescription: description,
+        expectedEvidence,
+        comment,
       });
       if (send) {
         await dispatchContractAction(contract.id, { type: 'SEND_TO_LEARNER' });
       }
     } catch (err) {
       onError(err instanceof Error ? err.message : 'Could not send the plan');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function reject(event: FormEvent) {
+    event.preventDefault();
+    setBusy(true);
+    onError(null);
+    try {
+      await dispatchContractAction(contract.id, {
+        type: 'REJECT_PROPOSAL',
+        reason: rejectReason,
+      });
+      setRejectOpen(false);
+    } catch (err) {
+      onError(err instanceof Error ? err.message : 'Could not reject the proposal');
     } finally {
       setBusy(false);
     }
@@ -419,35 +554,55 @@ function MentorEditor({
         }}
       >
         <Stack gap={16}>
-          <Text variant="h3">Revise the plan</Text>
+          <Text variant="h3">Revise and propose</Text>
           {contract.changeRequestReason ? (
             <Text variant="danger">Requested change: {contract.changeRequestReason}</Text>
           ) : null}
-          <TextArea
-            label="Goal"
-            value={goalText}
-            onChange={(event) => setGoalText(event.target.value)}
+          <Input
+            label="Goal title"
+            value={goalTitle}
+            onChange={(event) => setGoalTitle(event.target.value)}
             required
           />
-          {objectives.map((text, index) => (
-            <Input
-              id={`objective-${index}`}
-              label={`Objective ${index + 1}`}
-              value={text}
-              onChange={(event) =>
-                setObjectives((current) =>
-                  current.map((item, itemIndex) =>
-                    itemIndex === index ? event.target.value : item,
-                  ),
-                )
-              }
-              required
-            />
+          <TextArea
+            label="Goal description"
+            value={goalDescription}
+            onChange={(event) => setGoalDescription(event.target.value)}
+            required
+          />
+          {objectives.map((item, index) => (
+            <Stack key={`objective-${index}`} gap={8}>
+              <Input
+                id={`objective-title-${index}`}
+                label={`Objective ${index + 1} title`}
+                value={item.title}
+                onChange={(event) =>
+                  setObjectives((current) =>
+                    current.map((row, rowIndex) =>
+                      rowIndex === index ? { ...row, title: event.target.value } : row,
+                    ),
+                  )
+                }
+                required
+              />
+              <TextArea
+                id={`objective-desc-${index}`}
+                label={`Objective ${index + 1} description`}
+                value={item.description}
+                onChange={(event) =>
+                  setObjectives((current) =>
+                    current.map((row, rowIndex) =>
+                      rowIndex === index ? { ...row, description: event.target.value } : row,
+                    ),
+                  )
+                }
+              />
+            </Stack>
           ))}
           <Button
             variant="secondary"
             size="sm"
-            onClick={() => setObjectives((current) => [...current, ''])}
+            onClick={() => setObjectives((current) => [...current, { title: '', description: '' }])}
           >
             Add objective
           </Button>
@@ -479,13 +634,13 @@ function MentorEditor({
                 required
               />
               <Input
-                label={`Milestone ${index + 1} evidence required`}
-                value={item.evidenceRequired}
+                label={`Milestone ${index + 1} success criteria`}
+                value={item.successCriteria}
                 onChange={(event) =>
                   setMilestones((current) =>
                     current.map((row, rowIndex) =>
                       rowIndex === index
-                        ? { ...row, evidenceRequired: event.target.value }
+                        ? { ...row, successCriteria: event.target.value }
                         : row,
                     ),
                   )
@@ -500,7 +655,7 @@ function MentorEditor({
             onClick={() =>
               setMilestones((current) => [
                 ...current,
-                { title: '', description: '', evidenceRequired: '' },
+                { title: '', description: '', successCriteria: '' },
               ])
             }
           >
@@ -518,16 +673,53 @@ function MentorEditor({
             onChange={(event) => setDescription(event.target.value)}
             required
           />
+          <Input
+            label="Expected evidence"
+            value={expectedEvidence}
+            onChange={(event) => setExpectedEvidence(event.target.value)}
+          />
+          <TextArea
+            label="Comments for the learner"
+            value={comment}
+            onChange={(event) => setComment(event.target.value)}
+          />
           <Cluster gap={8}>
             <Button type="submit" loading={busy}>
-              Send to Learner
+              Propose to learner
             </Button>
             <Button variant="secondary" loading={busy} onClick={() => void saveThen(false)}>
               Save plan
             </Button>
+            <Button variant="danger" onClick={() => setRejectOpen(true)}>
+              Reject proposal
+            </Button>
           </Cluster>
         </Stack>
       </form>
+      <Modal
+        open={rejectOpen}
+        title="Reject this proposal"
+        onClose={() => setRejectOpen(false)}
+        footer={
+          <Cluster gap={8}>
+            <Button variant="secondary" onClick={() => setRejectOpen(false)}>
+              Keep reviewing
+            </Button>
+            <Button type="submit" form="reject-proposal" variant="danger" loading={busy}>
+              Reject
+            </Button>
+          </Cluster>
+        }
+      >
+        <form id="reject-proposal" onSubmit={(event) => void reject(event)}>
+          <TextArea
+            label="Reason"
+            value={rejectReason}
+            onChange={(event) => setRejectReason(event.target.value)}
+            required
+          />
+        </form>
+      </Modal>
     </Card>
   );
 }
@@ -573,18 +765,21 @@ function LearnerReview({
   return (
     <Card>
       <Stack gap={16}>
-        <Text variant="h3">Review the mentor&apos;s plan</Text>
+        <Text variant="h3">Review the mentor&apos;s proposal</Text>
+        {contract.mentorComment ? (
+          <Text variant="small">Mentor comment: {contract.mentorComment}</Text>
+        ) : null}
         <Cluster gap={8}>
           <Button loading={busy} onClick={() => void approve()}>
             Approve
           </Button>
           <Button variant="secondary" onClick={() => setOpen(true)}>
-            Request Changes
+            Request revision
           </Button>
         </Cluster>
         <Modal
           open={open}
-          title="Request changes"
+          title="Request revision"
           onClose={() => setOpen(false)}
           footer={
             <Cluster gap={8}>
@@ -609,6 +804,101 @@ function LearnerReview({
         </Modal>
       </Stack>
     </Card>
+  );
+}
+
+function ActivateCard({
+  contract,
+  onError,
+}: {
+  contract: LearningContract;
+  onError: (message: string | null) => void;
+}) {
+  const [busy, setBusy] = useState(false);
+
+  async function activate() {
+    setBusy(true);
+    onError(null);
+    try {
+      await dispatchContractAction(contract.id, { type: 'ACTIVATE' });
+    } catch (err) {
+      onError(err instanceof Error ? err.message : 'Could not activate the contract');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Card>
+      <Stack gap={16}>
+        <Text variant="h3">Mutual approval recorded</Text>
+        <Text>
+          Both sides agreed. Activate the contract to start milestone work. It is
+          not ACTIVE until you do this.
+        </Text>
+        <Button loading={busy} onClick={() => void activate()}>
+          Activate contract
+        </Button>
+      </Stack>
+    </Card>
+  );
+}
+
+function CancelRow({
+  contract,
+  onError,
+}: {
+  contract: LearningContract;
+  onError: (message: string | null) => void;
+}) {
+  const [busy, setBusy] = useState(false);
+
+  async function cancel() {
+    setBusy(true);
+    onError(null);
+    try {
+      await dispatchContractAction(contract.id, { type: 'CANCEL', reason: 'Cancelled from the builder' });
+    } catch (err) {
+      onError(err instanceof Error ? err.message : 'Could not cancel');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Button variant="ghost" size="sm" loading={busy} onClick={() => void cancel()}>
+      Cancel builder
+    </Button>
+  );
+}
+
+function RevisionHistory({ contract }: { contract: LearningContract }) {
+  const rows = [...contract.revisionHistory].reverse();
+  return (
+    <Stack gap={12}>
+      <Text variant="h2">Revision history</Text>
+      {rows.length === 0 ? (
+        <EmptyState title="No revisions yet" />
+      ) : (
+        <Card>
+          <Stack gap={16}>
+            {rows.map((item) => (
+              <Stack key={item.id} gap={4}>
+                <Cluster gap={8}>
+                  <Badge>{item.action}</Badge>
+                  <Text variant="caption">{LEARNING_CONTRACT_STATUS_LABEL[item.stage] ?? item.stage}</Text>
+                </Cluster>
+                <Text variant="small">
+                  {item.actorRole} · {new Date(item.timestamp).toLocaleString()}
+                </Text>
+                <Text>{item.summary}</Text>
+                {item.comment ? <Text variant="small">Comment: {item.comment}</Text> : null}
+              </Stack>
+            ))}
+          </Stack>
+        </Card>
+      )}
+    </Stack>
   );
 }
 
@@ -675,7 +965,9 @@ function DcmActions({
         <Text variant="h3">
           Current milestone: {current.order + 1}. {current.title}
         </Text>
-        <Text variant="small">Evidence required: {current.evidenceRequired}</Text>
+        <Text variant="small">
+          Success criteria: {current.successCriteria || current.evidenceRequired}
+        </Text>
         {actions.includes('SUBMIT_EVIDENCE') ? (
           <form onSubmit={(event) => void submit(event)}>
             <Stack gap={12}>
