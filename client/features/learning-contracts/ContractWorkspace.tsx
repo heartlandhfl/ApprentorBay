@@ -147,9 +147,10 @@ export function ContractWorkspace({
           <Text variant="caption">What needs to happen next</Text>
           <Text variant="h3">{focus.next}</Text>
           <Text variant="small">
-            Who needs to take action: {workspacePartyLabel(focus.who)}
-            {focus.who !== 'nobody' && focus.who !== 'either' ? ` (${whoName})` : null}
-            {focus.who === 'either' ? ` (${whoName})` : null}
+            Who needs to take action:{' '}
+            {focus.who === 'learner' || focus.who === 'mentor'
+              ? `${workspacePartyLabel(focus.who)} (${whoName})`
+              : workspacePartyLabel(focus.who)}
           </Text>
         </Stack>
       </Card>
