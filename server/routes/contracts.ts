@@ -23,7 +23,13 @@ export const contractsRouter = Router();
 contractsRouter.use(requireAccount);
 
 function asActor(account: User): ContractActor | null {
-  if (account.role !== USER_ROLE.learner && account.role !== USER_ROLE.mentor) return null;
+  if (
+    account.role !== USER_ROLE.learner &&
+    account.role !== USER_ROLE.mentor &&
+    account.role !== USER_ROLE.admin
+  ) {
+    return null;
+  }
   return { uid: account.uid, role: account.role };
 }
 
@@ -96,7 +102,7 @@ contractsRouter.post('/:id/action', async (req: AccountRequest, res, next) => {
     }
     const actor = asActor(account);
     if (!actor) {
-      sendApiError(res, 403, 'forbidden', 'Only the learner or mentor can act');
+      sendApiError(res, 403, 'forbidden', 'Only the learner, mentor, or an admin can act');
       return;
     }
 

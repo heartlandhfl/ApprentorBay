@@ -32,6 +32,7 @@ export {
   isMentorReviewStatus,
   isMilestoneStatus,
   isNegotiationOpen,
+  isOperationalContractStatus,
   isRelationshipStatus,
   isStepOwner,
   isVerificationStatus,
@@ -114,13 +115,21 @@ export type { Deliverable, DeliverableRef } from './deliverables.js';
 
 export {
   combineGoalText,
+  contractEvidenceItems,
+  contractProgress,
+  contractTitle,
   firstLine,
   isContractCompleted,
   isContractInProgress,
+  isContractWorkspaceView,
   isLearnerStep,
   isMentorStep,
+  isOperationalContract,
   learningGoalBuilderFromContract,
+  milestoneEvidenceCount,
   nextActionCopy,
+  workspaceFocus,
+  workspacePartyLabel,
   normalizeContract,
   normalizeDeliverable,
   normalizeGoal,
@@ -129,11 +138,14 @@ export {
   restLines,
 } from './learningContracts.js';
 export type {
+  ContractEvidenceItem,
   ContractRevision,
   Goal,
   LearningContract,
   LearningGoalBuilder,
   Objective,
+  WorkspaceFocus,
+  WorkspacePartyNeeded,
 } from './learningContracts.js';
 
 export { SHOWCASE_SOURCE, showcaseFromDeliverableRef, showcasesFromProfile } from './showcases.js';
@@ -148,6 +160,7 @@ export type { AdminAuditAction, AdminAuditLog, AuditEvent } from './auditLog.js'
 export type { Mentorship } from './legacy.js';
 
 export {
+  canAccessContractWorkspace,
   canAcceptApplication,
   canAdminister,
   canApplyForMentorship,

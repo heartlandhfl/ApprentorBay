@@ -7,7 +7,9 @@ import {
   MILESTONE_STATUS,
   USER_ROLE,
   availableActions,
+  canAccessContractWorkspace,
   isContractCompleted,
+  isContractWorkspaceView,
   isStepActor,
   journeyStepIndex,
   nextActionCopy,
@@ -31,7 +33,7 @@ import {
   Text,
   TextArea,
 } from '../components';
-import { watchContractForRelationship } from '../features/learning-contracts';
+import { ContractWorkspace, watchContractForRelationship } from '../features/learning-contracts';
 import { firestoreDenied, watchRelationship } from '../features/mentorship';
 import { getPublicDisplayName } from '../features/profiles';
 import { dispatchContractAction } from '../lib/api';
@@ -42,7 +44,8 @@ export function JourneyPage() {
   const { account } = useAuth();
   const [relationship, setRelationship] = useState<MentorshipRelationship | null>(null);
   const [contract, setContract] = useState<LearningContract | null | undefined>(undefined);
-  const [otherName, setOtherName] = useState('your pairing');
+  const [learnerName, setLearnerName] = useState('Learner');
+  const [mentorName, setMentorName] = useState('Mentor');
   const [error, setError] = useState<string | null>(null);
   const [denied, setDenied] = useState(false);
 
@@ -53,8 +56,8 @@ export function JourneyPage() {
       (next) => {
         setRelationship(next);
         if (next) {
-          const otherId = next.learnerId === account.uid ? next.mentorId : next.learnerId;
-          void getPublicDisplayName(otherId).then(setOtherName);
+          void getPublicDisplayName(next.learnerId).then(setLearnerName);
+          void getPublicDisplayName(next.mentorId).then(setMentorName);
         }
       },
       (err) => {
@@ -65,7 +68,10 @@ export function JourneyPage() {
     const unsubContract = watchContractForRelationship(
       relationshipId,
       setContract,
-      (err) => setError(err.message),
+      (err) => {
+        if (firestoreDenied(err)) setDenied(true);
+        else setError(err.message);
+      },
     );
     return () => {
       unsubRel();
@@ -77,8 +83,8 @@ export function JourneyPage() {
     return (
       <Page>
         <EmptyState
-          title="This Learning Goal Builder is not yours"
-          description="Only the learner and mentor on the active relationship can open it."
+          title="This contract is not yours"
+          description="Only the learner, the mentor, and authorized admins can open this workspace."
           action={
             <Button variant="secondary" to="/dashboard/mentorships">
               Back to mentorships
@@ -92,7 +98,7 @@ export function JourneyPage() {
   if (!account || contract === undefined) {
     return (
       <Page>
-        <Text variant="muted">Opening the Learning Goal Builder…</Text>
+        <Text variant="muted">Opening the learning contract…</Text>
       </Page>
     );
   }
@@ -108,6 +114,40 @@ export function JourneyPage() {
               Back to the relationship
             </Button>
           }
+        />
+      </Page>
+    );
+  }
+
+  if (contract && !canAccessContractWorkspace(account, contract)) {
+    return (
+      <Page>
+        <EmptyState
+          title="This contract is not yours"
+          description="Only the learner, the mentor, and authorized admins can open this workspace."
+          action={
+            <Button variant="secondary" to="/dashboard/mentorships">
+              Back to mentorships
+            </Button>
+          }
+        />
+      </Page>
+    );
+  }
+
+  const otherName = account.uid === relationship.learnerId ? mentorName : learnerName;
+
+  if (isContractWorkspaceView(contract)) {
+    return (
+      <Page>
+        <ContractWorkspace
+          account={account}
+          contract={contract}
+          relationship={relationship}
+          learnerName={learnerName}
+          mentorName={mentorName}
+          error={error}
+          onError={setError}
         />
       </Page>
     );
@@ -138,7 +178,9 @@ function JourneyBody({
   onError: (message: string | null) => void;
 }) {
   const actor =
-    account.role === USER_ROLE.learner || account.role === USER_ROLE.mentor
+    account.role === USER_ROLE.learner ||
+    account.role === USER_ROLE.mentor ||
+    account.role === USER_ROLE.admin
       ? { uid: account.uid, role: account.role }
       : null;
   const actions = actor ? availableActions(contract, actor) : [];

@@ -8,6 +8,7 @@ import {
   type MentorshipRelationship,
   type PairingMemberIds,
 } from './relationships.js';
+import type { LearningContract } from './learningContracts.js';
 import { validateApplicationMessage, validateMessageText } from './validation.js';
 
 export type PermissionActor = Pick<User, 'uid' | 'role' | 'active'>;
@@ -63,6 +64,15 @@ export function canSendMessage(
   if (actor?.role === USER_ROLE.admin) return false;
   if (relationship.status !== RELATIONSHIP_STATUS.active) return false;
   return validateMessageText(text).ok;
+}
+
+export function canAccessContractWorkspace(
+  actor: PermissionActor | null | undefined,
+  contract: Pick<LearningContract, 'learnerId' | 'mentorId'>,
+): boolean {
+  if (!actor || !isAccountActive(actor)) return false;
+  if (actor.role === USER_ROLE.admin) return true;
+  return actor.uid === contract.learnerId || actor.uid === contract.mentorId;
 }
 
 export function canStartLearningJourney(

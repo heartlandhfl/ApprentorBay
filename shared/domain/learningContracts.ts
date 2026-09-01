@@ -1,6 +1,8 @@
+import { MILESTONE_STATUS } from './statuses.js';
 import {
   LEARNING_CONTRACT_STATUS,
   STEP_OWNER,
+  isOperationalContractStatus,
   type LearningContractStatus,
   type StepOwner,
 } from './statuses.js';
@@ -228,6 +230,173 @@ export function isContractInProgress(
   return contract.status === LEARNING_CONTRACT_STATUS.inProgress;
 }
 
+export function isOperationalContract(
+  contract: Pick<LearningContract, 'status'>,
+): boolean {
+  return isOperationalContractStatus(contract.status);
+}
+
+/**
+ * The Learning Contract Workspace, not the Goal Builder.
+ * Starts at mutual approval. Cancelled builder drafts stay in the builder;
+ * a contract cancelled after activation still opens here.
+ */
+export function isContractWorkspaceView(
+  contract: Pick<LearningContract, 'status' | 'milestones'>,
+): boolean {
+  if (isOperationalContract(contract)) return true;
+  if (contract.status !== LEARNING_CONTRACT_STATUS.cancelled) return false;
+  return contract.milestones.some((item) => item.status !== MILESTONE_STATUS.locked);
+}
+
+export type WorkspacePartyNeeded = 'learner' | 'mentor' | 'either' | 'nobody';
+
+export type WorkspaceFocus = {
+  who: WorkspacePartyNeeded;
+  next: string;
+  currentMilestoneTitle: string | null;
+};
+
+export function workspacePartyLabel(who: WorkspacePartyNeeded): string {
+  switch (who) {
+    case 'learner':
+      return 'Learner';
+    case 'mentor':
+      return 'Mentor';
+    case 'either':
+      return 'Learner or mentor';
+    case 'nobody':
+      return 'Nobody';
+  }
+}
+
+/** What has to happen next, and who must do it. Derived, not stored. */
+export function workspaceFocus(contract: LearningContract): WorkspaceFocus {
+  const ordered = [...contract.milestones].sort((a, b) => a.order - b.order);
+  const submitted =
+    ordered.find((item) => item.status === MILESTONE_STATUS.submitted) ?? null;
+  const current =
+    ordered.find(
+      (item) =>
+        item.status === MILESTONE_STATUS.active ||
+        item.status === MILESTONE_STATUS.rejected,
+    ) ?? null;
+
+  switch (contract.status) {
+    case LEARNING_CONTRACT_STATUS.mutuallyApproved:
+    case LEARNING_CONTRACT_STATUS.agreed:
+      return {
+        who: 'either',
+        next: 'Activate the contract so the first milestone can start.',
+        currentMilestoneTitle: null,
+      };
+    case LEARNING_CONTRACT_STATUS.inProgress:
+      if (submitted) {
+        return {
+          who: 'mentor',
+          next: `Review evidence for “${submitted.title}”.`,
+          currentMilestoneTitle: submitted.title,
+        };
+      }
+      if (current) {
+        return {
+          who: 'learner',
+          next:
+            current.status === MILESTONE_STATUS.rejected
+              ? `Resubmit evidence for “${current.title}”.`
+              : `Submit evidence for “${current.title}”.`,
+          currentMilestoneTitle: current.title,
+        };
+      }
+      return {
+        who: 'either',
+        next: nextActionCopy(contract),
+        currentMilestoneTitle: null,
+      };
+    case LEARNING_CONTRACT_STATUS.paused:
+      return {
+        who: 'either',
+        next: 'Resume the contract to continue evidence work.',
+        currentMilestoneTitle: current?.title ?? submitted?.title ?? null,
+      };
+    case LEARNING_CONTRACT_STATUS.completionPending:
+      return {
+        who: 'either',
+        next: 'Confirm completion to publish the deliverable.',
+        currentMilestoneTitle: null,
+      };
+    case LEARNING_CONTRACT_STATUS.completed:
+      return {
+        who: 'nobody',
+        next: 'This contract is complete. The deliverable is on both profiles.',
+        currentMilestoneTitle: null,
+      };
+    case LEARNING_CONTRACT_STATUS.cancelled:
+      return {
+        who: 'nobody',
+        next: 'This contract was cancelled.',
+        currentMilestoneTitle: null,
+      };
+    default:
+      return {
+        who: contract.currentStepOwner,
+        next: nextActionCopy(contract),
+        currentMilestoneTitle: null,
+      };
+  }
+}
+
+export function contractTitle(contract: LearningContract): string {
+  const title = contract.deliverable?.title?.trim() || contract.goal?.title?.trim();
+  return title || 'Learning contract';
+}
+
+/** Derived only. Never persist this as an editable field. */
+export function contractProgress(contract: Pick<LearningContract, 'milestones'>): {
+  approved: number;
+  total: number;
+  percent: number;
+} {
+  const total = contract.milestones.length;
+  const approved = contract.milestones.filter(
+    (item) => item.status === MILESTONE_STATUS.approved,
+  ).length;
+  return {
+    approved,
+    total,
+    percent: total === 0 ? 0 : Math.round((approved / total) * 100),
+  };
+}
+
+export function milestoneEvidenceCount(
+  milestone: Pick<Milestone, 'evidenceText' | 'evidenceLink'>,
+): number {
+  return milestone.evidenceText.trim() || milestone.evidenceLink.trim() ? 1 : 0;
+}
+
+export type ContractEvidenceItem = {
+  milestoneId: string;
+  milestoneTitle: string;
+  order: number;
+  text: string;
+  link: string;
+  feedback: string | null;
+};
+
+export function contractEvidenceItems(contract: LearningContract): ContractEvidenceItem[] {
+  return [...contract.milestones]
+    .sort((a, b) => a.order - b.order)
+    .filter((item) => milestoneEvidenceCount(item) > 0)
+    .map((item) => ({
+      milestoneId: item.id,
+      milestoneTitle: item.title,
+      order: item.order,
+      text: item.evidenceText,
+      link: item.evidenceLink,
+      feedback: item.lastFeedback,
+    }));
+}
+
 export function isLearnerStep(owner: StepOwner): boolean {
   return owner === STEP_OWNER.learner;
 }
@@ -253,11 +422,15 @@ export function nextActionCopy(contract: LearningContract): string {
       return 'Activate the contract. Work cannot start until this step.';
     case LEARNING_CONTRACT_STATUS.inProgress:
       return 'Work the current milestone. Only one milestone is active.';
+    case LEARNING_CONTRACT_STATUS.paused:
+      return 'This contract is paused. Resume it to submit or review evidence.';
+    case LEARNING_CONTRACT_STATUS.completionPending:
+      return 'All milestones are approved. Confirm completion to publish the deliverable.';
     case LEARNING_CONTRACT_STATUS.completed:
       return 'This contract is complete. The deliverable is on both profiles.';
     case LEARNING_CONTRACT_STATUS.rejected:
       return 'The mentor rejected this proposal. Start a new builder from the relationship.';
     case LEARNING_CONTRACT_STATUS.cancelled:
-      return 'This builder was cancelled.';
+      return 'This contract was cancelled.';
   }
 }
