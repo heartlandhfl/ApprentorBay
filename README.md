@@ -159,7 +159,7 @@ The site must be a **Node.js web app**, not a static / Vite website.
 
    A console document at `admins/{uid}` (email + uid) is not enough by itself. Express copies it into `users/{uid}` with `role: admin` on boot and when you POST `/api/account/session`. You still need a Firebase Auth user for that email. Use **Reset password** on `/login` if you do not know the Auth password. To create the Auth user automatically, set `SEED_ADMIN_PASSWORD` and restart.
 
-   `https://apprentorbay.com/api/health` must show `"adminInitialized": true`. If it is `false`, read `firebase.error` — usually `FIREBASE_PRIVATE_KEY` is not the PEM key (paste the key with literal `\n` newlines, no extra quotes).
+   `https://apprentorbay.com/api/health` must show `"adminInitialized": true`. If `firebase.error` mentions DECODER / parse private key, Hostinger mangled the PEM. Paste `private_key` from the service-account JSON as **one line** (literal `\n` is fine), or set `FIREBASE_SERVICE_ACCOUNT` to the entire JSON. Then restart — do not rebuild just to change runtime secrets.
 
    You can also run `npm run create-admin` on your machine with the same vars. After the first admin exists, later boots skip bootstrap.
 

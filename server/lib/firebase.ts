@@ -1,6 +1,7 @@
 import { cert, getApps, initializeApp, type App } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore } from 'firebase-admin/firestore';
+import { normalizePrivateKey, resolvePrivateKeyInput } from './privateKey.js';
 
 export interface AdminFirebaseState {
   configured: boolean;
@@ -30,42 +31,13 @@ function hasAdminCredentials(): boolean {
   return Boolean(
     process.env.FIREBASE_PROJECT_ID &&
       process.env.FIREBASE_CLIENT_EMAIL &&
-      process.env.FIREBASE_PRIVATE_KEY,
+      resolvePrivateKeyInput(),
   );
 }
 
 function publicError(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error);
   return message.replace(/-----BEGIN[\s\S]+?-----END[^-]+-----/g, '[pem]').slice(0, 240);
-}
-
-function normalizePrivateKey(raw: string): string {
-  let key = raw.trim();
-  if (
-    (key.startsWith('{') && key.endsWith('}')) ||
-    (key.startsWith("'{") && key.endsWith("}'")) ||
-    (key.startsWith('"{') && key.endsWith('}"'))
-  ) {
-    const parsed = JSON.parse(key.replace(/^['"]|['"]$/g, '')) as { private_key?: string };
-    if (!parsed.private_key) {
-      throw new Error('FIREBASE_PRIVATE_KEY JSON is missing private_key');
-    }
-    key = parsed.private_key;
-  }
-  if (
-    (key.startsWith('"') && key.endsWith('"')) ||
-    (key.startsWith("'") && key.endsWith("'"))
-  ) {
-    key = key.slice(1, -1);
-  }
-  key = key.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-  while (key.includes('\\n')) {
-    key = key.replace(/\\n/g, '\n');
-  }
-  if (!key.includes('BEGIN PRIVATE KEY')) {
-    throw new Error('FIREBASE_PRIVATE_KEY must be the PEM private key from the Firebase service account');
-  }
-  return key.trim();
 }
 
 export function getAdminFirebase(): AdminFirebaseState {
@@ -93,7 +65,7 @@ export function getAdminFirebase(): AdminFirebaseState {
   }
 
   try {
-    const privateKey = normalizePrivateKey(process.env.FIREBASE_PRIVATE_KEY!);
+    const privateKey = normalizePrivateKey(resolvePrivateKeyInput()!);
     const app = initializeApp({
       credential: cert({
         projectId: process.env.FIREBASE_PROJECT_ID,
