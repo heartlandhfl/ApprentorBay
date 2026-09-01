@@ -1,0 +1,11 @@
+# Fallback if this build is uploaded as static files on Apache (Hostinger hPanel).
+# This restores /login, /admin, and other React routes. It does NOT start the API.
+# Production needs the Express Node.js web app (repo root app.js) for /api/health.
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /
+  RewriteRule ^index\.html$ - [L]
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteRule . /index.html [L]
+</IfModule>

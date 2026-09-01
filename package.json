@@ -2,7 +2,8 @@
   "name": "apprentorbay",
   "private": true,
   "version": "0.1.0",
-  "description": "ApprentorBay — a mentorship and apprenticeship app for learners and mentors.",
+  "description": "ApprentorBay — Express API + Vite client. Deploy as a Node.js/Express web app (entry: app.js), not a static Vite site.",
+  "main": "app.js",
   "workspaces": [
     "client",
     "server",
@@ -14,7 +15,8 @@
     "dev:client": "npm run dev -w client",
     "dev:server": "npm run dev -w server",
     "build": "npm run build -w shared && npm run build -w client && npm run build -w server",
-    "start": "npm run start -w server",
+    "start": "node app.js",
+    "create-admin": "npm run create-admin -w server",
     "typecheck": "npm run typecheck -w shared && npm run typecheck -w client && npm run typecheck -w server",
     "test": "npm run test -w shared"
   },
@@ -22,6 +24,7 @@
     "node": ">=20"
   },
   "dependencies": {
+    "express": "^5.1.0",
     "typescript": "^5.9.2"
   },
   "devDependencies": {

@@ -8,7 +8,7 @@ A mentorship and apprenticeship app — structured pairings and living learning 
 - **Server:** Express (Node/TypeScript) — one app, one health route
 - **Data / auth:** Firebase (Firestore + Firebase Auth)
 - **Local data:** Auth + Firestore emulators (`npm run dev` starts them)
-- **Deploy:** static Vite build + Node host (Express serves `client/dist` in production)
+- **Deploy:** Node.js / Express host (`app.js`). Express serves `/api/*` and `client/dist`. Do not deploy as a static Vite site.
 
 ## Folder structure
 
@@ -89,5 +89,66 @@ Set `VITE_USE_FIREBASE_EMULATOR=false` and fill real Firebase Admin credentials 
 | --- | --- |
 | `npm run dev` | Emulators + client + server |
 | `npm run emulators` | Auth + Firestore emulators only |
-| `npm run build` | Typecheck + Vite production build |
-| `npm start` | Serve API (and `client/dist` in prod) |
+| `npm run build` | Shared types + Vite client + Express |
+| `npm start` | `node app.js` — API and `client/dist` |
+| `npm run create-admin` | Create the live Firebase admin (production credentials only) |
+
+## Production (Hostinger)
+
+`https://apprentorbay.com` was serving the Vite files as static hosting. That is why `/api/health` and `/admin` 404: Hostinger never started Express.
+
+The site must be a **Node.js web app**, not a static / Vite website.
+
+1. In hPanel → **Websites**, remove the existing static site for `apprentorbay.com` (Hostinger will not attach a Node app to a domain that already has a site).
+2. **Add Website** → **Node.js web app** → import this GitHub repo (or upload a zip **without** `node_modules` / `.git`).
+3. Override auto-detect if it picks Vite:
+
+   | Setting | Value |
+   | --- | --- |
+   | Framework | **Express** or **Other** — not Vite / React / static |
+   | Node.js | **20** or **22** |
+   | Build command | `npm run build` |
+   | Entry file | `app.js` |
+   | Output directory | leave empty (or `client/dist` only if the panel requires one; Express still serves it) |
+   | Package manager | npm |
+
+4. Set environment variables **before** the first build (`VITE_*` are compiled into the client):
+
+   | Name | Value |
+   | --- | --- |
+   | `NODE_ENV` | `production` |
+   | `VITE_USE_FIREBASE_EMULATOR` | `false` |
+   | `USE_FIREBASE_EMULATOR` | `false` |
+   | `CLIENT_ORIGIN` | `https://apprentorbay.com` |
+   | `VITE_FIREBASE_API_KEY` | from Firebase project settings |
+   | `VITE_FIREBASE_AUTH_DOMAIN` | `apprentorbay.firebaseapp.com` |
+   | `VITE_FIREBASE_PROJECT_ID` | `apprentorbay` |
+   | `VITE_FIREBASE_STORAGE_BUCKET` | `apprentorbay.firebasestorage.app` |
+   | `VITE_FIREBASE_MESSAGING_SENDER_ID` | from Firebase |
+   | `VITE_FIREBASE_APP_ID` | from Firebase |
+   | `FIREBASE_PROJECT_ID` | `apprentorbay` |
+   | `FIREBASE_CLIENT_EMAIL` | Admin SDK service account email |
+   | `FIREBASE_PRIVATE_KEY` | full private key, with `\n` for newlines |
+
+   Hostinger assigns `PORT`. The app already listens on `process.env.PORT` and `0.0.0.0`.
+
+5. Deploy. Confirm `https://apprentorbay.com/api/health` returns JSON:
+
+   ```json
+   { "ok": true, "service": "apprentorbay-api", ... }
+   ```
+
+   If you still get Hostinger’s HTML “This Page Does Not Exist”, the domain is still on the static site. Runtime logs should show `ApprentorBay API listening` and `Serving client from .../client/dist`.
+
+6. Create the production admin **once**, on your machine (not on Hostinger), with the live Admin SDK key and a unique password — never `ApprentorBayAdmin-2026`:
+
+   ```bash
+   # in .env: USE_FIREBASE_EMULATOR=false, FIREBASE_* , SEED_ADMIN_EMAIL, SEED_ADMIN_PASSWORD
+   npm run create-admin
+   ```
+
+   Sign in at `https://apprentorbay.com/login`, then open `/admin`.
+
+Signup cannot grant `admin`. Firestore freezes `role` after create. Local emulator admin remains `admin@apprentorbay.test` / `ApprentorBayAdmin-2026`.
+
+Your plan must include Hostinger **Node.js / Web Apps** (Business or Cloud). Shared-hosting file upload to `public_html` cannot run this API.
