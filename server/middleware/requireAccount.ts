@@ -1,13 +1,13 @@
 import type { NextFunction, Request, RequestHandler, Response } from 'express';
 import {
   ACCOUNT_STATUS,
-  COLLECTIONS,
   accountStatusOf,
   isAccountActive,
   type ApiError,
   type User,
 } from '@apprentorbay/shared';
-import { adminAuth, adminDb, getAdminFirebase } from '../lib/firebase.js';
+import { adminAuth, getAdminFirebase } from '../lib/firebase.js';
+import { hydrateAccountFromOperator } from '../lib/seedAdmin.js';
 
 export type AccountRequest = Request & {
   account?: User;
@@ -37,8 +37,11 @@ export const requireAccount: RequestHandler = async (
     }
 
     const decoded = await adminAuth().verifyIdToken(token);
-    const snap = await adminDb().collection(COLLECTIONS.users).doc(decoded.uid).get();
-    const account = snap.data() as User | undefined;
+    const account = await hydrateAccountFromOperator({
+      uid: decoded.uid,
+      email: decoded.email,
+      displayName: decoded.name,
+    });
 
     if (!account) {
       sendApiError(res, 403, 'forbidden', 'No user document');

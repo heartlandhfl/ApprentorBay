@@ -1,6 +1,7 @@
 import type { NextFunction, Request, RequestHandler, Response } from 'express';
-import { COLLECTIONS, canGovernAccounts, type ApiError, type User } from '@apprentorbay/shared';
-import { adminAuth, adminDb, getAdminFirebase } from '../lib/firebase.js';
+import { canGovernAccounts, type ApiError, type User } from '@apprentorbay/shared';
+import { adminAuth, getAdminFirebase } from '../lib/firebase.js';
+import { hydrateAccountFromOperator } from '../lib/seedAdmin.js';
 
 export type AdminRequest = Request & {
   account?: User;
@@ -30,8 +31,11 @@ export const requireAdmin: RequestHandler = async (
     }
 
     const decoded = await adminAuth().verifyIdToken(token);
-    const snap = await adminDb().collection(COLLECTIONS.users).doc(decoded.uid).get();
-    const account = snap.data() as User | undefined;
+    const account = await hydrateAccountFromOperator({
+      uid: decoded.uid,
+      email: decoded.email,
+      displayName: decoded.name,
+    });
 
     if (!account || !canGovernAccounts(account)) {
       sendError(res, 403, 'forbidden', 'Admin role required');

@@ -19,7 +19,7 @@ export function RequireAdmin({ children }: { children: ReactNode }) {
       <Page>
         <EmptyState
           title="Sign in to administer"
-          description="The dashboard is only for an admin account. Sign up cannot create that role — use the operator email from SEED_ADMIN_EMAIL."
+          description="Sign in with the operator email listed in Firestore admins/. Signup cannot create an admin."
           action={
             <Cluster gap={12}>
               <Button to="/login">Log in</Button>

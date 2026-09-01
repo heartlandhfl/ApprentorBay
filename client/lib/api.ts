@@ -248,6 +248,14 @@ export async function bootstrapProfile() {
   return readJson<{ profile: unknown; slug: string }>(response);
 }
 
+export async function establishAccountSession() {
+  const response = await fetch('/api/account/session', {
+    method: 'POST',
+    headers: await authHeaders(),
+  });
+  return readJson<{ account: User }>(response);
+}
+
 export async function recordTermsAcceptance() {
   const response = await fetch('/api/account/terms', {
     method: 'POST',

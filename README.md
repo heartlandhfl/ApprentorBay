@@ -157,6 +157,8 @@ The site must be a **Node.js web app**, not a static / Vite website.
 
    Redeploy or Restart. On boot, if Firebase Admin is initialized and **no** `users.role == admin` exists, Express creates that Auth user and Firestore doc. Sign in at `/login`, then open `/admin`.
 
+   A console document at `admins/{uid}` (email + uid) is not enough by itself. Express copies it into `users/{uid}` with `role: admin` on boot and when you POST `/api/account/session`. You still need a Firebase Auth user for that email. Use **Reset password** on `/login` if you do not know the Auth password. To create the Auth user automatically, set `SEED_ADMIN_PASSWORD` and restart.
+
    `https://apprentorbay.com/api/health` must show `"adminInitialized": true`. If it is `false`, read `firebase.error` — usually `FIREBASE_PRIVATE_KEY` is not the PEM key (paste the key with literal `\n` newlines, no extra quotes).
 
    You can also run `npm run create-admin` on your machine with the same vars. After the first admin exists, later boots skip bootstrap.

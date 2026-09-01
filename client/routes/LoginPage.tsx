@@ -1,13 +1,16 @@
 import { useState, type FormEvent } from 'react';
 import { Navigate } from 'react-router-dom';
+import { sendPasswordResetEmail } from 'firebase/auth';
 import { Button, Card, Cluster, Input, Page, Stack, Text } from '../components';
 import { signedInHomePath, useAuth } from '../lib/auth';
+import { getFirebaseAuth } from '../lib/firebase';
 
 export function LoginPage() {
   const { account, loading, logIn } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [info, setInfo] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   if (!loading && account) {
@@ -18,6 +21,7 @@ export function LoginPage() {
     event.preventDefault();
     setBusy(true);
     setError(null);
+    setInfo(null);
     try {
       await logIn(email, password);
     } catch (err) {
@@ -54,9 +58,35 @@ export function LoginPage() {
                 autoComplete="current-password"
               />
               {error ? <Text variant="danger">{error}</Text> : null}
+              {info ? <Text variant="muted">{info}</Text> : null}
               <Cluster gap={12}>
                 <Button type="submit" loading={busy}>
                   Log in
+                </Button>
+                <Button
+                  variant="ghost"
+                  type="button"
+                  disabled={busy || !email.trim()}
+                  onClick={() => {
+                    const auth = getFirebaseAuth();
+                    if (!auth) {
+                      setError('Firebase is not initialized');
+                      return;
+                    }
+                    setBusy(true);
+                    setError(null);
+                    setInfo(null);
+                    void sendPasswordResetEmail(auth, email.trim())
+                      .then(() => {
+                        setInfo('Password reset email sent. Check that inbox, then log in here.');
+                      })
+                      .catch(() => {
+                        setError('Could not send a reset email. Confirm the address exists in Firebase Auth.');
+                      })
+                      .finally(() => setBusy(false));
+                  }}
+                >
+                  Reset password
                 </Button>
                 <Button variant="ghost" to="/signup">
                   Create an account
