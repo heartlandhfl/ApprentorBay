@@ -73,6 +73,19 @@ export async function listAccounts(): Promise<AccountRow[]> {
   return body.rows;
 }
 
+export async function setMentorClaim(
+  userId: string,
+  type: string,
+  verified: boolean,
+) {
+  const response = await fetch(`/api/admin/mentors/${userId}/claims`, {
+    method: 'POST',
+    headers: await authHeaders(),
+    body: JSON.stringify({ type, verified }),
+  });
+  return readJson<{ profile: unknown }>(response);
+}
+
 export async function setAccountActive(userId: string, active: boolean): Promise<User> {
   const response = await fetch(`/api/admin/accounts/${userId}/active`, {
     method: 'POST',
@@ -141,4 +154,44 @@ export async function dispatchContractAction(
   });
   const body = await readJson<{ contract: LearningContract }>(response);
   return body.contract;
+}
+
+export async function bootstrapProfile() {
+  const response = await fetch('/api/profiles/me/bootstrap', {
+    method: 'POST',
+    headers: await authHeaders(),
+  });
+  return readJson<{ profile: unknown; slug: string }>(response);
+}
+
+export async function getOwnProfile() {
+  const response = await fetch('/api/profiles/me', {
+    headers: await authHeaders(),
+  });
+  return readJson<{ profile: unknown; slug: string | null }>(response);
+}
+
+export async function updateOwnProfile(body: Record<string, unknown>) {
+  const response = await fetch('/api/profiles/me', {
+    method: 'PUT',
+    headers: await authHeaders(),
+    body: JSON.stringify(body),
+  });
+  return readJson<{ profile: unknown; publicProfile: unknown }>(response);
+}
+
+export async function applyToMentor(mentorSlug: string, message: string) {
+  const response = await fetch('/api/applications', {
+    method: 'POST',
+    headers: await authHeaders(),
+    body: JSON.stringify({ mentorSlug, message }),
+  });
+  return readJson<{ application: MentorshipApplication }>(response);
+}
+
+export async function resolveMentorApplyTarget(slug: string) {
+  const response = await fetch(`/api/profiles/mentors/${slug}/apply-target`, {
+    headers: await authHeaders(),
+  });
+  return readJson<{ mentorId: string; slug: string }>(response);
 }

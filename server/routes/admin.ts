@@ -5,7 +5,9 @@ import {
   RELATIONSHIP_STATUS,
   USER_ROLE,
   VERIFICATION_STATUS,
+  VERIFIED_CLAIM_TYPE,
   isAccountActive,
+  normalizeMentorProfile,
   type AccountRow,
   type ApiError,
   type AdminCounts,
@@ -18,6 +20,7 @@ import {
   type VerificationStatus,
 } from '@apprentorbay/shared';
 import { adminDb } from '../lib/firebase.js';
+import { writePublicProfile } from '../lib/profiles.js';
 import { requireAdmin, type AdminRequest } from '../middleware/requireAdmin.js';
 
 export const adminRouter = Router();
@@ -59,10 +62,31 @@ adminRouter.get('/stats', async (_req, res, next) => {
 
 adminRouter.get('/accounts', async (_req, res, next) => {
   try {
-    const snap = await adminDb().collection(COLLECTIONS.users).get();
-    const rows: AccountRow[] = snap.docs
-      .map((doc) => ({ user: doc.data() as User }))
-      .sort((a, b) => a.user.displayName.localeCompare(b.user.displayName));
+    const snaps = await adminDb().collection(COLLECTIONS.users).get();
+    const rows: AccountRow[] = [];
+    for (const doc of snaps.docs) {
+      const user = doc.data() as User;
+      if (user.role === USER_ROLE.mentor) {
+        const profileSnap = await adminDb().collection(COLLECTIONS.mentorProfiles).doc(user.uid).get();
+        const profile = profileSnap.exists
+          ? normalizeMentorProfile({ ...(profileSnap.data() as MentorProfile), userId: user.uid })
+          : null;
+        rows.push({
+          user,
+          publicSlug: user.profileSlug ?? profile?.slug ?? null,
+          approvalStatus: profile?.verificationStatus ?? null,
+          verifiedClaims: profile?.verifiedClaims ?? [],
+        });
+      } else {
+        rows.push({
+          user,
+          publicSlug: user.profileSlug ?? null,
+          approvalStatus: null,
+          verifiedClaims: [],
+        });
+      }
+    }
+    rows.sort((a, b) => a.user.displayName.localeCompare(b.user.displayName));
     res.json({ rows });
   } catch (error) {
     next(error);
@@ -121,6 +145,12 @@ adminRouter.post('/accounts/:userId/active', async (req: AdminRequest, res, next
     }
 
     await batch.commit();
+    if (profileSnap.exists) {
+      await writePublicProfile(
+        userId,
+        user.role === USER_ROLE.mentor ? USER_ROLE.mentor : USER_ROLE.learner,
+      );
+    }
     const next: User = { ...user, active };
     res.json({ user: next });
   } catch (error) {
@@ -179,8 +209,45 @@ adminRouter.post('/mentors/:userId/verification', async (req, res, next) => {
 
     await ref.update({ verificationStatus: status });
     const profile = { ...(snap.data() as MentorProfile), verificationStatus: status };
-
+    await writePublicProfile(userId, USER_ROLE.mentor);
     res.json({ profile });
+  } catch (error) {
+    next(error);
+  }
+});
+
+adminRouter.post('/mentors/:userId/claims', async (req, res, next) => {
+  try {
+    const userId = String(req.params.userId ?? '');
+    const type = (req.body as { type?: string } | undefined)?.type;
+    const verified = (req.body as { verified?: boolean } | undefined)?.verified === true;
+    const allowed = new Set(Object.values(VERIFIED_CLAIM_TYPE));
+    if (!userId || !type || !allowed.has(type as never)) {
+      const error: ApiError = {
+        code: 'invalid',
+        message: 'type must be identity, education, or professional_experience',
+      };
+      res.status(400).json({ error });
+      return;
+    }
+
+    const ref = adminDb().collection(COLLECTIONS.mentorProfiles).doc(userId);
+    const snap = await ref.get();
+    if (!snap.exists) {
+      const error: ApiError = { code: 'not_found', message: 'Mentor profile not found' };
+      res.status(404).json({ error });
+      return;
+    }
+    const profile = normalizeMentorProfile({ ...(snap.data() as MentorProfile), userId });
+    const nextClaims = profile.verifiedClaims.filter((item) => item.type !== type);
+    nextClaims.push({
+      type: type as MentorProfile['verifiedClaims'][number]['type'],
+      verified,
+      verifiedAt: verified ? new Date().toISOString() : null,
+    });
+    await ref.update({ verifiedClaims: nextClaims });
+    await writePublicProfile(userId, USER_ROLE.mentor);
+    res.json({ profile: { ...profile, verifiedClaims: nextClaims } });
   } catch (error) {
     next(error);
   }

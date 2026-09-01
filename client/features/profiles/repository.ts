@@ -1,12 +1,63 @@
 import { collection, doc, getDoc, onSnapshot, query, where } from 'firebase/firestore';
 import {
   COLLECTIONS,
-  VERIFICATION_STATUS,
   type LearnerProfile,
   type MentorProfile,
+  type PublicProfile,
 } from '@apprentorbay/shared';
 import { getFirebaseDb } from '../../lib/firebase';
 import { firestoreDenied } from '../mentorship';
+
+export function watchPublicProfile(
+  slug: string,
+  onNext: (profile: PublicProfile | null) => void,
+  onError?: (error: Error) => void,
+  options?: { includeUnpublished?: boolean },
+): () => void {
+  const db = getFirebaseDb();
+  if (!db) {
+    onError?.(new Error('Firebase is not initialized'));
+    return () => undefined;
+  }
+
+  return onSnapshot(
+    doc(db, COLLECTIONS.publicProfiles, slug),
+    (snap) => {
+      if (!snap.exists()) {
+        onNext(null);
+        return;
+      }
+      const data = snap.data() as PublicProfile;
+      onNext(data.published || options?.includeUnpublished ? data : null);
+    },
+    (error) => {
+      if (firestoreDenied(error)) onNext(null);
+      else onError?.(error);
+    },
+  );
+}
+
+export function watchListedMentors(
+  onNext: (mentors: PublicProfile[]) => void,
+  onError?: (error: Error) => void,
+): () => void {
+  const db = getFirebaseDb();
+  if (!db) {
+    onError?.(new Error('Firebase is not initialized'));
+    return () => undefined;
+  }
+
+  return onSnapshot(
+    query(collection(db, COLLECTIONS.publicProfiles), where('listed', '==', true)),
+    (snap) => {
+      const rows = snap.docs
+        .map((item) => item.data() as PublicProfile)
+        .sort((a, b) => a.displayName.localeCompare(b.displayName));
+      onNext(rows);
+    },
+    (error) => onError?.(error),
+  );
+}
 
 export function watchLearnerProfile(
   userId: string,
@@ -75,28 +126,35 @@ export async function getPublicDisplayName(userId: string): Promise<string> {
   return 'Member';
 }
 
+/** @deprecated Use watchListedMentors. Kept for pairing workspace private reads. */
 export function watchApprovedMentors(
   onNext: (mentors: MentorProfile[]) => void,
   onError?: (error: Error) => void,
 ): () => void {
-  const db = getFirebaseDb();
-  if (!db) {
-    onError?.(new Error('Firebase is not initialized'));
-    return () => undefined;
-  }
-
-  return onSnapshot(
-    query(
-      collection(db, COLLECTIONS.mentorProfiles),
-      where('verificationStatus', '==', VERIFICATION_STATUS.approved),
-      where('public', '==', true),
-    ),
-    (snap) => {
-      const rows = snap.docs
-        .map((item) => item.data() as MentorProfile)
-        .sort((a, b) => a.displayName.localeCompare(b.displayName));
-      onNext(rows);
-    },
-    (error) => onError?.(error),
-  );
+  return watchListedMentors((rows) => {
+    onNext(
+      rows.map((row) => ({
+        userId: '',
+        slug: row.slug,
+        displayName: row.displayName,
+        photoPath: row.photoPath,
+        professionalIdentity: row.professionalIdentity,
+        location: row.location ?? '',
+        locationPublic: Boolean(row.location),
+        expertise: row.areasOfExpertise[0] ?? '',
+        areasOfExpertise: row.areasOfExpertise,
+        education: row.education,
+        qualifications: row.qualifications,
+        certifications: row.certifications,
+        experience: row.experience,
+        professionalGoals: row.professionalGoals,
+        mentoringInterests: row.mentoringInterests,
+        deliverables: [],
+        reviews: [],
+        verificationStatus: row.approvalStatus,
+        verifiedClaims: row.verifiedClaims,
+        public: row.published,
+      })),
+    );
+  }, onError);
 }

@@ -46,6 +46,7 @@ export type {
   UserRole,
   VerificationDecision,
   VerificationStatus,
+  VerifiedClaim,
 } from './domain/index.js';
 
 export interface FirebaseClientStatus {

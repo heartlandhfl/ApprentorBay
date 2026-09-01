@@ -11,6 +11,7 @@ import { adminRouter } from './routes/admin.js';
 import { applicationsRouter } from './routes/applications.js';
 import { contractsRouter } from './routes/contracts.js';
 import { healthRouter } from './routes/health.js';
+import { profilesRouter } from './routes/profiles.js';
 import { relationshipsRouter } from './routes/relationships.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -49,6 +50,7 @@ app.use(express.json());
 
 app.use('/api/health', healthRouter);
 app.use('/api/admin', adminRouter);
+app.use('/api/profiles', profilesRouter);
 app.use('/api/applications', applicationsRouter);
 app.use('/api/relationships', relationshipsRouter);
 app.use('/api/contracts', contractsRouter);

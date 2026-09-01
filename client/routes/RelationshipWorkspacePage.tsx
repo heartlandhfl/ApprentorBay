@@ -243,13 +243,13 @@ export function RelationshipWorkspacePage() {
               role="Mentor"
               name={mentorName}
               detail={mentor?.expertise || 'No expertise listed yet'}
-              href={`/mentors/${relationship.mentorId}`}
+              href={mentor?.slug ? `/mentors/${mentor.slug}` : null}
             />
             <PartyCard
               role="Learner"
               name={learnerName}
               detail={learner?.careerAspirations || learner?.jobStatus || 'No goals listed yet'}
-              href={`/learners/${relationship.learnerId}`}
+              href={learner?.slug ? `/learners/${learner.slug}` : null}
             />
           </div>
         </Stack>
@@ -326,7 +326,7 @@ function PartyCard({
   role: string;
   name: string;
   detail: string;
-  href: string;
+  href: string | null;
 }) {
   return (
     <Card>
@@ -334,9 +334,11 @@ function PartyCard({
         <Text variant="caption">{role}</Text>
         <Text variant="h3">{name}</Text>
         <Text variant="small">{detail}</Text>
-        <Button variant="ghost" size="sm" to={href}>
-          View profile
-        </Button>
+        {href ? (
+          <Button variant="ghost" size="sm" to={href}>
+            View profile
+          </Button>
+        ) : null}
       </Stack>
     </Card>
   );

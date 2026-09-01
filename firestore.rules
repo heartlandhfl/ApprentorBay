@@ -50,6 +50,13 @@ service cloud.firestore {
         && relationshipData(relationshipId).status == 'active';
     }
 
+    function isPairedWith(profileId) {
+      return isSignedIn() && (
+        exists(relationshipPath(request.auth.uid + '_' + profileId))
+        || exists(relationshipPath(profileId + '_' + request.auth.uid))
+      );
+    }
+
     function isPairingMember() {
       return isSignedIn() && (
         resource.data.learnerId == request.auth.uid
@@ -71,7 +78,11 @@ service cloud.firestore {
         && request.resource.data.termsVersion is string
         && request.resource.data.termsVersion.size() > 0
         && request.resource.data.termsAcceptedAt is string
-        && request.resource.data.termsAcceptedAt.size() > 0;
+        && request.resource.data.termsAcceptedAt.size() > 0
+        && (
+          !('profileSlug' in request.resource.data)
+          || request.resource.data.profileSlug == null
+        );
       allow update: if (isOwner(userId) || isAdmin())
         && request.resource.data.uid == resource.data.uid
         && request.resource.data.role == resource.data.role
@@ -79,29 +90,42 @@ service cloud.firestore {
         && (
           request.resource.data.termsVersion == resource.data.termsVersion
           || request.resource.data.termsVersion is string
+        )
+        && (
+          !('profileSlug' in request.resource.data)
+          || request.resource.data.profileSlug == resource.data.profileSlug
         );
       allow delete: if false;
     }
 
     match /learnerProfiles/{profileId} {
-      allow read: if resource.data.public == true || isOwner(profileId) || isAdmin();
+      allow read: if isOwner(profileId) || isAdmin() || isPairedWith(profileId);
       allow create: if isOwner(profileId)
         && request.resource.data.userId == request.auth.uid;
-      allow update: if isOwner(profileId) || isAdmin();
-      allow delete: if false;
+      allow update, delete: if false;
     }
 
     match /mentorProfiles/{profileId} {
-      allow read: if resource.data.public == true || isOwner(profileId) || isAdmin();
+      allow read: if isOwner(profileId) || isAdmin() || isPairedWith(profileId);
       allow create: if isOwner(profileId)
         && request.resource.data.userId == request.auth.uid
         && request.resource.data.verificationStatus == 'pending';
-      allow update: if isAdmin()
-        || (
-          isOwner(profileId)
-          && request.resource.data.verificationStatus == resource.data.verificationStatus
-        );
-      allow delete: if false;
+      allow update, delete: if false;
+    }
+
+    function ownsPublicSlug(slug) {
+      return isSignedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && userDoc(request.auth.uid).profileSlug == slug;
+    }
+
+    match /publicProfiles/{slug} {
+      allow read: if resource.data.published == true || isAdmin() || ownsPublicSlug(slug);
+      allow create, update, delete: if false;
+    }
+
+    match /profileSlugs/{slug} {
+      allow read, write: if false;
     }
 
     match /mentorshipApplications/{applicationId} {
@@ -143,11 +167,10 @@ service cloud.firestore {
       allow create, update, delete: if false;
     }
 
-    // Public showcase records. Client writes stay denied.
+    // Public showcase records are projected onto publicProfiles. Direct reads
+    // stay pairing/admin so visitor queries cannot harvest Firebase UIDs.
     match /showcases/{showcaseId} {
-      allow read: if resource.data.published == true
-        || isPairingMember()
-        || isAdmin();
+      allow read: if isPairingMember() || isAdmin();
       allow create, update, delete: if false;
     }
 

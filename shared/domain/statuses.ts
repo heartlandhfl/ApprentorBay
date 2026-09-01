@@ -13,6 +13,21 @@ export const VERIFICATION_STATUS = {
 export type VerificationStatus =
   (typeof VERIFICATION_STATUS)[keyof typeof VERIFICATION_STATUS];
 
+/** Specific evidence the platform has checked. Not a background-check badge. */
+export const VERIFIED_CLAIM_TYPE = {
+  identity: 'identity',
+  education: 'education',
+  professionalExperience: 'professional_experience',
+} as const;
+
+export type VerifiedClaimType = (typeof VERIFIED_CLAIM_TYPE)[keyof typeof VERIFIED_CLAIM_TYPE];
+
+export interface VerifiedClaim {
+  type: VerifiedClaimType;
+  verified: boolean;
+  verifiedAt: string | null;
+}
+
 export const APPLICATION_STATUS = {
   pending: 'pending',
   accepted: 'accepted',

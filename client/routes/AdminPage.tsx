@@ -1,6 +1,14 @@
 import { useEffect, useState } from 'react';
-import type { AccountRow, AdminCounts, PendingMentorRow, User } from '@apprentorbay/shared';
-import { USER_ROLE, VERIFICATION_STATUS, isAccountActive } from '@apprentorbay/shared';
+import type { AccountRow, AdminCounts, PendingMentorRow, User, VerifiedClaimType } from '@apprentorbay/shared';
+import {
+  APPROVAL_DISCLAIMER,
+  APPROVAL_STATUS_LABEL,
+  USER_ROLE,
+  VERIFICATION_STATUS,
+  VERIFIED_CLAIM_LABEL,
+  VERIFIED_CLAIM_TYPE,
+  isAccountActive,
+} from '@apprentorbay/shared';
 import {
   Badge,
   Button,
@@ -18,6 +26,7 @@ import {
   listAdminCounts,
   listPendingMentors,
   setAccountActive,
+  setMentorClaim,
   setMentorVerification,
 } from '../lib/api';
 
@@ -57,7 +66,19 @@ export function AdminPage() {
       await setMentorVerification(userId, status);
       await refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not update verification');
+                    setError(err instanceof Error ? err.message : 'Could not update approval');
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function setClaim(userId: string, type: VerifiedClaimType, verified: boolean) {
+    setBusyId(`${userId}-${type}`);
+    try {
+      await setMentorClaim(userId, type, verified);
+      await refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not update the verified claim');
     } finally {
       setBusyId(null);
     }
@@ -81,8 +102,9 @@ export function AdminPage() {
         <Stack gap={12}>
           <Text variant="h1">Admin</Text>
           <Text variant="muted">
-            Counts, pending mentor approvals, and account suspension. Suspension sets
-            active to false, hides the public profile, and blocks login.
+            Counts, pending mentor approvals, verified claims, and account suspension.
+            Approval is participation only. {APPROVAL_DISCLAIMER} Email stays on this
+            page; it is not copied onto public profiles.
           </Text>
         </Stack>
 
@@ -101,7 +123,7 @@ export function AdminPage() {
         )}
 
         <Stack gap={16}>
-          <Text variant="h2">Pending mentor verifications</Text>
+          <Text variant="h2">Pending mentor approvals</Text>
           {pending === null ? (
             <Text variant="muted">Loading pending mentors…</Text>
           ) : pending.length === 0 ? (
@@ -141,9 +163,11 @@ export function AdminPage() {
                       >
                         Reject
                       </Button>
-                      <Button size="sm" variant="ghost" to={`/mentors/${row.user.uid}`}>
-                        View profile
-                      </Button>
+                      {row.profile.slug ? (
+                        <Button size="sm" variant="ghost" to={`/mentors/${row.profile.slug}`}>
+                          View profile
+                        </Button>
+                      ) : null}
                     </Cluster>
                   ),
                 },
@@ -189,29 +213,77 @@ export function AdminPage() {
                     ),
                 },
                 {
+                  key: 'approval',
+                  header: 'Approval / verified claims',
+                  render: (row) =>
+                    row.user.role === USER_ROLE.mentor ? (
+                      <Stack gap={8}>
+                        <Text variant="small">
+                          {APPROVAL_STATUS_LABEL[row.approvalStatus ?? VERIFICATION_STATUS.pending]}
+                        </Text>
+                        <Cluster gap={8}>
+                          {Object.values(VERIFIED_CLAIM_TYPE).map((type) => {
+                            const current = row.verifiedClaims?.find((item) => item.type === type);
+                            const on = current?.verified === true;
+                            return (
+                              <Button
+                                key={type}
+                                size="sm"
+                                variant={on ? 'secondary' : 'ghost'}
+                                loading={busyId === `${row.user.uid}-${type}`}
+                                onClick={() => void setClaim(row.user.uid, type, !on)}
+                              >
+                                {on ? VERIFIED_CLAIM_LABEL[type] : `Verify ${type.replace('_', ' ')}`}
+                              </Button>
+                            );
+                          })}
+                        </Cluster>
+                      </Stack>
+                    ) : (
+                      <Text variant="small">—</Text>
+                    ),
+                },
+                {
                   key: 'actions',
                   header: 'Action',
                   render: (row) =>
                     row.user.role === USER_ROLE.admin ? (
                       <Text variant="small">Admin</Text>
-                    ) : isAccountActive(row.user) ? (
-                      <Button
-                        size="sm"
-                        variant="danger"
-                        loading={busyId === row.user.uid}
-                        onClick={() => void setActive(row.user, false)}
-                      >
-                        Suspend
-                      </Button>
                     ) : (
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        loading={busyId === row.user.uid}
-                        onClick={() => void setActive(row.user, true)}
-                      >
-                        Restore
-                      </Button>
+                      <Cluster gap={8}>
+                        {row.publicSlug ? (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            to={
+                              row.user.role === USER_ROLE.mentor
+                                ? `/mentors/${row.publicSlug}`
+                                : `/learners/${row.publicSlug}`
+                            }
+                          >
+                            View profile
+                          </Button>
+                        ) : null}
+                        {isAccountActive(row.user) ? (
+                          <Button
+                            size="sm"
+                            variant="danger"
+                            loading={busyId === row.user.uid}
+                            onClick={() => void setActive(row.user, false)}
+                          >
+                            Suspend
+                          </Button>
+                        ) : (
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            loading={busyId === row.user.uid}
+                            onClick={() => void setActive(row.user, true)}
+                          >
+                            Restore
+                          </Button>
+                        )}
+                      </Cluster>
                     ),
                 },
               ]}

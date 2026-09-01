@@ -19,6 +19,7 @@ import {
   type User,
 } from '@apprentorbay/shared';
 import { adminDb } from '../lib/firebase.js';
+import { writePublicProfile } from '../lib/profiles.js';
 import { requireAccount, sendApiError, type AccountRequest } from '../middleware/requireAccount.js';
 
 export const contractsRouter = Router();
@@ -160,6 +161,10 @@ async function publishShowcase(contract: LearningContract) {
   const existing = existingSnap.exists ? (existingSnap.data() as Showcase) : null;
   await ref.set(mergeShowcaseRecord(existing, next));
   await attachDeliverableRefs(contract, next);
+  await Promise.all([
+    writePublicProfile(contract.learnerId, USER_ROLE.learner),
+    writePublicProfile(contract.mentorId, USER_ROLE.mentor),
+  ]);
 }
 
 async function setShowcasePublished(contract: LearningContract, published: boolean) {
@@ -178,6 +183,10 @@ async function setShowcasePublished(contract: LearningContract, published: boole
     },
     { merge: true },
   );
+  await Promise.all([
+    writePublicProfile(contract.learnerId, USER_ROLE.learner),
+    writePublicProfile(contract.mentorId, USER_ROLE.mentor),
+  ]);
 }
 
 async function attachDeliverableRefs(

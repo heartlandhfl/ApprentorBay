@@ -72,6 +72,13 @@
         { "fieldPath": "mentorId", "order": "ASCENDING" },
         { "fieldPath": "published", "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "publicProfiles",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "listed", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

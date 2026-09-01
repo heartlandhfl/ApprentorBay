@@ -12,6 +12,8 @@ export const COLLECTIONS = {
   messages: 'messages',
   contracts: 'learningContracts',
   showcases: 'showcases',
+  publicProfiles: 'publicProfiles',
+  profileSlugs: 'profileSlugs',
   auditLogs: 'adminAuditLogs',
 } as const;
 

@@ -31,6 +31,26 @@ import {
   pairingIdFieldForRole,
   relationshipDocId,
   MENTOR_CONTRIBUTION,
+  APPROVAL_DISCLAIMER,
+  APPROVAL_STATUS,
+  APPROVAL_STATUS_LABEL,
+  VERIFIED_CLAIM_TYPE,
+  buildPublicLearnerProfile,
+  buildPublicMentorProfile,
+  canListPublicMentor,
+  canReadPrivateProfile,
+  emptyLearnerProfile,
+  emptyMentorProfile,
+  isPublicPhotoPath,
+  looksLikeFirebaseUid,
+  normalizeLearnerProfile,
+  ownPublicProfilePath,
+  profilePhotoStoragePath,
+  publicProfileOmitsPrivateFields,
+  publicProfilePath,
+  suggestSlug,
+  toStoredPublicProfile,
+  validateProfileSlug,
   canConfirmCompletion,
   completionRequirements,
   showcaseFromDeliverableRef,
@@ -54,6 +74,8 @@ describe('domain identities', () => {
     assert.equal(COLLECTIONS.relationships, 'mentorshipRelationships');
     assert.equal(COLLECTIONS.contracts, 'learningContracts');
     assert.equal(COLLECTIONS.showcases, 'showcases');
+    assert.equal(COLLECTIONS.publicProfiles, 'publicProfiles');
+    assert.equal(COLLECTIONS.profileSlugs, 'profileSlugs');
     assert.equal(COLLECTIONS.auditLogs, 'adminAuditLogs');
     assert.equal(RESERVED_COLLECTIONS.legacyMentorships, 'mentorships');
     assert.equal(RESERVED_COLLECTIONS.notifications, 'notifications');
@@ -361,6 +383,120 @@ describe('mentorship relationship engine', () => {
     assert.equal(canPauseRelationship(learner, relationship), true);
     assert.equal(canEndRelationship(learner, relationship), true);
     assert.equal(canPauseRelationship(stranger, relationship), false);
+  });
+});
+
+describe('public profile system', () => {
+  it('assigns safe slugs and rejects reserved or uid-like public URLs', () => {
+    assert.equal(suggestSlug('Ada Lovelace'), 'ada-lovelace');
+    assert.equal(validateProfileSlug('ada-lovelace').ok, true);
+    assert.equal(validateProfileSlug('admin').ok, false);
+    assert.equal(validateProfileSlug('Ada Lovelace').ok, true);
+    assert.equal(looksLikeFirebaseUid('dWy0NfpQvdkBcN8TGGaygsuohKO5'), true);
+    assert.equal(looksLikeFirebaseUid('ada-lovelace'), false);
+    assert.equal(validateProfileSlug('dWy0NfpQvdkBcN8TGGaygsuohKO5').ok, false);
+    assert.equal(publicProfilePath(USER_ROLE.learner, 'ada-lovelace'), '/learners/ada-lovelace');
+    assert.equal(ownPublicProfilePath(USER_ROLE.mentor, null), '/mentors/me');
+    assert.equal(profilePhotoStoragePath('ada-lovelace', 'photo.jpg').includes('dWy0NfpQvdkBcN8TGGaygsuohKO5'), false);
+    assert.equal(isPublicPhotoPath('profile-photos/ada-lovelace/1.jpg', 'ada-lovelace'), true);
+    assert.equal(isPublicPhotoPath('profile-photos/dWy0NfpQvdkBcN8TGGaygsuohKO5/1.jpg', 'ada-lovelace'), false);
+  });
+
+  it('projects a learner profile without private fields or a hidden location', () => {
+    const profile = normalizeLearnerProfile({
+      ...emptyLearnerProfile('learner-1', 'Ada'),
+      slug: 'ada',
+      location: 'Detroit',
+      locationPublic: false,
+      jobStatus: 'Apprentice joiner',
+      skillsDeveloping: ['Joinery'],
+    });
+    const publicProfile = buildPublicLearnerProfile({
+      profile,
+      portfolio: [
+        {
+          id: 'c1',
+          title: 'A sawhorse',
+          description: 'Done',
+          skillsDemonstrated: ['Layout'],
+          links: [],
+          publicEvidence: [],
+          completedAt: '2026-09-01T00:00:00.000Z',
+          learnerDisplayName: 'Ada',
+          mentorDisplayName: 'Ben',
+          mentorContribution: 'Mentored this work. The learner remains the creator.',
+        },
+      ],
+      now: '2026-09-01T00:00:00.000Z',
+    });
+    assert.equal(publicProfile.location, null);
+    assert.equal(publicProfile.careerStatus, 'Apprentice joiner');
+    assert.ok(publicProfile.skillsDemonstrated.includes('Layout'));
+    assert.deepEqual(publicProfileOmitsPrivateFields(publicProfile as unknown as Record<string, unknown>), []);
+    assert.equal('userId' in publicProfile, false);
+    assert.equal('email' in publicProfile, false);
+    assert.equal(publicProfile.portfolio.length, 1);
+    const stored = toStoredPublicProfile({
+      ...publicProfile,
+      userId: 'learner-1',
+      email: 'ada@example.com',
+    } as unknown as typeof publicProfile);
+    assert.equal('userId' in stored, false);
+    assert.equal('email' in stored, false);
+
+    const withUidPhoto = buildPublicLearnerProfile({
+      profile: { ...profile, photoPath: 'profile-photos/learner-1/headshot.jpg' },
+      portfolio: [],
+      now: '2026-09-01T00:00:00.000Z',
+    });
+    assert.equal(withUidPhoto.photoPath, null);
+  });
+
+  it('lists approved mentors only and does not treat approval as a background check', () => {
+    const pending = emptyMentorProfile('mentor-1', 'Ben');
+    pending.slug = 'ben';
+    pending.verificationStatus = APPROVAL_STATUS.pending;
+    const pendingPublic = buildPublicMentorProfile({
+      profile: pending,
+      mentoredDeliverables: [],
+      now: '2026-09-01T00:00:00.000Z',
+    });
+    assert.equal(pendingPublic.published, false);
+    assert.equal(canListPublicMentor(pendingPublic), false);
+    assert.equal(APPROVAL_STATUS_LABEL[APPROVAL_STATUS.approved], 'Approved');
+    assert.match(APPROVAL_DISCLAIMER, /not a comprehensive background check/i);
+
+    const approved = {
+      ...pending,
+      public: true,
+      verificationStatus: APPROVAL_STATUS.approved,
+      verifiedClaims: [
+        { type: VERIFIED_CLAIM_TYPE.identity, verified: true, verifiedAt: '2026-09-01T00:00:00.000Z' },
+        { type: VERIFIED_CLAIM_TYPE.education, verified: false, verifiedAt: null },
+      ],
+    };
+    const listed = buildPublicMentorProfile({
+      profile: approved,
+      mentoredDeliverables: [],
+      now: '2026-09-01T00:00:00.000Z',
+    });
+    assert.equal(canListPublicMentor(listed), true);
+    assert.equal(listed.verifiedClaims.length, 1);
+    assert.equal(listed.verifiedClaims[0]?.type, VERIFIED_CLAIM_TYPE.identity);
+    assert.notEqual(APPROVAL_STATUS_LABEL[APPROVAL_STATUS.approved], 'Verified');
+  });
+
+  it('keeps private profiles to the owner, pairing, or admin', () => {
+    const pairing = { learnerId: 'learner-1', mentorId: 'mentor-1' };
+    const learner = { uid: 'learner-1', role: USER_ROLE.learner, active: true };
+    const mentor = { uid: 'mentor-1', role: USER_ROLE.mentor, active: true };
+    const visitor = { uid: 'visitor', role: USER_ROLE.learner, active: true };
+    const admin = { uid: 'admin-1', role: USER_ROLE.admin, active: true };
+    assert.equal(canReadPrivateProfile(learner, 'learner-1'), true);
+    assert.equal(canReadPrivateProfile(mentor, 'learner-1', pairing), true);
+    assert.equal(canReadPrivateProfile(visitor, 'learner-1', pairing), false);
+    assert.equal(canReadPrivateProfile(admin, 'learner-1'), true);
+    assert.equal(canReadPrivateProfile(null, 'learner-1'), false);
   });
 });
 

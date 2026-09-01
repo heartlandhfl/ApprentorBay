@@ -1,10 +1,9 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import {
   APPLICATION_STATUS,
+  APPROVAL_STATUS,
   USER_ROLE,
-  VERIFICATION_STATUS,
   isOpenRelationship,
-  type MentorProfile,
 } from '@apprentorbay/shared';
 import {
   Badge,
@@ -15,35 +14,54 @@ import {
   TextArea,
 } from '../../components';
 import { useAuth } from '../../lib/auth';
-import { createApplication, watchPairing } from './repository';
+import { applyToMentor, resolveMentorApplyTarget } from '../../lib/api';
+import { watchPairing } from './repository';
 
 type ApplyMentorshipProps = {
-  profile: MentorProfile;
+  slug: string;
+  displayName: string;
+  approvalStatus: string;
 };
 
-export function ApplyMentorship({ profile }: ApplyMentorshipProps) {
+export function ApplyMentorship({ slug, displayName, approvalStatus }: ApplyMentorshipProps) {
   const { account, loading } = useAuth();
   const [open, setOpen] = useState(false);
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [mentorId, setMentorId] = useState<string | null>(null);
   const [applicationStatus, setApplicationStatus] = useState<string | null>(null);
   const [relationshipId, setRelationshipId] = useState<string | null>(null);
   const [relationshipOpen, setRelationshipOpen] = useState(false);
 
   useEffect(() => {
-    if (!account || account.role !== USER_ROLE.learner || account.uid === profile.userId) {
+    if (!account || account.role !== USER_ROLE.learner) return;
+    let cancelled = false;
+    void resolveMentorApplyTarget(slug)
+      .then((result) => {
+        if (!cancelled) setMentorId(result.mentorId);
+      })
+      .catch(() => {
+        if (!cancelled) setMentorId(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [account, slug]);
+
+  useEffect(() => {
+    if (!account || account.role !== USER_ROLE.learner || !mentorId || account.uid === mentorId) {
       return;
     }
-    return watchPairing(account.uid, profile.userId, (state) => {
+    return watchPairing(account.uid, mentorId, (state) => {
       setApplicationStatus(state.application?.status ?? null);
       setRelationshipId(state.relationship?.id ?? null);
       setRelationshipOpen(Boolean(state.relationship && isOpenRelationship(state.relationship)));
     });
-  }, [account, profile.userId]);
+  }, [account, mentorId]);
 
   if (loading) return null;
-  if (profile.verificationStatus !== VERIFICATION_STATUS.approved) return null;
+  if (approvalStatus !== APPROVAL_STATUS.approved) return null;
   if (!account) {
     return (
       <Button variant="secondary" to="/login">
@@ -52,7 +70,7 @@ export function ApplyMentorship({ profile }: ApplyMentorshipProps) {
     );
   }
   if (account.role !== USER_ROLE.learner) return null;
-  if (account.uid === profile.userId) return null;
+  if (mentorId && account.uid === mentorId) return null;
 
   if (relationshipId && relationshipOpen) {
     return (
@@ -70,11 +88,7 @@ export function ApplyMentorship({ profile }: ApplyMentorshipProps) {
     setBusy(true);
     setError(null);
     try {
-      await createApplication({
-        learnerId: account.uid,
-        mentorId: profile.userId,
-        message,
-      });
+      await applyToMentor(slug, message);
       setOpen(false);
       setMessage('');
     } catch (err) {
@@ -89,18 +103,14 @@ export function ApplyMentorship({ profile }: ApplyMentorshipProps) {
       <Button onClick={() => setOpen(true)}>Apply for Mentorship</Button>
       <Modal
         open={open}
-        title={`Write to ${profile.displayName}`}
+        title={`Write to ${displayName}`}
         onClose={() => setOpen(false)}
         footer={
           <Cluster gap={8}>
             <Button variant="secondary" onClick={() => setOpen(false)}>
               Cancel
             </Button>
-            <Button
-              type="submit"
-              form="apply-mentorship"
-              loading={busy}
-            >
+            <Button type="submit" form="apply-mentorship" loading={busy}>
               Send application
             </Button>
           </Cluster>
