@@ -1,25 +1,14 @@
 import { useState, type FormEvent } from 'react';
-import { Navigate, useLocation } from 'react-router-dom';
-import { parsePasswordResetAction } from '@apprentorbay/shared';
+import { Navigate } from 'react-router-dom';
 import { Button, Card, Cluster, Input, Page, Stack, Text } from '../components';
 import { signedInHomePath, useAuth } from '../lib/auth';
 
-export function LoginPage() {
-  const { account, loading, logIn } = useAuth();
-  const location = useLocation();
-  const resetAction = parsePasswordResetAction({
-    search: location.search,
-    hash: location.hash,
-  });
+export function ForgotPasswordPage() {
+  const { account, loading, requestPasswordReset } = useAuth();
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [sent, setSent] = useState(false);
   const [busy, setBusy] = useState(false);
-
-  if (resetAction.kind === 'reset') {
-    const query = location.search || (location.hash ? `?${location.hash.replace(/^#/, '')}` : '');
-    return <Navigate to={`/reset-password${query}`} replace />;
-  }
 
   if (!loading && account) {
     return <Navigate to={signedInHomePath(account)} replace />;
@@ -29,10 +18,12 @@ export function LoginPage() {
     event.preventDefault();
     setBusy(true);
     setError(null);
+    setSent(false);
     try {
-      await logIn(email, password);
+      await requestPasswordReset(email);
+      setSent(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Log in failed');
+      setError(err instanceof Error ? err.message : 'Could not send a reset email');
     } finally {
       setBusy(false);
     }
@@ -42,8 +33,11 @@ export function LoginPage() {
     <Page>
       <Stack gap={24}>
         <Stack gap={12}>
-          <Text variant="h1">Welcome back</Text>
-          <Text variant="muted">Email and password. Same door for every role.</Text>
+          <Text variant="h1">Forgotten password</Text>
+          <Text variant="muted">
+            Enter the email you use to log in. If that address has an account, we
+            send a reset link.
+          </Text>
         </Stack>
         <Card>
           <form onSubmit={(event) => void onSubmit(event)}>
@@ -56,29 +50,22 @@ export function LoginPage() {
                 required
                 autoComplete="email"
               />
-              <Input
-                label="Password"
-                type="password"
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                required
-                autoComplete="current-password"
-              />
               {error ? <Text variant="danger">{error}</Text> : null}
+              {sent ? (
+                <Text variant="muted">
+                  If that inbox has an account, a reset email is on its way. Open
+                  the link, then choose a new password.
+                </Text>
+              ) : null}
               <Cluster gap={12}>
                 <Button type="submit" loading={busy}>
-                  Log in
-                </Button>
-                <Button variant="ghost" to="/signup">
-                  Create an account
-                </Button>
-              </Cluster>
-              <Cluster gap={12}>
-                <Button variant="ghost" to="/forgot-password">
-                  Forgotten password
+                  Send reset email
                 </Button>
                 <Button variant="ghost" to="/reset-password">
                   Reset password
+                </Button>
+                <Button variant="ghost" to="/login">
+                  Back to log in
                 </Button>
               </Cluster>
             </Stack>

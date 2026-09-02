@@ -18,11 +18,64 @@ export type ValidationResult =
   | { ok: true }
   | { ok: false; error: string };
 
+export const PASSWORD = {
+  minLength: 6,
+} as const;
+
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+export type EmailValidation =
+  | { ok: true; email: string }
+  | { ok: false; error: string };
+
+export type PasswordResetAction =
+  | { kind: 'reset'; oobCode: string }
+  | { kind: 'other'; mode: string }
+  | { kind: 'none' };
+
 function fail(error: string): ValidationResult {
   return { ok: false, error };
 }
 
 const ok: ValidationResult = { ok: true };
+
+export function validatePasswordResetEmail(email: string): EmailValidation {
+  const trimmed = email.trim();
+  if (!trimmed) return { ok: false, error: 'Enter the email you use to log in.' };
+  if (!EMAIL_PATTERN.test(trimmed)) return { ok: false, error: 'Enter a valid email address.' };
+  return { ok: true, email: trimmed };
+}
+
+export function validateNewPassword(password: string, confirmPassword: string): ValidationResult {
+  if (password.length < PASSWORD.minLength) {
+    return fail(`Password must be at least ${PASSWORD.minLength} characters.`);
+  }
+  if (password !== confirmPassword) {
+    return fail('The two passwords do not match.');
+  }
+  return ok;
+}
+
+export function parsePasswordResetAction(input: {
+  search?: string;
+  hash?: string;
+}): PasswordResetAction {
+  const fromSearch = paramsFromQuery(input.search ?? '');
+  const fromHash = paramsFromQuery((input.hash ?? '').replace(/^#/, ''));
+  const mode = fromSearch.get('mode') ?? fromHash.get('mode');
+  const oobCode = (fromSearch.get('oobCode') ?? fromHash.get('oobCode') ?? '').trim();
+  if (oobCode && (!mode || mode === 'resetPassword')) {
+    return { kind: 'reset', oobCode };
+  }
+  if (mode && mode !== 'resetPassword') {
+    return { kind: 'other', mode };
+  }
+  return { kind: 'none' };
+}
+
+function paramsFromQuery(value: string): URLSearchParams {
+  return new URLSearchParams(value.replace(/^\?/, ''));
+}
 
 export function validateApplicationMessage(message: string): ValidationResult {
   const trimmed = message.trim();

@@ -7,10 +7,13 @@ import {
   type ReactNode,
 } from 'react';
 import {
+  confirmPasswordReset,
   createUserWithEmailAndPassword,
   onAuthStateChanged,
+  sendPasswordResetEmail,
   signInWithEmailAndPassword,
   signOut,
+  verifyPasswordResetCode,
   type User as FirebaseUser,
 } from 'firebase/auth';
 import { doc, getDoc, onSnapshot, runTransaction } from 'firebase/firestore';
@@ -24,6 +27,8 @@ import {
   emptyMentorProfile,
   isAccountActive,
   ownPublicProfilePath,
+  validateNewPassword,
+  validatePasswordResetEmail,
   type SignupRole,
   type User,
 } from '@apprentorbay/shared';
@@ -47,6 +52,13 @@ type AuthContextValue = {
   }) => Promise<User>;
   logIn: (email: string, password: string) => Promise<void>;
   logOut: () => Promise<void>;
+  requestPasswordReset: (email: string) => Promise<void>;
+  inspectPasswordResetCode: (oobCode: string) => Promise<string>;
+  completePasswordReset: (
+    oobCode: string,
+    password: string,
+    confirmPassword: string,
+  ) => Promise<void>;
   acceptCurrentTerms: () => Promise<void>;
 };
 
@@ -257,6 +269,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (!auth) return;
         await signOut(auth);
       },
+      async requestPasswordReset(email) {
+        const auth = getFirebaseAuth();
+        if (!auth) throw new Error('Firebase is not initialized');
+        const check = validatePasswordResetEmail(email);
+        if (!check.ok) throw new Error(check.error);
+        await sendResetEmail(auth, check.email);
+      },
+      async inspectPasswordResetCode(oobCode) {
+        const auth = getFirebaseAuth();
+        if (!auth) throw new Error('Firebase is not initialized');
+        const code = oobCode.trim();
+        if (!code) {
+          throw new Error('This reset link is missing or incomplete. Request a new one.');
+        }
+        return verifyPasswordResetCode(auth, code).catch((error: unknown) => {
+          throw new Error(authMessage(error));
+        });
+      },
+      async completePasswordReset(oobCode, password, confirmPassword) {
+        const auth = getFirebaseAuth();
+        if (!auth) throw new Error('Firebase is not initialized');
+        const check = validateNewPassword(password, confirmPassword);
+        if (!check.ok) throw new Error(check.error);
+        const code = oobCode.trim();
+        if (!code) {
+          throw new Error('This reset link is missing or incomplete. Request a new one.');
+        }
+        await confirmPasswordReset(auth, code, password).catch((error: unknown) => {
+          throw new Error(authMessage(error));
+        });
+      },
       async acceptCurrentTerms() {
         await recordTermsAcceptance();
       },
@@ -275,15 +318,60 @@ export function useAuth(): AuthContextValue {
   return value;
 }
 
+function firebaseCode(error: unknown): string {
+  return error && typeof error === 'object' && 'code' in error ? String(error.code) : '';
+}
+
+async function sendResetEmail(
+  auth: NonNullable<ReturnType<typeof getFirebaseAuth>>,
+  email: string,
+) {
+  const continueUrl =
+    typeof window !== 'undefined' ? `${window.location.origin}/reset-password` : '';
+  try {
+    if (continueUrl) {
+      await sendPasswordResetEmail(auth, email, {
+        url: continueUrl,
+        handleCodeInApp: true,
+      });
+      return;
+    }
+    await sendPasswordResetEmail(auth, email);
+  } catch (error: unknown) {
+    const code = firebaseCode(error);
+    if (code === 'auth/user-not-found') return;
+    if (
+      continueUrl &&
+      (code === 'auth/unauthorized-continue-uri' || code === 'auth/invalid-continue-uri')
+    ) {
+      await sendPasswordResetEmail(auth, email).catch((retry: unknown) => {
+        if (firebaseCode(retry) === 'auth/user-not-found') return;
+        throw new Error(authMessage(retry));
+      });
+      return;
+    }
+    throw new Error(authMessage(error));
+  }
+}
+
 function authMessage(error: unknown): string {
-  const code =
-    error && typeof error === 'object' && 'code' in error ? String(error.code) : '';
+  const code = firebaseCode(error);
   if (code === 'auth/email-already-in-use') return 'That email already has an account.';
   if (code === 'auth/invalid-email') return 'Enter a valid email address.';
   if (code === 'auth/invalid-credential' || code === 'auth/wrong-password') {
     return 'Email or password is incorrect.';
   }
   if (code === 'auth/weak-password') return 'Password must be at least 6 characters.';
+  if (code === 'auth/expired-action-code') {
+    return 'This reset link has expired. Request a new one.';
+  }
+  if (code === 'auth/invalid-action-code') {
+    return 'This reset link is invalid or has already been used. Request a new one.';
+  }
+  if (code === 'auth/too-many-requests') {
+    return 'Too many attempts. Wait a minute and try again.';
+  }
+  if (code === 'auth/user-disabled') return 'This account has been disabled.';
   if (error instanceof Error && error.message) return error.message;
   return 'Authentication failed.';
 }

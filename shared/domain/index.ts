@@ -342,6 +342,8 @@ export {
 export type { PermissionActor } from './permissions.js';
 
 export {
+  PASSWORD,
+  parsePasswordResetAction,
   validateApplicationMessage,
   validateChangeRequestReason,
   validateEvidenceDrafts,
@@ -351,8 +353,10 @@ export {
   validateMentorPlan,
   validateMessageText,
   validateMilestoneFeedback,
+  validateNewPassword,
+  validatePasswordResetEmail,
 } from './validation.js';
-export type { ValidationResult } from './validation.js';
+export type { EmailValidation, PasswordResetAction, ValidationResult } from './validation.js';
 
 export {
   APPLICATION_TRANSITIONS,
