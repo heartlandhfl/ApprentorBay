@@ -166,7 +166,7 @@ The site must be a **Node.js web app**, not a static / Vite website.
    node scripts/encode-firebase-key.mjs ./your-service-account.json
    ```
 
-   Set `FIREBASE_SERVICE_ACCOUNT_BASE64` to the printed one-line value (no quotes). You can leave `FIREBASE_PROJECT_ID` / `FIREBASE_CLIENT_EMAIL` or let the JSON supply them. **Redeploy** (not only Restart) so this parser is live, then confirm health shows `"adminInitialized": true` and `"keySource": "service-account-base64"`.
+   Set `FIREBASE_SERVICE_ACCOUNT_BASE64` to the printed one-line value (no quotes). It **must start with `eyJ`**. If it starts with `MII`, you pasted `private_key` from the JSON instead of encoding the file. Keep `FIREBASE_PROJECT_ID` / `FIREBASE_CLIENT_EMAIL` if you already have them. **Redeploy** (not only Restart). Health should show `"adminInitialized": true`. `"keySource": "service-account-base64"` means the JSON file was used; `"private-key-base64"` means Express recovered a pasted key body and still needs `FIREBASE_CLIENT_EMAIL`.
 
    You can also run `npm run create-admin` on your machine with the same vars. After the first admin exists, later boots skip bootstrap.
 
