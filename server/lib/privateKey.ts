@@ -40,9 +40,42 @@ function unescapeNewlines(value: string): string {
   return next.replace(/\\r/g, '');
 }
 
-function decodeBase64Env(value: string): string {
-  const compact = unwrapQuotes(value).replace(/\s+/g, '');
-  return Buffer.from(compact, 'base64').toString('utf8');
+function compactEnv(value: string): string {
+  return unwrapQuotes(value).replace(/\s+/g, '');
+}
+
+function decodeBase64Buffer(value: string): Buffer {
+  return Buffer.from(compactEnv(value), 'base64');
+}
+
+function decodeMaybeUtf16(buf: Buffer): string {
+  if (buf.length >= 2 && buf[0] === 0xff && buf[1] === 0xfe) {
+    return buf.subarray(2).toString('utf16le');
+  }
+  if (buf.length >= 4 && buf[0] === 0x7b && buf[1] === 0x00) {
+    return buf.toString('utf16le');
+  }
+  return buf.toString('utf8');
+}
+
+function pemFromDer(der: Buffer): string | null {
+  if (der.length < 32 || der[0] !== 0x30) return null;
+  const body = der.toString('base64');
+  const pem = `-----BEGIN PRIVATE KEY-----\n${wrapPemLines(body)}\n-----END PRIVATE KEY-----\n`;
+  try {
+    createPrivateKey(pem);
+    return pem;
+  } catch {
+    return null;
+  }
+}
+
+function wrapPemLines(body: string): string {
+  const lines: string[] = [];
+  for (let index = 0; index < body.length; index += 64) {
+    lines.push(body.slice(index, index + 64));
+  }
+  return lines.join('\n');
 }
 
 function parseServiceAccountJson(raw: string): {
@@ -83,12 +116,7 @@ function compactPemBody(body: string): string {
 }
 
 function wrapPemBody(body: string): string {
-  const compact = compactPemBody(body);
-  const lines: string[] = [];
-  for (let index = 0; index < compact.length; index += 64) {
-    lines.push(compact.slice(index, index + 64));
-  }
-  return lines.join('\n');
+  return wrapPemLines(compactPemBody(body));
 }
 
 export function normalizePrivateKey(raw: string): string {
@@ -105,6 +133,12 @@ export function normalizePrivateKey(raw: string): string {
   const begin = BEGIN.exec(key);
   const end = END.exec(key);
   if (!begin || !end) {
+    const compact = key.replace(/\s+/g, '').replace(/^n+(?=MII)/, '');
+    if (compact.startsWith('MII')) {
+      const pem = `-----BEGIN PRIVATE KEY-----\n${wrapPemBody(compact)}\n-----END PRIVATE KEY-----\n`;
+      createPrivateKey(pem);
+      return pem;
+    }
     throw new Error(
       'FIREBASE_PRIVATE_KEY must be the PEM private_key from the Firebase JSON, or set FIREBASE_PRIVATE_KEY_BASE64',
     );
@@ -141,10 +175,36 @@ export function configuredKeySource(): ResolvedServiceAccount['source'] | null {
   return null;
 }
 
-export function resolveServiceAccount(): ResolvedServiceAccount | null {
-  const serviceAccountB64 = process.env.FIREBASE_SERVICE_ACCOUNT_BASE64?.trim();
-  if (serviceAccountB64) {
-    const parsed = parseServiceAccountJson(decodeBase64Env(serviceAccountB64));
+function resolveEncodedBlob(
+  raw: string,
+  preferJson: boolean,
+): ResolvedServiceAccount {
+  const unwrapped = unescapeNewlines(unwrapQuotes(raw));
+  if (preferJson && unwrapQuotes(unwrapped).startsWith('{')) {
+    return resolveEncodedBlob(Buffer.from(unwrapped, 'utf8').toString('base64'), true);
+  }
+  if (BEGIN.test(unwrapped)) {
+    const privateKey = normalizePrivateKey(unwrapped);
+    return { privateKey, source: 'private-key-base64', ...inspectNormalizedKey(privateKey) };
+  }
+
+  const compact = compactEnv(raw).replace(/^n+(?=MII)/, '');
+  if (compact.startsWith('MII')) {
+    const privateKey = normalizePrivateKey(compact);
+    return { privateKey, source: 'private-key-base64', ...inspectNormalizedKey(privateKey) };
+  }
+
+  const buf = decodeBase64Buffer(compact);
+  const text = unwrapQuotes(decodeMaybeUtf16(buf));
+
+  if (preferJson && text.startsWith('{')) {
+    let parsed: { private_key?: string; project_id?: string; client_email?: string };
+    try {
+      parsed = parseServiceAccountJson(text);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new Error(`FIREBASE_SERVICE_ACCOUNT_BASE64 JSON is invalid (${message.slice(0, 80)})`);
+    }
     if (!parsed.private_key) {
       throw new Error('FIREBASE_SERVICE_ACCOUNT_BASE64 JSON is missing private_key');
     }
@@ -158,10 +218,30 @@ export function resolveServiceAccount(): ResolvedServiceAccount | null {
     };
   }
 
+  if (BEGIN.test(text) || compact.startsWith('MII')) {
+    const privateKey = normalizePrivateKey(BEGIN.test(text) ? text : compact);
+    return { privateKey, source: 'private-key-base64', ...inspectNormalizedKey(privateKey) };
+  }
+
+  const fromDer = pemFromDer(buf);
+  if (fromDer) {
+    return { privateKey: fromDer, source: 'private-key-base64', ...inspectNormalizedKey(fromDer) };
+  }
+
+  throw new Error(
+    'FIREBASE_SERVICE_ACCOUNT_BASE64 did not decode to JSON. You likely pasted the private_key (MII…) instead of the encoded .json file. Run: node scripts/encode-firebase-key.mjs ./serviceAccount.json — the value must start with eyJ.',
+  );
+}
+
+export function resolveServiceAccount(): ResolvedServiceAccount | null {
+  const serviceAccountB64 = process.env.FIREBASE_SERVICE_ACCOUNT_BASE64?.trim();
+  if (serviceAccountB64) {
+    return resolveEncodedBlob(serviceAccountB64, true);
+  }
+
   const keyB64 = process.env.FIREBASE_PRIVATE_KEY_BASE64?.trim();
   if (keyB64) {
-    const privateKey = normalizePrivateKey(decodeBase64Env(keyB64));
-    return { privateKey, source: 'private-key-base64', ...inspectNormalizedKey(privateKey) };
+    return resolveEncodedBlob(keyB64, false);
   }
 
   const serviceAccount =

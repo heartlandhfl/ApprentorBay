@@ -40,6 +40,12 @@ describe('normalizePrivateKey', () => {
     assertParses(normalizePrivateKey(json));
   });
 
+  it('wraps a bare MII body as PKCS8 PEM', () => {
+    const pem = samplePem();
+    const body = pem.replace(/-----BEGIN [^-]+-----/, '').replace(/-----END [^-]+-----/, '').replace(/\s+/g, '');
+    assertParses(normalizePrivateKey(body));
+  });
+
   it('normalized n-wrapped bodies start with MII, not nMII', () => {
     const pem = samplePem();
     const nWrapped = pem.replace(/\n/g, 'n');
@@ -78,6 +84,32 @@ describe('resolveServiceAccount', () => {
       assert.equal(account?.source, 'service-account-base64');
       assert.equal(account?.projectId, 'apprentorbay');
       assert.match(account?.bodyPrefix ?? '', /^MII/);
+      assertParses(account!.privateKey);
+    } finally {
+      restoreEnv();
+    }
+  });
+
+  it('treats a pasted MII private-key body as a key, not JSON', () => {
+    const pem = samplePem();
+    const body = pem.replace(/-----BEGIN [^-]+-----/, '').replace(/-----END [^-]+-----/, '').replace(/\s+/g, '');
+    process.env.FIREBASE_SERVICE_ACCOUNT_BASE64 = body;
+    try {
+      const account = resolveServiceAccount();
+      assert.equal(account?.source, 'private-key-base64');
+      assert.match(account?.bodyPrefix ?? '', /^MII/);
+      assertParses(account!.privateKey);
+    } finally {
+      restoreEnv();
+    }
+  });
+
+  it('accepts a base64-encoded PEM in FIREBASE_SERVICE_ACCOUNT_BASE64', () => {
+    const pem = samplePem();
+    process.env.FIREBASE_SERVICE_ACCOUNT_BASE64 = Buffer.from(pem, 'utf8').toString('base64');
+    try {
+      const account = resolveServiceAccount();
+      assert.equal(account?.source, 'private-key-base64');
       assertParses(account!.privateKey);
     } finally {
       restoreEnv();
