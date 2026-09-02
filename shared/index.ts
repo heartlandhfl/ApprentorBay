@@ -284,6 +284,8 @@ export {
   showcaseFromDeliverableRef,
   showcasesFromProfile,
   sortMilestones,
+  PASSWORD,
+  parsePasswordResetAction,
   validateApplicationMessage,
   validateChangeRequestReason,
   validateEvidenceDrafts,
@@ -293,6 +295,8 @@ export {
   validateMentorPlan,
   validateMessageText,
   validateMilestoneFeedback,
+  validateNewPassword,
+  validatePasswordResetEmail,
 } from './domain/index.js';
 
 export type {
@@ -345,6 +349,8 @@ export type {
   ShowcaseItem,
   ShowcaseSource,
   TransitionMap,
+  EmailValidation,
+  PasswordResetAction,
   ValidationResult,
   MilestoneParty,
 } from './domain/index.js';

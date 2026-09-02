@@ -10,7 +10,10 @@ import { HowItWorksPage } from './routes/HowItWorksPage';
 import { MentorsPage } from './routes/MentorsPage';
 import { JourneyPage } from './routes/JourneyPage';
 import { LearnerProfilePage } from './routes/LearnerProfilePage';
+import { AuthActionPage } from './routes/AuthActionPage';
+import { ForgotPasswordPage } from './routes/ForgotPasswordPage';
 import { LoginPage } from './routes/LoginPage';
+import { ResetPasswordPage } from './routes/ResetPasswordPage';
 import { MentorProfilePage } from './routes/MentorProfilePage';
 import { MessagesInboxPage } from './routes/MessagesInboxPage';
 import { MessagesPage } from './routes/MessagesPage';
@@ -33,6 +36,9 @@ export function App() {
           <Route path="/how-it-works" element={<HowItWorksPage />} />
           <Route path="/signup" element={<SignupPage />} />
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
+          <Route path="/auth/action" element={<AuthActionPage />} />
           <Route path="/legal/terms" element={<TermsPage />} />
           <Route path="/support" element={<SupportPage />} />
           <Route path="/learners/:id" element={<LearnerProfilePage />} />

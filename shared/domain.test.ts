@@ -79,6 +79,9 @@ import {
   validateApplicationMessage,
   validateEvidenceDrafts,
   validateEvidenceSubmission,
+  parsePasswordResetAction,
+  validateNewPassword,
+  validatePasswordResetEmail,
 } from './domain/index.js';
 
 describe('domain identities', () => {
@@ -439,6 +442,9 @@ describe('public profile system', () => {
     assert.equal(suggestSlug('Ada Lovelace'), 'ada-lovelace');
     assert.equal(validateProfileSlug('ada-lovelace').ok, true);
     assert.equal(validateProfileSlug('admin').ok, false);
+    assert.equal(validateProfileSlug('login').ok, false);
+    assert.equal(validateProfileSlug('forgot-password').ok, false);
+    assert.equal(validateProfileSlug('reset-password').ok, false);
     assert.equal(validateProfileSlug('Ada Lovelace').ok, true);
     assert.equal(looksLikeFirebaseUid('dWy0NfpQvdkBcN8TGGaygsuohKO5'), true);
     assert.equal(looksLikeFirebaseUid('ada-lovelace'), false);
@@ -909,6 +915,43 @@ describe('lifecycle dashboards', () => {
       contracts: [normalizeContract({ ...draftContract(), status: LEARNING_CONTRACT_STATUS.completed })],
     });
     assert.equal(legacy, 'build_legacy');
+  });
+});
+
+describe('password reset', () => {
+  it('requires a usable login email before sending a reset link', () => {
+    assert.equal(validatePasswordResetEmail('').ok, false);
+    assert.equal(validatePasswordResetEmail('   ').ok, false);
+    assert.equal(validatePasswordResetEmail('not-an-email').ok, false);
+    const valid = validatePasswordResetEmail('  ada@example.com  ');
+    assert.equal(valid.ok, true);
+    if (valid.ok) assert.equal(valid.email, 'ada@example.com');
+  });
+
+  it('requires a matching password of at least 6 characters', () => {
+    assert.equal(validateNewPassword('short', 'short').ok, false);
+    assert.equal(validateNewPassword('long-enough', 'different').ok, false);
+    assert.equal(validateNewPassword('long-enough', 'long-enough').ok, true);
+  });
+
+  it('reads a Firebase reset action from the query or hash', () => {
+    assert.deepEqual(parsePasswordResetAction({}), { kind: 'none' });
+    assert.deepEqual(
+      parsePasswordResetAction({ search: '?mode=resetPassword&oobCode=abc123' }),
+      { kind: 'reset', oobCode: 'abc123' },
+    );
+    assert.deepEqual(
+      parsePasswordResetAction({ hash: '#mode=resetPassword&oobCode=from-hash' }),
+      { kind: 'reset', oobCode: 'from-hash' },
+    );
+    assert.deepEqual(
+      parsePasswordResetAction({ search: '?oobCode=bare-code' }),
+      { kind: 'reset', oobCode: 'bare-code' },
+    );
+    assert.deepEqual(
+      parsePasswordResetAction({ search: '?mode=verifyEmail&oobCode=xyz' }),
+      { kind: 'other', mode: 'verifyEmail' },
+    );
   });
 });
 
