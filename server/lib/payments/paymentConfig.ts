@@ -1,7 +1,19 @@
 import { PAYMENT_PROVIDER_ID } from '@apprentorbay/shared';
 
+const MOCK_PROVIDER_FORBIDDEN_IN_PRODUCTION =
+  'PAYMENT_PROVIDER=mock is not allowed when NODE_ENV=production';
+
 export function paymentProviderIdFromEnv(): string {
   return (process.env.PAYMENT_PROVIDER ?? PAYMENT_PROVIDER_ID.stripe).trim();
+}
+
+export function assertPaymentProviderAllowedForEnvironment(): void {
+  if (
+    process.env.NODE_ENV === 'production' &&
+    paymentProviderIdFromEnv() === PAYMENT_PROVIDER_ID.mock
+  ) {
+    throw new Error(MOCK_PROVIDER_FORBIDDEN_IN_PRODUCTION);
+  }
 }
 
 export function stripeSecretKeyFromEnv(): string | null {
