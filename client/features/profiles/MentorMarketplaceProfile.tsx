@@ -34,14 +34,14 @@ export function MentorMarketplaceHero({
   children,
 }: MentorMarketplaceHeroProps) {
   const helpWith = mentorHelpSummary({
-    servicesDescription: profile.servicesDescription,
+    serviceDescription: profile.serviceDescription,
     mentoringInterests: profile.mentoringInterests,
     areasOfExpertise: profile.areasOfExpertise,
     professionalIdentity: profile.professionalIdentity || identity,
   });
   const priceLabel = formatMentorPriceDisplay({
     commercialMode: profile.commercialMode ?? COMMERCIAL_MODE.givingBack,
-    sessionPriceUsd: profile.sessionPriceUsd ?? null,
+    baseSessionPriceUsd: profile.baseSessionPriceUsd ?? null,
     sessionDurationMinutes: profile.sessionDurationMinutes,
   });
 
@@ -79,7 +79,7 @@ export function MentorMarketplaceHero({
               title={mentorAvailabilityCopy(profile.acceptsNewLearners)}
               description={[
                 mentorVideoSessionCopy(profile.offersVideoSessions),
-                mentorMessagingCopy(profile.messagingIncluded),
+                mentorMessagingCopy(profile.includedMessaging),
               ].join(' · ')}
             />
           </div>
@@ -125,17 +125,17 @@ export function mentorOfferingForApply(profile: PublicProfile) {
     isPaid: isPaidCommercialMode(commercialMode),
     priceLabel: formatMentorPriceDisplay({
       commercialMode,
-      sessionPriceUsd: profile.sessionPriceUsd ?? null,
+      baseSessionPriceUsd: profile.baseSessionPriceUsd ?? null,
       sessionDurationMinutes: profile.sessionDurationMinutes,
     }),
     helpWith: mentorHelpSummary({
-      servicesDescription: profile.servicesDescription,
+      serviceDescription: profile.serviceDescription,
       mentoringInterests: profile.mentoringInterests,
       areasOfExpertise: profile.areasOfExpertise,
       professionalIdentity: profile.professionalIdentity,
     }),
     offersVideoSessions: profile.offersVideoSessions === true,
-    messagingIncluded: profile.messagingIncluded !== false,
+    includedMessaging: profile.includedMessaging !== false,
     mentorTypeLabel: mentorTypePublicTitle(profile.mentorType),
     serviceModelLabel: commercialModePublicTitle(profile.commercialMode),
     serviceModelDescription: commercialModeDescription(profile.commercialMode),

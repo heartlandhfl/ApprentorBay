@@ -97,12 +97,18 @@ export interface PublicProfile {
   updatedAt: string;
   mentorType?: MentorType;
   commercialMode?: CommercialMode;
-  servicesDescription?: string;
-  sessionPriceUsd?: number | null;
+  serviceDescription?: string;
+  baseSessionPriceUsd?: number | null;
   sessionDurationMinutes?: number | null;
   offersVideoSessions?: boolean;
-  messagingIncluded?: boolean;
+  includedMessaging?: boolean;
   acceptsNewLearners?: boolean;
+  /** @deprecated Legacy field. Use serviceDescription. */
+  servicesDescription?: string;
+  /** @deprecated Legacy whole-dollar field. Use baseSessionPriceUsd (cents). */
+  sessionPriceUsd?: number | null;
+  /** @deprecated Legacy field. Use includedMessaging. */
+  messagingIncluded?: boolean;
 }
 
 export interface ProfileSlugRecord {
@@ -159,11 +165,11 @@ export function toStoredPublicProfile(profile: PublicProfile): PublicProfile {
     updatedAt: profile.updatedAt,
     mentorType: profile.mentorType,
     commercialMode: profile.commercialMode,
-    servicesDescription: profile.servicesDescription,
-    sessionPriceUsd: profile.sessionPriceUsd,
+    serviceDescription: profile.serviceDescription,
+    baseSessionPriceUsd: profile.baseSessionPriceUsd,
     sessionDurationMinutes: profile.sessionDurationMinutes,
     offersVideoSessions: profile.offersVideoSessions,
-    messagingIncluded: profile.messagingIncluded,
+    includedMessaging: profile.includedMessaging,
     acceptsNewLearners: profile.acceptsNewLearners,
   };
 }
@@ -321,11 +327,11 @@ export function buildPublicMentorProfile(input: {
     updatedAt: now,
     mentorType: profile.mentorType ?? MENTOR_TYPE.accomplished,
     commercialMode: profile.commercialMode ?? COMMERCIAL_MODE.givingBack,
-    servicesDescription: profile.servicesDescription ?? '',
-    sessionPriceUsd: profile.sessionPriceUsd ?? null,
+    serviceDescription: profile.serviceDescription ?? '',
+    baseSessionPriceUsd: profile.baseSessionPriceUsd ?? null,
     sessionDurationMinutes: profile.sessionDurationMinutes ?? null,
     offersVideoSessions: profile.offersVideoSessions === true,
-    messagingIncluded: profile.messagingIncluded !== false,
+    includedMessaging: profile.includedMessaging !== false,
     acceptsNewLearners: profile.acceptsNewLearners === true,
   };
 }

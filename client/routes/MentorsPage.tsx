@@ -82,7 +82,7 @@ function MentorCard({ mentor }: { mentor: PublicProfile }) {
   const craft = mentor.areasOfExpertise[0] || mentor.professionalIdentity || 'Mentor';
   const priceLabel = formatMentorPriceDisplay({
     commercialMode: mentor.commercialMode ?? COMMERCIAL_MODE.givingBack,
-    sessionPriceUsd: mentor.sessionPriceUsd ?? null,
+    baseSessionPriceUsd: mentor.baseSessionPriceUsd ?? null,
     sessionDurationMinutes: mentor.sessionDurationMinutes,
   });
 
@@ -123,7 +123,7 @@ function mentorMatches(mentor: PublicProfile, needle: string): boolean {
   const haystack = [
     mentor.displayName,
     mentor.professionalIdentity,
-    mentor.servicesDescription,
+    mentor.serviceDescription,
     ...mentor.areasOfExpertise,
     ...mentor.experience.map((item) => `${item.title} ${item.organization} ${item.summary}`),
     ...mentor.education.map((item) => `${item.credential} ${item.institution}`),

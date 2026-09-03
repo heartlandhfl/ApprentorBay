@@ -3,6 +3,8 @@
  * `mentorType` and `commercialMode` are separate dimensions — not a single combined enum.
  */
 
+import { isValidPriceCents, readSessionPriceCents } from './money.js';
+
 export const MENTOR_TYPE = {
   accomplished: 'accomplished',
   competencyCoach: 'competency_coach',
@@ -48,6 +50,13 @@ export const COMMERCIAL_MODE_DESCRIPTION: Record<CommercialMode, string> = {
     'High-value mentorship from highly experienced professionals.',
 };
 
+/** Plain-language copy for the mentor profile editor. */
+export const COMMERCIAL_MODE_EDITOR_DESCRIPTION: Record<CommercialMode, string> = {
+  [COMMERCIAL_MODE.givingBack]: 'Free mentorship for learners.',
+  [COMMERCIAL_MODE.professional]: 'Offer paid mentorship and set your session price.',
+  [COMMERCIAL_MODE.premium]: 'Offer high-value mentorship at a premium price.',
+};
+
 /** Allowed commercial modes for each mentor type. Premium is accomplished-only. */
 export const COMMERCIAL_MODES_FOR_MENTOR_TYPE: Record<MentorType, readonly CommercialMode[]> = {
   [MENTOR_TYPE.accomplished]: [
@@ -64,13 +73,12 @@ export const SESSION_DURATION = {
   maxMinutes: 180,
 } as const;
 
-export const MENTOR_SERVICES_DESCRIPTION = {
+export const MENTOR_SERVICE_DESCRIPTION = {
   maxLength: 500,
 } as const;
 
-export const SESSION_PRICE_USD = {
-  max: 9999,
-} as const;
+/** @deprecated Use MENTOR_SERVICE_DESCRIPTION */
+export const MENTOR_SERVICES_DESCRIPTION = MENTOR_SERVICE_DESCRIPTION;
 
 const MENTOR_TYPE_VALUES = new Set<string>(Object.values(MENTOR_TYPE));
 const COMMERCIAL_MODE_VALUES = new Set<string>(Object.values(COMMERCIAL_MODE));
@@ -93,22 +101,30 @@ export function commercialModeAllowedForMentorType(
 export interface MentorOfferingFields {
   mentorType?: MentorType;
   commercialMode?: CommercialMode;
-  servicesDescription?: string;
-  sessionPriceUsd?: number | null;
+  serviceDescription?: string;
+  /** Integer cents, e.g. 7500 = $75.00. Null for free mentors. */
+  baseSessionPriceUsd?: number | null;
   sessionDurationMinutes?: number | null;
   offersVideoSessions?: boolean;
-  messagingIncluded?: boolean;
+  includedMessaging?: boolean;
   acceptsNewLearners?: boolean;
+  /** @deprecated Legacy whole-dollar field. Read-only for backwards compatibility. */
+  servicesDescription?: string;
+  /** @deprecated Legacy whole-dollar field. Read-only for backwards compatibility. */
+  sessionPriceUsd?: number | null;
+  /** @deprecated Use includedMessaging. Read-only for backwards compatibility. */
+  messagingIncluded?: boolean;
 }
 
 export interface ResolvedMentorOffering {
   mentorType: MentorType;
   commercialMode: CommercialMode;
-  servicesDescription: string;
-  sessionPriceUsd: number | null;
+  serviceDescription: string;
+  /** Integer cents. Null for free mentors. */
+  baseSessionPriceUsd: number | null;
   sessionDurationMinutes: number | null;
   offersVideoSessions: boolean;
-  messagingIncluded: boolean;
+  includedMessaging: boolean;
   acceptsNewLearners: boolean;
 }
 
@@ -116,20 +132,32 @@ function asText(value: unknown): string {
   return typeof value === 'string' ? value : '';
 }
 
-function asOptionalBoolean(value: unknown): boolean | undefined {
-  return typeof value === 'boolean' ? value : undefined;
-}
-
-function asOptionalPrice(value: unknown): number | null | undefined {
-  if (value === null) return null;
-  if (typeof value !== 'number' || !Number.isFinite(value)) return undefined;
-  return value;
-}
-
 function asOptionalDuration(value: unknown): number | null | undefined {
   if (value === null) return null;
   if (typeof value !== 'number' || !Number.isInteger(value)) return undefined;
   return value;
+}
+
+function readServiceDescription(input: MentorOfferingFields): string {
+  const description = asText(input.serviceDescription ?? input.servicesDescription).trim();
+  return description;
+}
+
+function readIncludedMessaging(input: MentorOfferingFields): boolean {
+  if (input.includedMessaging !== undefined) return input.includedMessaging !== false;
+  if (input.messagingIncluded !== undefined) return input.messagingIncluded !== false;
+  return true;
+}
+
+function readBaseSessionPriceCents(
+  input: MentorOfferingFields,
+  commercialMode: CommercialMode,
+): number | null {
+  const raw = readSessionPriceCents(input);
+  if (raw === undefined) return null;
+  if (raw === null) return null;
+  if (commercialMode === COMMERCIAL_MODE.givingBack) return null;
+  return raw;
 }
 
 /**
@@ -153,18 +181,20 @@ export function resolveMentorOffering(
     input.acceptsNewLearners ??
     (input.public !== false && input.verificationStatus === 'approved');
 
+  const baseSessionPriceUsd = readBaseSessionPriceCents(input, safeCommercialMode);
+
   return {
     mentorType,
     commercialMode: safeCommercialMode,
-    servicesDescription: asText(input.servicesDescription).trim(),
-    sessionPriceUsd:
-      input.sessionPriceUsd === undefined ? null : (input.sessionPriceUsd ?? null),
+    serviceDescription: readServiceDescription(input),
+    baseSessionPriceUsd:
+      safeCommercialMode === COMMERCIAL_MODE.givingBack ? null : baseSessionPriceUsd,
     sessionDurationMinutes:
       input.sessionDurationMinutes === undefined
         ? null
-        : (input.sessionDurationMinutes ?? null),
+        : asOptionalDuration(input.sessionDurationMinutes) ?? null,
     offersVideoSessions: input.offersVideoSessions === true,
-    messagingIncluded: input.messagingIncluded !== false,
+    includedMessaging: readIncludedMessaging(input),
     acceptsNewLearners,
   };
 }

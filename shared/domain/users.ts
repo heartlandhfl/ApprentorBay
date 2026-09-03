@@ -140,15 +140,21 @@ export interface MentorProfile {
   /** Commercial tier separate from mentor type. Optional on older documents. */
   commercialMode?: CommercialMode;
   /** Short plain-text description of what the mentor offers. */
-  servicesDescription?: string;
-  /** USD session price. Null for free (giving back) mentors. */
-  sessionPriceUsd?: number | null;
+  serviceDescription?: string;
+  /** Base session price in integer USD cents. Null for free (giving back) mentors. */
+  baseSessionPriceUsd?: number | null;
   /** Optional session length in minutes. */
   sessionDurationMinutes?: number | null;
   offersVideoSessions?: boolean;
-  messagingIncluded?: boolean;
+  includedMessaging?: boolean;
   /** Whether the mentor is open to new learner applications. */
   acceptsNewLearners?: boolean;
+  /** @deprecated Legacy field. Use serviceDescription. */
+  servicesDescription?: string;
+  /** @deprecated Legacy whole-dollar field. Use baseSessionPriceUsd (cents). */
+  sessionPriceUsd?: number | null;
+  /** @deprecated Legacy field. Use includedMessaging. */
+  messagingIncluded?: boolean;
 }
 
 export interface AdminCounts {
@@ -358,11 +364,12 @@ export function normalizeMentorProfile(
   const offering = normalizeMentorOfferingFields({
     mentorType: input.mentorType,
     commercialMode: input.commercialMode,
-    servicesDescription: input.servicesDescription,
+    serviceDescription: input.serviceDescription ?? input.servicesDescription,
+    baseSessionPriceUsd: input.baseSessionPriceUsd,
     sessionPriceUsd: input.sessionPriceUsd,
     sessionDurationMinutes: input.sessionDurationMinutes,
     offersVideoSessions: input.offersVideoSessions,
-    messagingIncluded: input.messagingIncluded,
+    includedMessaging: input.includedMessaging ?? input.messagingIncluded,
     acceptsNewLearners: input.acceptsNewLearners,
     public: input.public,
     verificationStatus: status,
@@ -396,11 +403,11 @@ export function normalizeMentorProfile(
     public: input.public !== false,
     mentorType: offering.mentorType,
     commercialMode: offering.commercialMode,
-    servicesDescription: offering.servicesDescription,
-    sessionPriceUsd: offering.sessionPriceUsd,
+    serviceDescription: offering.serviceDescription,
+    baseSessionPriceUsd: offering.baseSessionPriceUsd,
     sessionDurationMinutes: offering.sessionDurationMinutes,
     offersVideoSessions: offering.offersVideoSessions,
-    messagingIncluded: offering.messagingIncluded,
+    includedMessaging: offering.includedMessaging,
     acceptsNewLearners: offering.acceptsNewLearners,
     displayName: asText(input.displayName).trim() || empty.displayName,
     userId: input.userId,

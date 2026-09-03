@@ -68,8 +68,12 @@ import {
   COMMERCIAL_MODE,
   MENTOR_TYPE,
   commercialModeAllowedForMentorType,
+  centsToDisplayDollars,
   formatMentorPriceDisplay,
+  formatUsdCents,
   mentorPrimaryActionLabel,
+  parseUsdToCents,
+  readSessionPriceCents,
   normalizeLearnerProfile,
   normalizeMentorProfile,
   ownPublicProfilePath,
@@ -565,11 +569,11 @@ describe('public profile system', () => {
       verificationStatus: APPROVAL_STATUS.approved,
       mentorType: MENTOR_TYPE.competencyCoach,
       commercialMode: COMMERCIAL_MODE.professional,
-      servicesDescription: 'Weekly shop coaching',
-      sessionPriceUsd: 75,
+      serviceDescription: 'Weekly shop coaching',
+      baseSessionPriceUsd: 7500,
       sessionDurationMinutes: 60,
       offersVideoSessions: true,
-      messagingIncluded: true,
+      includedMessaging: true,
       acceptsNewLearners: true,
     });
     const publicProfile = buildPublicMentorProfile({
@@ -579,7 +583,7 @@ describe('public profile system', () => {
     });
     assert.equal(publicProfile.mentorType, MENTOR_TYPE.competencyCoach);
     assert.equal(publicProfile.commercialMode, COMMERCIAL_MODE.professional);
-    assert.equal(publicProfile.sessionPriceUsd, 75);
+    assert.equal(publicProfile.baseSessionPriceUsd, 7500);
     assert.equal(publicProfile.acceptsNewLearners, true);
     assert.equal('verificationStatus' in publicProfile, false);
     assert.equal('verificationCaseStatus' in publicProfile, false);
@@ -983,8 +987,8 @@ describe('mentor offering', () => {
     const profile = normalizeMentorProfile(emptyMentorProfile('mentor-1', 'Ben'));
     assert.equal(profile.mentorType, MENTOR_TYPE.accomplished);
     assert.equal(profile.commercialMode, COMMERCIAL_MODE.givingBack);
-    assert.equal(profile.sessionPriceUsd, null);
-    assert.equal(profile.messagingIncluded, true);
+    assert.equal(profile.baseSessionPriceUsd, null);
+    assert.equal(profile.includedMessaging, true);
   });
 
   it('validates paid modes and rejects premium for coaches', () => {
@@ -999,7 +1003,7 @@ describe('mentor offering', () => {
       validateMentorOffering({
         mentorType: MENTOR_TYPE.accomplished,
         commercialMode: COMMERCIAL_MODE.professional,
-        sessionPriceUsd: 120,
+        baseSessionPriceUsd: 12_000,
       }).ok,
       true,
     );
@@ -1007,10 +1011,60 @@ describe('mentor offering', () => {
       validateMentorOffering({
         mentorType: MENTOR_TYPE.accomplished,
         commercialMode: COMMERCIAL_MODE.givingBack,
-        sessionPriceUsd: 50,
+        baseSessionPriceUsd: 5000,
       }).ok,
       false,
     );
+    assert.equal(
+      validateMentorOffering({
+        mentorType: MENTOR_TYPE.accomplished,
+        commercialMode: COMMERCIAL_MODE.premium,
+        baseSessionPriceUsd: 0,
+      }).ok,
+      false,
+    );
+    assert.equal(
+      validateMentorOffering({
+        mentorType: MENTOR_TYPE.accomplished,
+        commercialMode: COMMERCIAL_MODE.professional,
+        baseSessionPriceUsd: Number.NaN,
+      }).ok,
+      false,
+    );
+  });
+});
+
+describe('mentor money', () => {
+  it('parses and formats USD amounts as integer cents', () => {
+    assert.equal(parseUsdToCents('75'), 7500);
+    assert.equal(parseUsdToCents('$75.50'), 7550);
+    assert.equal(parseUsdToCents('1,200.00'), 120_000);
+    assert.equal(parseUsdToCents(''), null);
+    assert.equal(parseUsdToCents('abc'), null);
+    assert.equal(formatUsdCents(7500), '$75');
+    assert.equal(formatUsdCents(7550), '$75.50');
+    assert.equal(centsToDisplayDollars(7500), '75');
+    assert.equal(centsToDisplayDollars(7550), '75.50');
+  });
+
+  it('reads legacy whole-dollar session prices as cents', () => {
+    assert.equal(readSessionPriceCents({ sessionPriceUsd: 75 }), 7500);
+    assert.equal(readSessionPriceCents({ baseSessionPriceUsd: 7500 }), 7500);
+    assert.equal(readSessionPriceCents({ baseSessionPriceUsd: null }), null);
+  });
+
+  it('normalizes legacy mentor documents with old field names', () => {
+    const profile = normalizeMentorProfile({
+      ...emptyMentorProfile('mentor-1', 'Ben'),
+      commercialMode: COMMERCIAL_MODE.professional,
+      servicesDescription: 'Shop coaching',
+      sessionPriceUsd: 120,
+      messagingIncluded: false,
+      verificationStatus: APPROVAL_STATUS.approved,
+    });
+    assert.equal(profile.serviceDescription, 'Shop coaching');
+    assert.equal(profile.baseSessionPriceUsd, 12_000);
+    assert.equal(profile.includedMessaging, false);
   });
 });
 
@@ -1019,21 +1073,21 @@ describe('mentor presentation', () => {
     assert.equal(
       formatMentorPriceDisplay({
         commercialMode: COMMERCIAL_MODE.givingBack,
-        sessionPriceUsd: null,
+        baseSessionPriceUsd: null,
       }),
       'Free mentorship',
     );
     assert.equal(
       formatMentorPriceDisplay({
         commercialMode: COMMERCIAL_MODE.professional,
-        sessionPriceUsd: 75,
+        baseSessionPriceUsd: 7500,
       }),
       '$75 / session',
     );
     assert.equal(
       formatMentorPriceDisplay({
         commercialMode: COMMERCIAL_MODE.premium,
-        sessionPriceUsd: 150,
+        baseSessionPriceUsd: 15_000,
         sessionDurationMinutes: 60,
       }),
       '$150 / 60 min',
@@ -1041,7 +1095,7 @@ describe('mentor presentation', () => {
     assert.equal(
       formatMentorPriceDisplay({
         commercialMode: COMMERCIAL_MODE.premium,
-        sessionPriceUsd: null,
+        baseSessionPriceUsd: null,
       }),
       'Paid mentorship',
     );

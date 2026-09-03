@@ -69,14 +69,15 @@ export type { CollectionName, ReservedCollectionName } from './collections.js';
 export {
   COMMERCIAL_MODE,
   COMMERCIAL_MODE_DESCRIPTION,
+  COMMERCIAL_MODE_EDITOR_DESCRIPTION,
   COMMERCIAL_MODE_LABEL,
   COMMERCIAL_MODES_FOR_MENTOR_TYPE,
+  MENTOR_SERVICE_DESCRIPTION,
   MENTOR_SERVICES_DESCRIPTION,
   MENTOR_TYPE,
   MENTOR_TYPE_DESCRIPTION,
   MENTOR_TYPE_LABEL,
   SESSION_DURATION,
-  SESSION_PRICE_USD,
   commercialModeAllowedForMentorType,
   isCommercialMode,
   isMentorType,
@@ -89,6 +90,15 @@ export type {
   MentorType,
   ResolvedMentorOffering,
 } from './mentorOffering.js';
+
+export {
+  BASE_SESSION_PRICE_USD,
+  centsToDisplayDollars,
+  formatUsdCents,
+  isValidPriceCents,
+  parseUsdToCents,
+  readSessionPriceCents,
+} from './money.js';
 
 export {
   COMMERCIAL_MODE_PUBLIC_LABEL,
