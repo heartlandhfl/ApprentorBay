@@ -18,7 +18,6 @@ import { ApplyMentorship } from '../features/mentorship';
 import { ProfileEditor } from '../features/profiles/ProfileEditor';
 import {
   MentorMarketplaceHero,
-  mentorOfferingForApply,
 } from '../features/profiles/MentorMarketplaceProfile';
 import { PortfolioSection } from '../features/profiles/PublicProfileView';
 import { watchMentorProfile, watchPublicProfile } from '../features/profiles';
@@ -135,15 +134,16 @@ function MentorBody({
           identity={identity}
           location={location}
           photoPath={view.photoPath ?? own?.photoPath ?? null}
-        >
-          <ApplyMentorship
-            slug={slug}
-            displayName={name}
-            approvalStatus={view.approvalStatus}
-            acceptsNewLearners={view.acceptsNewLearners !== false}
-            offering={mentorOfferingForApply(view)}
-          />
-        </MentorMarketplaceHero>
+          offeringAction={
+            <ApplyMentorship
+              slug={slug}
+              displayName={name}
+              approvalStatus={view.approvalStatus}
+              acceptsNewLearners={view.acceptsNewLearners !== false}
+              profile={view}
+            />
+          }
+        />
       ) : null}
 
       {isOwner && own && own.verificationStatus !== 'approved' ? (

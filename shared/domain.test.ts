@@ -71,6 +71,7 @@ import {
   centsToDisplayDollars,
   formatMentorPriceDisplay,
   formatUsdCents,
+  buildMentorshipOfferingView,
   mentorPrimaryActionLabel,
   parseUsdToCents,
   readSessionPriceCents,
@@ -1124,7 +1125,23 @@ describe('mentor presentation', () => {
 
   it('chooses primary actions by commercial mode', () => {
     assert.equal(mentorPrimaryActionLabel(COMMERCIAL_MODE.givingBack), 'Request mentorship');
-    assert.equal(mentorPrimaryActionLabel(COMMERCIAL_MODE.premium), 'View mentorship options');
+    assert.equal(mentorPrimaryActionLabel(COMMERCIAL_MODE.premium), 'Book a session');
+  });
+
+  it('builds mentorship offering views with clear purchase details', () => {
+    const offering = buildMentorshipOfferingView({
+      commercialMode: COMMERCIAL_MODE.professional,
+      baseSessionPriceUsd: 12_500,
+      sessionDurationMinutes: 60,
+      serviceDescription: 'Career Strategy Session\nA focused one-to-one session.',
+      mentorName: 'Maria Johnson',
+    });
+    assert.equal(offering.sessionTitle, 'Career Strategy Session');
+    assert.equal(offering.durationLabel, '60 minutes');
+    assert.equal(offering.priceAmountLabel, '$125');
+    assert.equal(offering.currencyCode, 'USD');
+    assert.equal(offering.primaryActionLabel, 'Book a session');
+    assert.ok(offering.nextSteps.length >= 3);
   });
 });
 

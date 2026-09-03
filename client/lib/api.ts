@@ -7,8 +7,10 @@ import type {
   ClientContractAction,
   LearningContract,
   MentorshipApplication,
+  MentorshipBooking,
   MentorshipRelationship,
   MentorshipSession,
+  PaymentIntent,
   PendingMentorRow,
   RelationshipStatus,
   SessionJoinPayload,
@@ -361,4 +363,43 @@ export async function joinMentorshipSession(sessionId: string): Promise<SessionJ
   });
   const body = await readJson<{ join: SessionJoinPayload }>(response);
   return body.join;
+}
+
+export async function createMentorshipBooking(input: {
+  relationshipId: string;
+  sessionId?: string | null;
+}): Promise<{ booking: MentorshipBooking }> {
+  const response = await fetch('/api/bookings', {
+    method: 'POST',
+    headers: await authHeaders(),
+    body: JSON.stringify(input),
+  });
+  return readJson<{ booking: MentorshipBooking }>(response);
+}
+
+export async function getMentorshipBooking(bookingId: string): Promise<MentorshipBooking> {
+  const response = await fetch(`/api/bookings/${encodeURIComponent(bookingId)}`, {
+    headers: await authHeaders(),
+  });
+  const body = await readJson<{ booking: MentorshipBooking }>(response);
+  return body.booking;
+}
+
+export async function startPaymentCheckout(
+  bookingId: string,
+): Promise<{ checkoutUrl: string; paymentIntentId: string }> {
+  const response = await fetch('/api/payments/checkout', {
+    method: 'POST',
+    headers: await authHeaders(),
+    body: JSON.stringify({ bookingId }),
+  });
+  return readJson<{ checkoutUrl: string; paymentIntentId: string }>(response);
+}
+
+export async function getPaymentIntent(paymentIntentId: string): Promise<PaymentIntent> {
+  const response = await fetch(`/api/payments/intents/${encodeURIComponent(paymentIntentId)}`, {
+    headers: await authHeaders(),
+  });
+  const body = await readJson<{ paymentIntent: PaymentIntent }>(response);
+  return body.paymentIntent;
 }
