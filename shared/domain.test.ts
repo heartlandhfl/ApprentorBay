@@ -93,6 +93,10 @@ import {
   parsePasswordResetAction,
   validateNewPassword,
   validatePasswordResetEmail,
+  EMPTY_MENTOR_DISCOVERY_FILTERS,
+  filterListedMentors,
+  hasActiveDiscoveryFilters,
+  mentorDiscoveryExpertiseLabel,
 } from './domain/index.js';
 
 describe('domain identities', () => {
@@ -1104,6 +1108,97 @@ describe('mentor presentation', () => {
   it('chooses primary actions by commercial mode', () => {
     assert.equal(mentorPrimaryActionLabel(COMMERCIAL_MODE.givingBack), 'Request mentorship');
     assert.equal(mentorPrimaryActionLabel(COMMERCIAL_MODE.premium), 'View mentorship options');
+  });
+});
+
+describe('mentor discovery', () => {
+  const mentors = [
+    buildPublicMentorProfile({
+      profile: normalizeMentorProfile({
+        ...emptyMentorProfile('mentor-1', 'Alex Rivera'),
+        slug: 'alex',
+        public: true,
+        verificationStatus: APPROVAL_STATUS.approved,
+        mentorType: MENTOR_TYPE.accomplished,
+        commercialMode: COMMERCIAL_MODE.premium,
+        serviceDescription: 'Executive coaching for product leaders',
+        baseSessionPriceUsd: 20_000,
+        offersVideoSessions: true,
+        acceptsNewLearners: true,
+        areasOfExpertise: ['Product strategy', 'Leadership'],
+      }),
+      mentoredDeliverables: [],
+      now: '2026-09-01T00:00:00.000Z',
+    }),
+    buildPublicMentorProfile({
+      profile: normalizeMentorProfile({
+        ...emptyMentorProfile('mentor-2', 'Sam Chen'),
+        slug: 'sam',
+        public: true,
+        verificationStatus: APPROVAL_STATUS.approved,
+        mentorType: MENTOR_TYPE.learningGuide,
+        commercialMode: COMMERCIAL_MODE.givingBack,
+        serviceDescription: 'Accountability for early-career writers',
+        offersVideoSessions: false,
+        acceptsNewLearners: true,
+        areasOfExpertise: ['Writing', 'Editing'],
+      }),
+      mentoredDeliverables: [],
+      now: '2026-09-01T00:00:00.000Z',
+    }),
+  ];
+
+  it('filters by mentor type, commercial model, and availability flags', () => {
+    assert.equal(
+      filterListedMentors(mentors, {
+        ...EMPTY_MENTOR_DISCOVERY_FILTERS,
+        mentorTypes: [MENTOR_TYPE.learningGuide],
+      }).length,
+      1,
+    );
+    assert.equal(
+      filterListedMentors(mentors, {
+        ...EMPTY_MENTOR_DISCOVERY_FILTERS,
+        commercialModes: [COMMERCIAL_MODE.premium],
+      })[0]?.displayName,
+      'Alex Rivera',
+    );
+    assert.equal(
+      filterListedMentors(mentors, {
+        ...EMPTY_MENTOR_DISCOVERY_FILTERS,
+        videoSessionsOnly: true,
+      }).length,
+      1,
+    );
+  });
+
+  it('searches names, service descriptions, and demonstrated skills', () => {
+    assert.equal(
+      filterListedMentors(mentors, {
+        ...EMPTY_MENTOR_DISCOVERY_FILTERS,
+        query: 'product leaders',
+      }).length,
+      1,
+    );
+    assert.equal(
+      filterListedMentors(mentors, {
+        ...EMPTY_MENTOR_DISCOVERY_FILTERS,
+        skillsQuery: 'writing',
+      })[0]?.displayName,
+      'Sam Chen',
+    );
+    assert.equal(hasActiveDiscoveryFilters(EMPTY_MENTOR_DISCOVERY_FILTERS), false);
+    assert.equal(
+      hasActiveDiscoveryFilters({ ...EMPTY_MENTOR_DISCOVERY_FILTERS, query: 'sam' }),
+      true,
+    );
+  });
+
+  it('summarises expertise for mentor cards', () => {
+    assert.equal(
+      mentorDiscoveryExpertiseLabel(mentors[0]!),
+      'Product strategy · Leadership',
+    );
   });
 });
 
