@@ -166,6 +166,15 @@ export const DELIVERABLE_STATUS = {
 export type DeliverableStatus =
   (typeof DELIVERABLE_STATUS)[keyof typeof DELIVERABLE_STATUS];
 
+/** Mentorship video session lifecycle. Persisted on `mentorshipSessions`. */
+export const SESSION_STATUS = {
+  scheduled: 'scheduled',
+  cancelled: 'cancelled',
+  completed: 'completed',
+} as const;
+
+export type SessionStatus = (typeof SESSION_STATUS)[keyof typeof SESSION_STATUS];
+
 export const NOTIFICATION_STATUS = {
   unread: 'unread',
   read: 'read',
@@ -260,6 +269,14 @@ export function isNegotiationOpen(status: LearningContractStatus): boolean {
     isMentorReviewStatus(status) ||
     isLearnerReviewStatus(status) ||
     status === LEARNING_CONTRACT_STATUS.mutuallyApproved
+  );
+}
+
+export function isSessionStatus(value: unknown): value is SessionStatus {
+  return (
+    value === SESSION_STATUS.scheduled ||
+    value === SESSION_STATUS.cancelled ||
+    value === SESSION_STATUS.completed
   );
 }
 

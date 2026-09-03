@@ -9,7 +9,7 @@
     "create-admin": "tsx createAdmin.ts",
     "build": "tsc",
     "typecheck": "tsc --noEmit",
-    "test": "tsx --test ./lib/privateKey.test.ts"
+    "test": "tsx --test ./lib/privateKey.test.ts ./lib/sessionService.test.ts"
   },
   "dependencies": {
     "@apprentorbay/shared": "0.1.0",
