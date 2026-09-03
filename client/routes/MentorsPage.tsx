@@ -46,7 +46,7 @@ export function MentorsPage() {
             label="Search by name or expertise"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Timber framing, joinery, display name…"
+            placeholder="College Writing, App Development, display name…"
           />
         </Stack>
 
