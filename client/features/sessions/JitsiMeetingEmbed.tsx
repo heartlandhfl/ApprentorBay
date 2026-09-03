@@ -5,6 +5,7 @@ import type { SessionJoinPayload } from '@apprentorbay/shared';
 type JitsiMeetingEmbedProps = {
   join: SessionJoinPayload;
   onLeave: () => void;
+  forceDisconnect?: boolean;
 };
 
 type JitsiExternalApi = {
@@ -14,7 +15,7 @@ type JitsiExternalApi = {
   dispose: () => void;
 };
 
-export function JitsiMeetingEmbed({ join, onLeave }: JitsiMeetingEmbedProps) {
+export function JitsiMeetingEmbed({ join, onLeave, forceDisconnect = false }: JitsiMeetingEmbedProps) {
   const apiRef = useRef<JitsiExternalApi | null>(null);
   const leaveHandled = useRef(false);
 
@@ -24,6 +25,15 @@ export function JitsiMeetingEmbed({ join, onLeave }: JitsiMeetingEmbedProps) {
       apiRef.current = null;
     };
   }, []);
+
+  useEffect(() => {
+    if (!forceDisconnect) return;
+    apiRef.current?.executeCommand('hangup');
+    if (!leaveHandled.current) {
+      leaveHandled.current = true;
+      onLeave();
+    }
+  }, [forceDisconnect, onLeave]);
 
   function handleLeave() {
     if (leaveHandled.current) return;
@@ -36,6 +46,7 @@ export function JitsiMeetingEmbed({ join, onLeave }: JitsiMeetingEmbedProps) {
       <JitsiMeeting
         domain={join.domain}
         roomName={join.roomName}
+        jwt={join.jwt}
         userInfo={join.userInfo}
         configOverwrite={{
           startWithAudioMuted: false,

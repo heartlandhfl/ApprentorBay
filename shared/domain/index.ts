@@ -119,6 +119,7 @@ export {
   mentorCardServiceDescription,
   mentorExpertiseHeadline,
   mentorPrimaryActionLabel,
+  learnerMentorshipPrimaryActionLabel,
   mentorProfileQuote,
   mentorTypeDescription,
   mentorTypePublicTitle,
@@ -313,10 +314,11 @@ export {
   relationshipRequiresPaidSessionAccess,
   sessionJoinWindow,
   sessionPaymentAccessGranted,
+  canRemainInSessionMeeting,
   sessionsOverlap,
   SESSION_SCHEDULE_DURATION_OPTIONS,
 } from './sessions.js';
-export type { MentorshipSession, SessionJoinPayload } from './sessions.js';
+export type { MentorshipSession, SessionJoinPayload, SessionMeetingAccess } from './sessions.js';
 
 export { MESSAGE_TEXT } from './messages.js';
 export type { Message } from './messages.js';

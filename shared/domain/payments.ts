@@ -224,6 +224,9 @@ export function validatePaymentMatchesBooking(
   if (intent.split.mentorNetCents !== booking.mentorAmountCents) {
     return { ok: false, error: 'Mentor amount does not match booking' };
   }
+  if (intent.split.platformFeeBps !== booking.platformFeeBps) {
+    return { ok: false, error: 'Platform fee basis points do not match booking' };
+  }
   return { ok: true };
 }
 

@@ -8,6 +8,7 @@ import {
   createMentorshipSession,
   getMentorshipSession,
   joinMentorshipSession,
+  getSessionMeetingAccess,
   listMentorshipSessions,
   type CreateSessionInput,
 } from '../lib/sessionService.js';
@@ -105,6 +106,20 @@ sessionsRouter.post('/:id/join', async (req: AccountRequest, res, next) => {
       String(req.params.id ?? ''),
     );
     res.json({ join });
+  } catch (error) {
+    if (handleServiceError(res, error)) return;
+    next(error);
+  }
+});
+
+sessionsRouter.get('/:id/meeting-access', async (req: AccountRequest, res, next) => {
+  try {
+    const access = await getSessionMeetingAccess(
+      firestoreStore,
+      req.account,
+      String(req.params.id ?? ''),
+    );
+    res.json({ access });
   } catch (error) {
     if (handleServiceError(res, error)) return;
     next(error);

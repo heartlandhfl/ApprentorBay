@@ -186,10 +186,7 @@ export function ApplyMentorship({
     setApplyOpen(true);
   }
 
-  const primaryLabel =
-    relationshipId && relationshipOpen && paymentRequired && !paymentSatisfied
-      ? 'Book and pay'
-      : offering.primaryActionLabel;
+  const primaryLabel = offering.primaryActionLabel;
 
   return (
     <>
@@ -210,7 +207,7 @@ export function ApplyMentorship({
                 setApplyOpen(true);
               }}
             >
-              Request mentorship
+              {offering.primaryActionLabel}
             </Button>
           </Cluster>
         }
@@ -220,7 +217,7 @@ export function ApplyMentorship({
 
       <Modal
         open={applyOpen}
-        title={`Request mentorship with ${displayName}`}
+        title={`${offering.primaryActionLabel} with ${displayName}`}
         onClose={() => setApplyOpen(false)}
         footer={
           <Cluster gap={8}>

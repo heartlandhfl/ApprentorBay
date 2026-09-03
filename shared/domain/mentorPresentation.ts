@@ -50,6 +50,26 @@ export function mentorPrimaryActionLabel(commercialMode: CommercialMode): string
   return commercialMode === COMMERCIAL_MODE.givingBack ? 'Request mentorship' : 'Book a session';
 }
 
+/** Learner-facing CTA that matches the actual next step in the product flow. */
+export function learnerMentorshipPrimaryActionLabel(input: {
+  commercialMode: CommercialMode;
+  hasActiveRelationship?: boolean;
+  paymentRequired?: boolean;
+  paymentSatisfied?: boolean;
+}): string {
+  const hasActiveRelationship = input.hasActiveRelationship === true;
+  const paymentRequired = input.paymentRequired === true;
+  const paymentSatisfied = input.paymentSatisfied === true;
+
+  if (hasActiveRelationship && paymentRequired && !paymentSatisfied) {
+    return 'Book and pay';
+  }
+  if (hasActiveRelationship && paymentSatisfied) {
+    return 'Open mentorship';
+  }
+  return 'Request mentorship';
+}
+
 export function mentorshipSessionTitle(input: {
   commercialMode: CommercialMode;
   serviceDescription?: string;
@@ -196,7 +216,12 @@ export function buildMentorshipOfferingView(input: {
     }),
     description: mentorshipOfferingDescription(input),
     isPaid,
-    primaryActionLabel: mentorPrimaryActionLabel(commercialMode),
+    primaryActionLabel: learnerMentorshipPrimaryActionLabel({
+      commercialMode,
+      hasActiveRelationship,
+      paymentRequired,
+      paymentSatisfied,
+    }),
     nextSteps: mentorshipNextSteps({
       commercialMode,
       mentorName: input.mentorName ?? 'your mentor',

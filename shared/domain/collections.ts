@@ -23,6 +23,8 @@ export const COLLECTIONS = {
   paymentRefunds: 'paymentRefunds',
   paymentEvents: 'paymentEvents',
   paymentWebhookDedup: 'paymentWebhookDedup',
+  /** One open pending booking per relationship. Server-only. */
+  bookingPendingLocks: 'bookingPendingLocks',
   /** Console / operator list. Not the app user record — sync into `users` with role admin. */
   operatorAdmins: 'admins',
 } as const;

@@ -5,7 +5,7 @@ import {
 } from './bookings.js';
 import { REQUEST_TYPE } from './mentorshipRequest.js';
 import { isPairingMember, type MentorshipRelationship, type PairingMemberIds } from './relationships.js';
-import { SESSION_STATUS, isSessionStatus, type SessionStatus } from './statuses.js';
+import { SESSION_STATUS, RELATIONSHIP_STATUS, isSessionStatus, type SessionStatus } from './statuses.js';
 import type { IsoDateString } from './users.js';
 
 /** Persisted as `mentorshipSessions`. Scoped to one mentorship relationship. */
@@ -130,6 +130,24 @@ export function sessionPaymentAccessGranted(
   return isPaidBookingForSession(booking, session.id);
 }
 
+/** Gate for participants already in a live meeting (ignores join window). */
+export function canRemainInSessionMeeting(
+  session: Pick<MentorshipSession, 'id' | 'paymentRequired' | 'bookingId' | 'learnerId' | 'mentorId' | 'relationshipId' | 'status'>,
+  booking: Pick<MentorshipBooking, 'id' | 'paymentStatus' | 'bookingStatus' | 'sessionId'> | null | undefined,
+  relationship: Pick<MentorshipRelationship, 'id' | 'status' | 'paymentRequired' | 'requestType' | 'learnerId' | 'mentorId'>,
+): boolean {
+  if (session.status !== SESSION_STATUS.scheduled) return false;
+  if (relationship.status !== RELATIONSHIP_STATUS.active) return false;
+  if (
+    session.learnerId !== relationship.learnerId ||
+    session.mentorId !== relationship.mentorId ||
+    session.relationshipId !== relationship.id
+  ) {
+    return false;
+  }
+  return sessionPaymentAccessGranted(session, booking, relationship);
+}
+
 export function buildMentorshipSession(input: {
   id: string;
   relationship: Pick<
@@ -211,6 +229,16 @@ export interface SessionJoinPayload {
     displayName: string;
     email: string;
   };
+  /** Present when the server signs JaaS/self-hosted join JWTs. */
+  jwt?: string;
+  jwtExpiresAt?: IsoDateString;
+  /** How often the client should re-check meeting access while connected. */
+  meetingAccessPollIntervalMs?: number;
+}
+
+export interface SessionMeetingAccess {
+  allowed: boolean;
+  reason?: string;
 }
 
 export function isUpcomingSession(

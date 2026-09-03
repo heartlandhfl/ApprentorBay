@@ -28,6 +28,7 @@ import {
   type PaymentRefund,
 } from '@apprentorbay/shared';
 import { recordAudit } from '../audit.js';
+import { releaseBookingPendingLock } from '../bookingsRepository.js';
 import { adminDb } from '../firebase.js';
 import { paymentCheckoutCancelUrl, paymentCheckoutSuccessUrl } from './paymentConfig.js';
 import { getPaymentProvider } from './registry.js';
@@ -499,6 +500,7 @@ export class PaymentService {
     tx.set(intentRef, nextIntent);
     tx.set(bookingRef, nextBooking);
     tx.set(relationshipRef, nextRelationship);
+    tx.delete(adminDb().collection(COLLECTIONS.bookingPendingLocks).doc(relationship.id));
 
     const eventRef = adminDb().collection(COLLECTIONS.paymentEvents).doc();
     tx.set(
