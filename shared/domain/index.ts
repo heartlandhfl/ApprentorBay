@@ -207,6 +207,7 @@ export {
   buildSessionRoomName,
   durationMinutesBetween,
   isLiveSession,
+  findSchedulingConflict,
   isPastSession,
   isSessionMember,
   isTerminalSessionStatus,
@@ -214,6 +215,8 @@ export {
   normalizeSession,
   pairingMatchesSession,
   sessionJoinWindow,
+  sessionsOverlap,
+  SESSION_SCHEDULE_DURATION_OPTIONS,
 } from './sessions.js';
 export type { MentorshipSession, SessionJoinPayload } from './sessions.js';
 
@@ -471,6 +474,7 @@ export {
   validateNewPassword,
   validatePasswordResetEmail,
   validateSessionScheduleInput,
+  validateLocalScheduleFields,
 } from './validation.js';
 export type { EmailValidation, PasswordResetAction, ValidationResult } from './validation.js';
 

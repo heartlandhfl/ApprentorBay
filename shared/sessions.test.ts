@@ -11,7 +11,10 @@ import {
   canCompleteSession,
   canScheduleSession,
   canTransitionSession,
+  findSchedulingConflict,
+  sessionsOverlap,
   validateSessionScheduleInput,
+  validateLocalScheduleFields,
 } from './domain/index.js';
 
 const NOW = '2026-09-03T12:00:00.000Z';
@@ -92,5 +95,37 @@ describe('mentorship session domain', () => {
     const completed = { ...scheduledSession(), status: SESSION_STATUS.completed };
     assert.equal(canCancelSession(actor('learner-1', USER_ROLE.learner), cancelled), false);
     assert.equal(canCompleteSession(actor('mentor-1', USER_ROLE.mentor), completed), false);
+  });
+
+  it('detects overlapping scheduled sessions', () => {
+    const existing = scheduledSession({
+      id: 'session-a',
+      scheduledStart: '2026-09-10T14:00:00.000Z',
+      scheduledEnd: '2026-09-10T15:00:00.000Z',
+    });
+    assert.equal(
+      sessionsOverlap(
+        '2026-09-10T14:30:00.000Z',
+        '2026-09-10T15:30:00.000Z',
+        existing.scheduledStart,
+        existing.scheduledEnd,
+      ),
+      true,
+    );
+    assert.equal(
+      sessionsOverlap(
+        '2026-09-10T15:00:00.000Z',
+        '2026-09-10T16:00:00.000Z',
+        existing.scheduledStart,
+        existing.scheduledEnd,
+      ),
+      false,
+    );
+    const conflict = findSchedulingConflict(
+      '2026-09-10T14:30:00.000Z',
+      '2026-09-10T15:30:00.000Z',
+      [existing],
+    );
+    assert.equal(conflict?.id, 'session-a');
   });
 });
