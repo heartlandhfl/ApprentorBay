@@ -230,6 +230,11 @@ service cloud.firestore {
       allow create, update, delete: if false;
     }
 
+    match /mentorshipSessions/{sessionId} {
+      allow read: if isRelationshipMember(resource.data.relationshipId) || isAdmin();
+      allow create, update, delete: if false;
+    }
+
     // Public showcase records are projected onto publicProfiles. Direct reads
     // stay pairing/admin so visitor queries cannot harvest Firebase UIDs.
     match /showcases/{showcaseId} {

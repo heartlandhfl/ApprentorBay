@@ -24,6 +24,7 @@ export {
   MILESTONE_STATUS_LABEL,
   NOTIFICATION_STATUS,
   RELATIONSHIP_STATUS,
+  SESSION_STATUS,
   STEP_OWNER,
   SUPPORT_ISSUE_STATUS,
   VERIFICATION_CASE_STATUS,
@@ -41,6 +42,7 @@ export {
   isReviewableMilestoneStatus,
   isOperationalContractStatus,
   isRelationshipStatus,
+  isSessionStatus,
   isStepOwner,
   isAccountStatus,
   isVerificationCaseStatus,
@@ -55,6 +57,7 @@ export type {
   MilestoneStatus,
   NotificationStatus,
   RelationshipStatus,
+  SessionStatus,
   StepOwner,
   SupportIssueStatus,
   VerificationCaseStatus,
@@ -107,6 +110,22 @@ export {
   relationshipDocId,
 } from './relationships.js';
 export type { MentorshipRelationship, PairingMemberIds } from './relationships.js';
+
+export {
+  SESSION_SCHEDULE,
+  SESSION_STATUS_LABEL,
+  assertSessionOwnership,
+  buildMentorshipSession,
+  buildSessionRoomName,
+  durationMinutesBetween,
+  isLiveSession,
+  isSessionMember,
+  isTerminalSessionStatus,
+  normalizeSession,
+  pairingMatchesSession,
+  sessionJoinWindow,
+} from './sessions.js';
+export type { MentorshipSession } from './sessions.js';
 
 export { MESSAGE_TEXT } from './messages.js';
 export type { Message } from './messages.js';
@@ -338,6 +357,11 @@ export {
   canSuspendAccount,
   canTerminateAccount,
   canTerminateRelationship,
+  canReadSession,
+  canScheduleSession,
+  canCancelSession,
+  canCompleteSession,
+  canJoinSession,
 } from './permissions.js';
 export type { PermissionActor } from './permissions.js';
 
@@ -355,6 +379,7 @@ export {
   validateMilestoneFeedback,
   validateNewPassword,
   validatePasswordResetEmail,
+  validateSessionScheduleInput,
 } from './validation.js';
 export type { EmailValidation, PasswordResetAction, ValidationResult } from './validation.js';
 
@@ -363,12 +388,14 @@ export {
   LEARNING_CONTRACT_TRANSITIONS,
   MILESTONE_TRANSITIONS,
   RELATIONSHIP_TRANSITIONS,
+  SESSION_TRANSITIONS,
   VERIFICATION_TRANSITIONS,
   canTransition,
   canTransitionApplication,
   canTransitionContract,
   canTransitionMilestone,
   canTransitionRelationship,
+  canTransitionSession,
   canTransitionVerification,
 } from './transitions.js';
 export type { TransitionMap } from './transitions.js';

@@ -13,6 +13,7 @@ import {
   type FinalDeliverableFile,
 } from './finalDeliverable.js';
 import { MESSAGE_TEXT } from './messages.js';
+import { SESSION_SCHEDULE } from './sessions.js';
 
 export type ValidationResult =
   | { ok: true }
@@ -96,6 +97,45 @@ export function validateMessageText(text: string): ValidationResult {
   if (trimmed.length > MESSAGE_TEXT.maxLength) {
     return fail(`Message must be at most ${MESSAGE_TEXT.maxLength} characters`);
   }
+  return ok;
+}
+
+export function validateSessionScheduleInput(input: {
+  title: string;
+  scheduledStart: string;
+  scheduledEnd: string;
+  now?: string;
+}): ValidationResult {
+  const title = input.title.trim();
+  if (!title) return fail('Session title is required');
+  if (title.length > SESSION_SCHEDULE.maxTitleLength) {
+    return fail(`Session title must be at most ${SESSION_SCHEDULE.maxTitleLength} characters`);
+  }
+
+  const startMs = Date.parse(input.scheduledStart);
+  const endMs = Date.parse(input.scheduledEnd);
+  const nowMs = Date.parse(input.now ?? new Date().toISOString());
+
+  if (!Number.isFinite(startMs)) return fail('scheduledStart must be a valid ISO date');
+  if (!Number.isFinite(endMs)) return fail('scheduledEnd must be a valid ISO date');
+  if (!Number.isFinite(nowMs)) return fail('Current time is invalid');
+
+  if (startMs < nowMs) return fail('Session must be scheduled in the future');
+  if (endMs <= startMs) return fail('scheduledEnd must be after scheduledStart');
+
+  const durationMinutes = Math.round((endMs - startMs) / 60_000);
+  if (durationMinutes < SESSION_SCHEDULE.minDurationMinutes) {
+    return fail(`Session must be at least ${SESSION_SCHEDULE.minDurationMinutes} minutes`);
+  }
+  if (durationMinutes > SESSION_SCHEDULE.maxDurationMinutes) {
+    return fail(`Session must be at most ${SESSION_SCHEDULE.maxDurationMinutes} minutes`);
+  }
+
+  const horizonMs = SESSION_SCHEDULE.maxHorizonDays * 24 * 60 * 60 * 1000;
+  if (startMs > nowMs + horizonMs) {
+    return fail(`Session cannot be scheduled more than ${SESSION_SCHEDULE.maxHorizonDays} days ahead`);
+  }
+
   return ok;
 }
 
