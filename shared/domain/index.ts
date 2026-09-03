@@ -117,12 +117,22 @@ export {
   mentorHelpSummary,
   mentorMessagingCopy,
   mentorCardServiceDescription,
+  mentorExpertiseHeadline,
   mentorPrimaryActionLabel,
+  mentorProfileQuote,
   mentorTypeDescription,
   mentorTypePublicTitle,
   mentorTypeTitle,
   mentorVideoSessionCopy,
+  mentorshipDurationLabel,
+  mentorshipNextSteps,
+  mentorshipOfferingDescription,
+  mentorshipPriceAmountLabel,
+  mentorshipSessionTitle,
+  buildMentorshipOfferingView,
+  MENTORSHIP_CURRENCY_CODE,
 } from './mentorPresentation.js';
+export type { MentorshipOfferingView } from './mentorPresentation.js';
 
 export {
   EMPTY_MENTOR_DISCOVERY_FILTERS,

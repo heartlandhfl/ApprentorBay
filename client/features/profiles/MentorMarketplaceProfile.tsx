@@ -1,20 +1,15 @@
 import type { ReactNode } from 'react';
 import {
   COMMERCIAL_MODE,
-  commercialModeDescription,
-  commercialModePublicTitle,
-  formatMentorPriceDisplay,
-  isPaidCommercialMode,
-  mentorAvailabilityCopy,
-  mentorHelpSummary,
-  mentorMessagingCopy,
-  mentorTypeDescription,
+  buildMentorshipOfferingView,
+  mentorExpertiseHeadline,
+  mentorProfileQuote,
   mentorTypePublicTitle,
-  mentorVideoSessionCopy,
   type PublicProfile,
 } from '@apprentorbay/shared';
 import { Card, Stack, Text } from '../../components';
 import { MentorBadges, ProfilePhoto } from './PublicProfileView';
+import { MentorshipOfferingCard } from './MentorshipOfferingCard';
 
 type MentorMarketplaceHeroProps = {
   profile: PublicProfile;
@@ -22,7 +17,7 @@ type MentorMarketplaceHeroProps = {
   identity: string;
   location: string | null;
   photoPath: string | null;
-  children?: ReactNode;
+  offeringAction?: ReactNode;
 };
 
 export function MentorMarketplaceHero({
@@ -31,18 +26,24 @@ export function MentorMarketplaceHero({
   identity,
   location,
   photoPath,
-  children,
+  offeringAction,
 }: MentorMarketplaceHeroProps) {
-  const helpWith = mentorHelpSummary({
+  const expertise = mentorExpertiseHeadline(profile.areasOfExpertise);
+  const quote = mentorProfileQuote({
+    mentoringInterests: profile.mentoringInterests,
+    serviceDescription: profile.serviceDescription,
+  });
+  const offering = buildMentorshipOfferingView({
+    commercialMode: profile.commercialMode ?? COMMERCIAL_MODE.givingBack,
+    mentorType: profile.mentorType,
+    baseSessionPriceUsd: profile.baseSessionPriceUsd ?? null,
+    sessionDurationMinutes: profile.sessionDurationMinutes,
     serviceDescription: profile.serviceDescription,
     mentoringInterests: profile.mentoringInterests,
     areasOfExpertise: profile.areasOfExpertise,
-    professionalIdentity: profile.professionalIdentity || identity,
-  });
-  const priceLabel = formatMentorPriceDisplay({
-    commercialMode: profile.commercialMode ?? COMMERCIAL_MODE.givingBack,
-    baseSessionPriceUsd: profile.baseSessionPriceUsd ?? null,
-    sessionDurationMinutes: profile.sessionDurationMinutes,
+    offersVideoSessions: profile.offersVideoSessions,
+    includedMessaging: profile.includedMessaging,
+    mentorName: name,
   });
 
   return (
@@ -53,91 +54,44 @@ export function MentorMarketplaceHero({
             <ProfilePhoto path={photoPath} name={name} />
             <div className="min-w-0 flex-1">
               <Stack gap={12}>
-                <Text variant="caption">Mentor</Text>
+                <Text variant="caption">{mentorTypePublicTitle(profile.mentorType)}</Text>
                 <Text variant="h1">{name}</Text>
                 {identity ? <Text variant="muted">{identity}</Text> : null}
+                {expertise ? <Text variant="small">{expertise}</Text> : null}
                 {location ? <Text variant="small">{location}</Text> : null}
                 <MentorBadges profile={profile} compact />
+                {quote ? (
+                  <blockquote className="border-l-2 border-accent pl-4 text-body text-ink-muted">
+                    “{quote}”
+                  </blockquote>
+                ) : null}
               </Stack>
             </div>
           </div>
-
-          <div className="grid gap-6 border-t border-line pt-6 sm:grid-cols-2">
-            <MarketplaceFact
-              label="Experience type"
-              title={mentorTypePublicTitle(profile.mentorType)}
-              description={mentorTypeDescription(profile.mentorType)}
-            />
-            <MarketplaceFact
-              label="Service model"
-              title={commercialModePublicTitle(profile.commercialMode)}
-              description={commercialModeDescription(profile.commercialMode)}
-            />
-            <MarketplaceFact label="Price" title={priceLabel} />
-            <MarketplaceFact
-              label="Availability"
-              title={mentorAvailabilityCopy(profile.acceptsNewLearners)}
-              description={[
-                mentorVideoSessionCopy(profile.offersVideoSessions),
-                mentorMessagingCopy(profile.includedMessaging),
-              ].join(' · ')}
-            />
-          </div>
-
-          {helpWith ? (
-            <div className="border-t border-line pt-6">
-              <Stack gap={8}>
-                <Text variant="caption">What I help with</Text>
-                <Text>{helpWith}</Text>
-              </Stack>
-            </div>
-          ) : null}
-
-          {children ? <div className="border-t border-line pt-6">{children}</div> : null}
         </Stack>
       </Card>
-    </Stack>
-  );
-}
 
-function MarketplaceFact({
-  label,
-  title,
-  description,
-}: {
-  label: string;
-  title: string;
-  description?: string;
-}) {
-  return (
-    <Stack gap={8}>
-      <Text variant="caption">{label}</Text>
-      <Text variant="h3">{title}</Text>
-      {description ? <Text variant="small">{description}</Text> : null}
+      <Stack gap={12}>
+        <Text variant="h2" as="h2">
+          Mentorship options
+        </Text>
+        <MentorshipOfferingCard offering={offering} action={offeringAction} />
+      </Stack>
     </Stack>
   );
 }
 
 export function mentorOfferingForApply(profile: PublicProfile) {
   const commercialMode = profile.commercialMode ?? COMMERCIAL_MODE.givingBack;
-  return {
+  return buildMentorshipOfferingView({
     commercialMode,
-    isPaid: isPaidCommercialMode(commercialMode),
-    priceLabel: formatMentorPriceDisplay({
-      commercialMode,
-      baseSessionPriceUsd: profile.baseSessionPriceUsd ?? null,
-      sessionDurationMinutes: profile.sessionDurationMinutes,
-    }),
-    helpWith: mentorHelpSummary({
-      serviceDescription: profile.serviceDescription,
-      mentoringInterests: profile.mentoringInterests,
-      areasOfExpertise: profile.areasOfExpertise,
-      professionalIdentity: profile.professionalIdentity,
-    }),
-    offersVideoSessions: profile.offersVideoSessions === true,
-    includedMessaging: profile.includedMessaging !== false,
-    mentorTypeLabel: mentorTypePublicTitle(profile.mentorType),
-    serviceModelLabel: commercialModePublicTitle(profile.commercialMode),
-    serviceModelDescription: commercialModeDescription(profile.commercialMode),
-  };
+    mentorType: profile.mentorType,
+    baseSessionPriceUsd: profile.baseSessionPriceUsd ?? null,
+    sessionDurationMinutes: profile.sessionDurationMinutes,
+    serviceDescription: profile.serviceDescription,
+    mentoringInterests: profile.mentoringInterests,
+    areasOfExpertise: profile.areasOfExpertise,
+    offersVideoSessions: profile.offersVideoSessions,
+    includedMessaging: profile.includedMessaging,
+  });
 }

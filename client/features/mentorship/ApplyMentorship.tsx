@@ -2,16 +2,14 @@ import { useEffect, useState, type FormEvent } from 'react';
 import {
   APPLICATION_STATUS,
   APPROVAL_STATUS,
+  COMMERCIAL_MODE,
+  REQUEST_TYPE,
   USER_ROLE,
+  buildMentorshipOfferingView,
   isOpenRelationship,
-  isPaidCommercialMode,
-  mentorAvailabilityCopy,
-  mentorMessagingCopy,
-  mentorPrimaryActionLabel,
-  mentorVideoSessionCopy,
-  normalizeApplicationCommercialFields,
+  paidMentorshipServicesBlocked,
   requestTypePublicLabel,
-  type CommercialMode,
+  type PublicProfile,
   type RequestType,
 } from '@apprentorbay/shared';
 import {
@@ -24,26 +22,24 @@ import {
   TextArea,
 } from '../../components';
 import { useAuth } from '../../lib/auth';
-import { applyToMentor, resolveMentorApplyTarget } from '../../lib/api';
+import {
+  applyToMentor,
+  createMentorshipBooking,
+  resolveMentorApplyTarget,
+  startPaymentCheckout,
+} from '../../lib/api';
+import {
+  MentorshipOfferingCard,
+  MentorshipOfferingCardButton,
+} from '../profiles/MentorshipOfferingCard';
 import { watchPairing } from './repository';
-
-export type MentorApplyOffering = {
-  commercialMode: CommercialMode;
-  priceLabel: string;
-  helpWith: string;
-  mentorTypeLabel: string;
-  serviceModelLabel: string;
-  serviceModelDescription: string;
-  offersVideoSessions: boolean;
-  includedMessaging: boolean;
-};
 
 type ApplyMentorshipProps = {
   slug: string;
   displayName: string;
   approvalStatus: string;
   acceptsNewLearners?: boolean;
-  offering: MentorApplyOffering;
+  profile: PublicProfile;
 };
 
 export function ApplyMentorship({
@@ -51,7 +47,7 @@ export function ApplyMentorship({
   displayName,
   approvalStatus,
   acceptsNewLearners = true,
-  offering,
+  profile,
 }: ApplyMentorshipProps) {
   const { account, loading } = useAuth();
   const [optionsOpen, setOptionsOpen] = useState(false);
@@ -64,9 +60,8 @@ export function ApplyMentorship({
   const [requestType, setRequestType] = useState<RequestType | null>(null);
   const [relationshipId, setRelationshipId] = useState<string | null>(null);
   const [relationshipOpen, setRelationshipOpen] = useState(false);
-
-  const isPaid = isPaidCommercialMode(offering.commercialMode);
-  const primaryLabel = mentorPrimaryActionLabel(offering.commercialMode);
+  const [paymentRequired, setPaymentRequired] = useState(false);
+  const [paymentSatisfied, setPaymentSatisfied] = useState(false);
 
   useEffect(() => {
     if (!account || account.role !== USER_ROLE.learner) return;
@@ -89,33 +84,53 @@ export function ApplyMentorship({
     }
     return watchPairing(account.uid, mentorId, (state) => {
       setApplicationStatus(state.application?.status ?? null);
-      setRequestType(
-        state.application
-          ? normalizeApplicationCommercialFields(state.application).requestType
-          : null,
-      );
+      setRequestType(state.application?.requestType ?? null);
       setRelationshipId(state.relationship?.id ?? null);
       setRelationshipOpen(Boolean(state.relationship && isOpenRelationship(state.relationship)));
+      setPaymentRequired(state.relationship?.paymentRequired === true);
+      setPaymentSatisfied(state.relationship?.paymentSatisfied === true);
     });
   }, [account, mentorId]);
+
+  const offering = buildMentorshipOfferingView({
+    commercialMode: profile.commercialMode ?? COMMERCIAL_MODE.givingBack,
+    mentorType: profile.mentorType,
+    baseSessionPriceUsd: profile.baseSessionPriceUsd ?? null,
+    sessionDurationMinutes: profile.sessionDurationMinutes,
+    serviceDescription: profile.serviceDescription,
+    mentoringInterests: profile.mentoringInterests,
+    areasOfExpertise: profile.areasOfExpertise,
+    offersVideoSessions: profile.offersVideoSessions,
+    includedMessaging: profile.includedMessaging,
+    mentorName: displayName,
+    hasActiveRelationship: relationshipOpen,
+    paymentRequired,
+    paymentSatisfied,
+  });
 
   if (loading) return null;
   if (approvalStatus !== APPROVAL_STATUS.approved) return null;
   if (!acceptsNewLearners) {
-    return <Text variant="small">{mentorAvailabilityCopy(false)}</Text>;
+    return <Text variant="small">Not currently accepting new learners</Text>;
   }
   if (!account) {
     return (
-      <Button variant="secondary" to="/login">
-        Log in to {isPaid ? 'view options' : 'request mentorship'}
-      </Button>
+      <MentorshipOfferingCardButton
+        label={`Log in to ${offering.primaryActionLabel.toLowerCase()}`}
+        to="/login"
+      />
     );
   }
   if (account.role !== USER_ROLE.learner) return null;
   if (mentorId && account.uid === mentorId) return null;
 
-  if (relationshipId && relationshipOpen) {
-    return <Button to={`/dashboard/mentorships/${relationshipId}`}>Open mentorship</Button>;
+  if (relationshipId && relationshipOpen && paymentSatisfied) {
+    return (
+      <MentorshipOfferingCardButton
+        label="Open mentorship"
+        to={`/dashboard/mentorships/${relationshipId}`}
+      />
+    );
   }
 
   if (applicationStatus === APPLICATION_STATUS.pending) {
@@ -143,17 +158,48 @@ export function ApplyMentorship({
     }
   }
 
+  async function onBookAndPay() {
+    if (!relationshipId) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const { booking } = await createMentorshipBooking({ relationshipId });
+      const checkout = await startPaymentCheckout(booking.id);
+      window.location.assign(checkout.checkoutUrl);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not start checkout');
+      setBusy(false);
+    }
+  }
+
   function openPrimaryAction() {
-    if (isPaid) {
+    if (
+      relationshipId &&
+      relationshipOpen &&
+      paidMentorshipServicesBlocked({
+        paymentRequired,
+        paymentSatisfied,
+        requestType: offering.isPaid ? REQUEST_TYPE.paidRequest : REQUEST_TYPE.freeRequest,
+      })
+    ) {
+      void onBookAndPay();
+      return;
+    }
+    if (offering.isPaid) {
       setOptionsOpen(true);
       return;
     }
     setApplyOpen(true);
   }
 
+  const primaryLabel =
+    relationshipId && relationshipOpen && paymentRequired && !paymentSatisfied
+      ? 'Book and pay'
+      : offering.primaryActionLabel;
+
   return (
     <>
-      <Button onClick={openPrimaryAction}>{primaryLabel}</Button>
+      <MentorshipOfferingCardButton label={primaryLabel} onClick={openPrimaryAction} loading={busy} />
 
       <Modal
         open={optionsOpen}
@@ -175,35 +221,7 @@ export function ApplyMentorship({
           </Cluster>
         }
       >
-        <Stack gap={16}>
-          <Text variant="small">
-            Payment is not handled in ApprentorBay yet. You can still request mentorship and
-            agree on details with {displayName} directly.
-          </Text>
-          <Stack gap={8}>
-            <Text variant="caption">Experience type</Text>
-            <Text variant="h3">{offering.mentorTypeLabel}</Text>
-          </Stack>
-          <Stack gap={8}>
-            <Text variant="caption">Service model</Text>
-            <Text variant="h3">{offering.serviceModelLabel}</Text>
-            <Text variant="small">{offering.serviceModelDescription}</Text>
-          </Stack>
-          <Stack gap={8}>
-            <Text variant="caption">Price</Text>
-            <Text variant="h3">{offering.priceLabel}</Text>
-          </Stack>
-          {offering.helpWith ? (
-            <Stack gap={8}>
-              <Text variant="caption">What you will work on</Text>
-              <Text>{offering.helpWith}</Text>
-            </Stack>
-          ) : null}
-          <Text variant="small">
-            {mentorVideoSessionCopy(offering.offersVideoSessions)} ·{' '}
-            {mentorMessagingCopy(offering.includedMessaging)}
-          </Text>
-        </Stack>
+        <MentorshipOfferingCard offering={offering} compact />
       </Modal>
 
       <Modal
@@ -216,21 +234,14 @@ export function ApplyMentorship({
               Cancel
             </Button>
             <Button type="submit" form="apply-mentorship" loading={busy}>
-              {isPaid ? 'Send paid request' : 'Send free request'}
+              {offering.isPaid ? 'Send request' : 'Send free request'}
             </Button>
           </Cluster>
         }
       >
         <form id="apply-mentorship" onSubmit={(event) => void onSubmit(event)}>
           <Stack gap={16}>
-            {isPaid ? (
-              <Text variant="small">
-                {offering.serviceModelLabel} · {offering.priceLabel}. Payment will be arranged
-                outside the platform for now.
-              </Text>
-            ) : (
-              <Text variant="small">This mentor offers free mentorship through Giving Back.</Text>
-            )}
+            <MentorshipOfferingCard offering={offering} compact />
             <TextArea
               label="Your message"
               value={message}
@@ -243,6 +254,8 @@ export function ApplyMentorship({
         </form>
         {error ? <Text variant="danger">{error}</Text> : null}
       </Modal>
+
+      {error && !applyOpen && !optionsOpen ? <Text variant="danger">{error}</Text> : null}
     </>
   );
 }

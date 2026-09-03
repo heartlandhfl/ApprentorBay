@@ -276,8 +276,8 @@ export function ProfileEditor({ role, profile, onSaved }: ProfileEditorProps) {
                   <Text variant="h3">Mentor service</Text>
                   <Text variant="small">
                     Configure how you offer mentorship on ApprentorBay. These settings appear on
-                    your public profile after you save. Payment collection and payouts are not
-                    handled in-app yet.
+                    your public profile after you save. Paid sessions are booked and paid in USD
+                    through ApprentorBay after a learner request is accepted.
                   </Text>
                   <Stack gap={12}>
                     <Text variant="small">Mentor type</Text>
