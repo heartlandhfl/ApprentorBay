@@ -5,6 +5,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import express from 'express';
 import { getAdminFirebase } from './lib/firebase.js';
+import { assertPaymentProviderAllowedForEnvironment } from './lib/payments/paymentConfig.js';
 import { seedAdmin } from './lib/seedAdmin.js';
 import { errorHandler, notFound } from './middleware/errorHandler.js';
 import { accountRouter } from './routes/account.js';
@@ -73,6 +74,7 @@ function listenPort(): number {
 const repoRoot = resolveRepoRoot(here);
 
 dotenv.config({ path: path.join(repoRoot, '.env') });
+assertPaymentProviderAllowedForEnvironment();
 
 const port = listenPort();
 const clientDist = resolveClientDist(repoRoot, here);

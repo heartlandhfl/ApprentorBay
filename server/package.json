@@ -9,7 +9,7 @@
     "create-admin": "tsx createAdmin.ts",
     "build": "tsc",
     "typecheck": "tsc --noEmit",
-    "test": "tsx --test ./lib/privateKey.test.ts ./lib/payments/paymentFlow.test.ts ./lib/payments/paymentCheckoutPolicy.test.ts ./lib/payments/paymentService.test.ts ./lib/jitsiJwt.test.ts ./lib/learningContractCreate.test.ts ./lib/sessionService.test.ts ./lib/paidSessionLifecycle.test.ts"
+    "test": "tsx --test ./lib/privateKey.test.ts ./lib/payments/paymentConfig.test.ts ./lib/payments/paymentFlow.test.ts ./lib/payments/paymentCheckoutPolicy.test.ts ./lib/payments/paymentService.test.ts ./lib/jitsiJwt.test.ts ./lib/learningContractCreate.test.ts ./lib/sessionService.test.ts ./lib/paidSessionLifecycle.test.ts"
   },
   "dependencies": {
     "@apprentorbay/shared": "0.1.0",

@@ -1,5 +1,5 @@
 import { PAYMENT_PROVIDER_ID } from '@apprentorbay/shared';
-import { paymentProviderIdFromEnv } from './paymentConfig.js';
+import { assertPaymentProviderAllowedForEnvironment, paymentProviderIdFromEnv } from './paymentConfig.js';
 import { createMockPaymentProvider } from './providers/mockProvider.js';
 import { createStripePaymentProvider } from './providers/stripeProvider.js';
 import type { PaymentProvider } from './types.js';
@@ -8,6 +8,7 @@ let cachedProvider: PaymentProvider | null = null;
 
 export function getPaymentProvider(): PaymentProvider {
   if (cachedProvider) return cachedProvider;
+  assertPaymentProviderAllowedForEnvironment();
   const providerId = paymentProviderIdFromEnv();
   if (providerId === PAYMENT_PROVIDER_ID.mock) {
     cachedProvider = createMockPaymentProvider();
