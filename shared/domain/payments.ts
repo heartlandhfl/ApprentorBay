@@ -250,6 +250,19 @@ export function validateCreateCheckoutBody(
   return { ok: true, bookingId };
 }
 
+export function validateCheckoutIdempotencyKey(
+  value: string | undefined,
+): ValidationResult & { key?: string } {
+  const key = typeof value === 'string' ? value.trim() : '';
+  if (!key) {
+    return { ok: false, error: 'Idempotency-Key header is required' };
+  }
+  if (key.length > 128) {
+    return { ok: false, error: 'Idempotency-Key must be at most 128 characters' };
+  }
+  return { ok: true, key };
+}
+
 export function buildPaymentIntentFromBooking(input: {
   id: string;
   booking: MentorshipBooking;

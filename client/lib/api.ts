@@ -387,10 +387,14 @@ export async function getMentorshipBooking(bookingId: string): Promise<Mentorshi
 
 export async function startPaymentCheckout(
   bookingId: string,
+  idempotencyKey: string = crypto.randomUUID(),
 ): Promise<{ checkoutUrl: string; paymentIntentId: string }> {
   const response = await fetch('/api/payments/checkout', {
     method: 'POST',
-    headers: await authHeaders(),
+    headers: {
+      ...(await authHeaders()),
+      'Idempotency-Key': idempotencyKey,
+    },
     body: JSON.stringify({ bookingId }),
   });
   return readJson<{ checkoutUrl: string; paymentIntentId: string }>(response);
