@@ -91,6 +91,24 @@ export type {
 } from './mentorOffering.js';
 
 export {
+  COMMERCIAL_MODE_PUBLIC_LABEL,
+  MENTOR_TYPE_PUBLIC_LABEL,
+  commercialModeDescription,
+  commercialModePublicTitle,
+  commercialModeTitle,
+  formatMentorPriceDisplay,
+  isPaidCommercialMode,
+  mentorAvailabilityCopy,
+  mentorHelpSummary,
+  mentorMessagingCopy,
+  mentorPrimaryActionLabel,
+  mentorTypeDescription,
+  mentorTypePublicTitle,
+  mentorTypeTitle,
+  mentorVideoSessionCopy,
+} from './mentorPresentation.js';
+
+export {
   emptyLearnerProfile,
   emptyMentorProfile,
   isAccountActive,

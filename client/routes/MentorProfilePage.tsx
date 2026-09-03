@@ -2,9 +2,6 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import {
   USER_ROLE,
-  COMMERCIAL_MODE,
-  COMMERCIAL_MODE_LABEL,
-  MENTOR_TYPE_LABEL,
   looksLikeFirebaseUid,
   type MentorProfile,
   type PublicProfile,
@@ -19,7 +16,11 @@ import {
 } from '../components';
 import { ApplyMentorship } from '../features/mentorship';
 import { ProfileEditor } from '../features/profiles/ProfileEditor';
-import { MentorBadges, PortfolioSection, ProfilePhoto } from '../features/profiles/PublicProfileView';
+import {
+  MentorMarketplaceHero,
+  mentorOfferingForApply,
+} from '../features/profiles/MentorMarketplaceProfile';
+import { PortfolioSection } from '../features/profiles/PublicProfileView';
 import { watchMentorProfile, watchPublicProfile } from '../features/profiles';
 import { useAuth } from '../lib/auth';
 import { getOwnProfile } from '../lib/api';
@@ -127,26 +128,27 @@ function MentorBody({
 
   return (
     <Stack gap={32}>
-      <Stack gap={16}>
-        <Text variant="caption">Mentor</Text>
-        {view ? <MentorBadges profile={view} /> : null}
-        <ProfilePhoto path={view?.photoPath ?? own?.photoPath ?? null} name={name} />
-        <Text variant="h1">{name}</Text>
-        {identity ? <Text>{identity}</Text> : null}
-        {location ? <Text variant="small">{location}</Text> : null}
-        {view ? <MentorOfferingSummary profile={view} /> : null}
-        {view ? (
+      {view ? (
+        <MentorMarketplaceHero
+          profile={view}
+          name={name}
+          identity={identity}
+          location={location}
+          photoPath={view.photoPath ?? own?.photoPath ?? null}
+        >
           <ApplyMentorship
             slug={slug}
             displayName={name}
             approvalStatus={view.approvalStatus}
             acceptsNewLearners={view.acceptsNewLearners !== false}
+            offering={mentorOfferingForApply(view)}
           />
-        ) : null}
-        {isOwner && own && own.verificationStatus !== 'approved' ? (
-          <Text variant="small">Public visitors see this profile after participation is approved.</Text>
-        ) : null}
-      </Stack>
+        </MentorMarketplaceHero>
+      ) : null}
+
+      {isOwner && own && own.verificationStatus !== 'approved' ? (
+        <Text variant="small">Public visitors see this profile after participation is approved.</Text>
+      ) : null}
 
       <Card>
         <Stack gap={16}>
@@ -181,30 +183,32 @@ function MentorBody({
         </Stack>
       </Card>
 
-      <Card>
-        <Stack gap={16}>
-          <Text variant="h2">Areas of expertise</Text>
-          {expertise.length === 0 ? (
-            <EmptyState title="No expertise listed yet" />
-          ) : (
+      {expertise.length > 0 ? (
+        <Card>
+          <Stack gap={16}>
+            <Text variant="h2">Areas of expertise</Text>
             <Text>{expertise.join(', ')}</Text>
-          )}
-        </Stack>
-      </Card>
+          </Stack>
+        </Card>
+      ) : null}
 
-      <Card>
-        <Stack gap={16}>
-          <Text variant="h2">Professional goals / interests</Text>
-          {goals.trim() ? <Text>{goals}</Text> : <EmptyState title="No professional goals listed yet" />}
-        </Stack>
-      </Card>
+      {goals.trim() ? (
+        <Card>
+          <Stack gap={16}>
+            <Text variant="h2">Professional goals / interests</Text>
+            <Text>{goals}</Text>
+          </Stack>
+        </Card>
+      ) : null}
 
-      <Card>
-        <Stack gap={16}>
-          <Text variant="h2">Mentoring interests</Text>
-          {mentoring.trim() ? <Text>{mentoring}</Text> : <EmptyState title="No mentoring interests listed yet" />}
-        </Stack>
-      </Card>
+      {mentoring.trim() && mentoring !== view?.servicesDescription ? (
+        <Card>
+          <Stack gap={16}>
+            <Text variant="h2">Mentoring interests</Text>
+            <Text>{mentoring}</Text>
+          </Stack>
+        </Card>
+      ) : null}
 
       <PortfolioSection
         title="Mentored deliverables"
@@ -233,37 +237,5 @@ function MentorBody({
 
       {isOwner && own ? <ProfileEditor role="mentor" profile={own} /> : null}
     </Stack>
-  );
-}
-
-function MentorOfferingSummary({ profile }: { profile: PublicProfile }) {
-  if (!profile.mentorType || !profile.commercialMode) return null;
-  const price =
-    profile.commercialMode !== COMMERCIAL_MODE.givingBack && profile.sessionPriceUsd
-      ? `$${profile.sessionPriceUsd}`
-      : 'Free';
-  const duration = profile.sessionDurationMinutes
-    ? `${profile.sessionDurationMinutes} minutes`
-    : null;
-
-  return (
-    <Card>
-      <Stack gap={12}>
-        <Text variant="h2">Mentorship offering</Text>
-        <Text variant="small">
-          {MENTOR_TYPE_LABEL[profile.mentorType]} · {COMMERCIAL_MODE_LABEL[profile.commercialMode]}
-        </Text>
-        {profile.servicesDescription ? <Text>{profile.servicesDescription}</Text> : null}
-        <Text variant="small">
-          {price}
-          {duration ? ` · ${duration} per session` : null}
-        </Text>
-        {profile.offersVideoSessions ? <Text variant="small">Video sessions available</Text> : null}
-        {profile.messagingIncluded ? <Text variant="small">Messaging included</Text> : null}
-        {profile.acceptsNewLearners === false ? (
-          <Text variant="small">Not currently accepting new learners</Text>
-        ) : null}
-      </Stack>
-    </Card>
   );
 }
