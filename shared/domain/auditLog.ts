@@ -27,6 +27,10 @@ export const AUDIT_EVENT = {
   bookingCreated: 'BOOKING_CREATED',
   bookingCancelled: 'BOOKING_CANCELLED',
   bookingPaid: 'BOOKING_PAID',
+  paymentCheckoutCreated: 'PAYMENT_CHECKOUT_CREATED',
+  paymentSucceeded: 'PAYMENT_SUCCEEDED',
+  paymentFailed: 'PAYMENT_FAILED',
+  paymentRefunded: 'PAYMENT_REFUNDED',
 } as const;
 
 export type AuditEvent = (typeof AUDIT_EVENT)[keyof typeof AUDIT_EVENT];

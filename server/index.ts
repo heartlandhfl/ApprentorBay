@@ -15,6 +15,9 @@ import { healthRouter } from './routes/health.js';
 import { profilesRouter } from './routes/profiles.js';
 import { relationshipsRouter } from './routes/relationships.js';
 import { bookingsRouter } from './routes/bookings.js';
+import { paymentsRouter } from './routes/payments.js';
+import { paymentWebhooksRouter } from './routes/paymentWebhooks.js';
+import { refundsRouter } from './routes/refunds.js';
 import { supportRouter } from './routes/support.js';
 
 function thisDir(): string {
@@ -86,6 +89,13 @@ app.use(
     origin: clientOrigin,
   }),
 );
+
+app.use(
+  '/api/webhooks/payments',
+  express.raw({ type: 'application/json' }),
+  paymentWebhooksRouter,
+);
+
 app.use(express.json());
 
 app.use('/api/health', healthRouter);
@@ -95,6 +105,8 @@ app.use('/api/profiles', profilesRouter);
 app.use('/api/applications', applicationsRouter);
 app.use('/api/relationships', relationshipsRouter);
 app.use('/api/bookings', bookingsRouter);
+app.use('/api/payments', paymentsRouter);
+app.use('/api/refunds', refundsRouter);
 app.use('/api/contracts', contractsRouter);
 app.use('/api/support', supportRouter);
 app.use('/api', notFound);

@@ -13,6 +13,10 @@ import {
   validateBookingRelationship,
   type MentorshipBooking,
 } from './bookings.js';
+import {
+  PAYMENT_STATUS,
+  type PaymentIntent,
+} from './payments.js';
 import { isPendingApplication, type MentorshipApplication } from './applications.js';
 import { validateMentorApplicationTarget, canAccessPaidMentorshipServices } from './mentorshipRequest.js';
 import {
@@ -272,4 +276,29 @@ export function canCancelBooking(
   if (!isOpenBookingPaymentStatus(booking.paymentStatus)) return false;
   if (actor?.role === USER_ROLE.admin) return true;
   return isPairingMember(actor?.uid ?? '', booking);
+}
+
+export function canStartCheckout(
+  actor: PermissionActor | null | undefined,
+  booking: MentorshipBooking,
+): boolean {
+  if (!actor || !canParticipate(actor)) return false;
+  if (actor.role !== USER_ROLE.learner) return false;
+  if (booking.learnerId !== actor.uid) return false;
+  return isOpenBookingPaymentStatus(booking.paymentStatus) && isOpenBookingStatus(booking.bookingStatus);
+}
+
+export function canReadPaymentIntent(
+  actor: PermissionActor | null | undefined,
+  intent: Pick<PaymentIntent, 'learnerId' | 'mentorId'>,
+): boolean {
+  return canReadBooking(actor, intent);
+}
+
+export function canRequestRefund(
+  actor: PermissionActor | null | undefined,
+  intent: Pick<PaymentIntent, 'learnerId' | 'mentorId' | 'status'>,
+): boolean {
+  if (!canAdminister(actor)) return false;
+  return intent.status === PAYMENT_STATUS.paid || intent.status === PAYMENT_STATUS.partiallyRefunded;
 }

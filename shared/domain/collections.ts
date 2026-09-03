@@ -17,6 +17,11 @@ export const COLLECTIONS = {
   auditLogs: 'adminAuditLogs',
   supportIssues: 'supportIssues',
   bookings: 'mentorshipBookings',
+  paymentIntents: 'paymentIntents',
+  checkoutSessions: 'checkoutSessions',
+  paymentRefunds: 'paymentRefunds',
+  paymentEvents: 'paymentEvents',
+  paymentWebhookDedup: 'paymentWebhookDedup',
   /** Console / operator list. Not the app user record — sync into `users` with role admin. */
   operatorAdmins: 'admins',
 } as const;

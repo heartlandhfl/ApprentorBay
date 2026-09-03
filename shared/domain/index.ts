@@ -231,6 +231,57 @@ export type {
   MentorshipBooking,
 } from './bookings.js';
 
+export {
+  CHECKOUT_SESSION_STATUS,
+  CLIENT_CHECKOUT_CREATE_FIELDS,
+  FORBIDDEN_CLIENT_CHECKOUT_FIELDS,
+  PAYMENT_EVENT_ENTITY,
+  PAYMENT_PROVIDER_ID,
+  PAYMENT_STATUS,
+  REFUND_REASON,
+  REFUND_STATUS,
+  buildPaymentEvent,
+  buildPaymentIntentFromBooking,
+  isCheckoutSessionStatus,
+  isOpenPaymentStatus,
+  isPaymentStatus,
+  isRefundStatus,
+  isTerminalPaymentStatus,
+  marketplaceSplitFromBooking,
+  normalizeCheckoutSession,
+  normalizePaymentIntent,
+  normalizePaymentRefund,
+  validateCreateCheckoutBody,
+  validatePaymentMatchesBooking,
+} from './payments.js';
+export type {
+  CheckoutSession,
+  CheckoutSessionStatus,
+  MarketplaceSplit,
+  MoneyAmount,
+  PaymentEvent,
+  PaymentEventEntity,
+  PaymentIntent,
+  PaymentProviderId,
+  PaymentRefund,
+  PaymentStatus,
+  RefundReason,
+  RefundStatus,
+} from './payments.js';
+
+export {
+  canApplyPaymentIntentAction,
+  isTerminalCheckoutStatus,
+  reduceCheckoutSession,
+  reducePaymentIntent,
+  reducePaymentRefund,
+} from './paymentMachine.js';
+export type {
+  CheckoutSessionAction,
+  PaymentIntentAction,
+  RefundAction,
+} from './paymentMachine.js';
+
 export { MESSAGE_TEXT } from './messages.js';
 export type { Message } from './messages.js';
 
@@ -464,6 +515,9 @@ export {
   canCreateBooking,
   canReadBooking,
   canCancelBooking,
+  canStartCheckout,
+  canReadPaymentIntent,
+  canRequestRefund,
 } from './permissions.js';
 export type { PermissionActor } from './permissions.js';
 
