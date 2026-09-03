@@ -1,4 +1,10 @@
 import { USER_ROLE, type UserRole } from './identities.js';
+import {
+  COMMERCIAL_MODE,
+  MENTOR_TYPE,
+  type CommercialMode,
+  type MentorType,
+} from './mentorOffering.js';
 import type { Showcase, ShowcaseEvidence } from './showcases.js';
 import {
   VERIFICATION_STATUS,
@@ -89,6 +95,14 @@ export interface PublicProfile {
   approvalStatus: ApprovalStatus;
   verifiedClaims: VerifiedClaim[];
   updatedAt: string;
+  mentorType?: MentorType;
+  commercialMode?: CommercialMode;
+  servicesDescription?: string;
+  sessionPriceUsd?: number | null;
+  sessionDurationMinutes?: number | null;
+  offersVideoSessions?: boolean;
+  messagingIncluded?: boolean;
+  acceptsNewLearners?: boolean;
 }
 
 export interface ProfileSlugRecord {
@@ -143,6 +157,14 @@ export function toStoredPublicProfile(profile: PublicProfile): PublicProfile {
     approvalStatus: profile.approvalStatus,
     verifiedClaims: profile.verifiedClaims,
     updatedAt: profile.updatedAt,
+    mentorType: profile.mentorType,
+    commercialMode: profile.commercialMode,
+    servicesDescription: profile.servicesDescription,
+    sessionPriceUsd: profile.sessionPriceUsd,
+    sessionDurationMinutes: profile.sessionDurationMinutes,
+    offersVideoSessions: profile.offersVideoSessions,
+    messagingIncluded: profile.messagingIncluded,
+    acceptsNewLearners: profile.acceptsNewLearners,
   };
 }
 
@@ -297,6 +319,14 @@ export function buildPublicMentorProfile(input: {
     approvalStatus: profile.verificationStatus,
     verifiedClaims: verifiedClaimsPublic(profile.verifiedClaims),
     updatedAt: now,
+    mentorType: profile.mentorType ?? MENTOR_TYPE.accomplished,
+    commercialMode: profile.commercialMode ?? COMMERCIAL_MODE.givingBack,
+    servicesDescription: profile.servicesDescription ?? '',
+    sessionPriceUsd: profile.sessionPriceUsd ?? null,
+    sessionDurationMinutes: profile.sessionDurationMinutes ?? null,
+    offersVideoSessions: profile.offersVideoSessions === true,
+    messagingIncluded: profile.messagingIncluded !== false,
+    acceptsNewLearners: profile.acceptsNewLearners === true,
   };
 }
 

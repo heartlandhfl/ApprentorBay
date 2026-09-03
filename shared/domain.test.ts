@@ -65,13 +65,18 @@ import {
   normalizeContract,
   isPublicPhotoPath,
   looksLikeFirebaseUid,
+  COMMERCIAL_MODE,
+  MENTOR_TYPE,
+  commercialModeAllowedForMentorType,
   normalizeLearnerProfile,
+  normalizeMentorProfile,
   ownPublicProfilePath,
   profilePhotoStoragePath,
   publicProfileOmitsPrivateFields,
   publicProfilePath,
   suggestSlug,
   toStoredPublicProfile,
+  validateMentorOffering,
   validateProfileSlug,
   canConfirmCompletion,
   completionRequirements,
@@ -235,6 +240,8 @@ describe('domain permissions and validation', () => {
   const approvedMentor = {
     userId: 'mentor-1',
     verificationStatus: VERIFICATION_STATUS.approved,
+    public: true,
+    acceptsNewLearners: true,
   };
 
   it('lets a learner apply to an approved mentor with a message', () => {
@@ -242,6 +249,14 @@ describe('domain permissions and validation', () => {
     assert.equal(canApplyForMentorship(mentor, approvedMentor, 'I want to learn joinery'), false);
     assert.equal(
       canApplyForMentorship(learner, { ...approvedMentor, verificationStatus: VERIFICATION_STATUS.pending }, 'Hi'),
+      false,
+    );
+    assert.equal(
+      canApplyForMentorship(learner, { ...approvedMentor, public: false }, 'Hi'),
+      false,
+    );
+    assert.equal(
+      canApplyForMentorship(learner, { ...approvedMentor, acceptsNewLearners: false }, 'Hi'),
       false,
     );
   });
@@ -538,6 +553,34 @@ describe('public profile system', () => {
     assert.equal(listed.verifiedClaims.length, 1);
     assert.equal(listed.verifiedClaims[0]?.type, VERIFIED_CLAIM_TYPE.identity);
     assert.notEqual(APPROVAL_STATUS_LABEL[APPROVAL_STATUS.approved], 'Verified');
+  });
+
+  it('projects mentor offering fields without private verification metadata', () => {
+    const profile = normalizeMentorProfile({
+      ...emptyMentorProfile('mentor-1', 'Ben'),
+      slug: 'ben',
+      public: true,
+      verificationStatus: APPROVAL_STATUS.approved,
+      mentorType: MENTOR_TYPE.competencyCoach,
+      commercialMode: COMMERCIAL_MODE.professional,
+      servicesDescription: 'Weekly shop coaching',
+      sessionPriceUsd: 75,
+      sessionDurationMinutes: 60,
+      offersVideoSessions: true,
+      messagingIncluded: true,
+      acceptsNewLearners: true,
+    });
+    const publicProfile = buildPublicMentorProfile({
+      profile,
+      mentoredDeliverables: [],
+      now: '2026-09-01T00:00:00.000Z',
+    });
+    assert.equal(publicProfile.mentorType, MENTOR_TYPE.competencyCoach);
+    assert.equal(publicProfile.commercialMode, COMMERCIAL_MODE.professional);
+    assert.equal(publicProfile.sessionPriceUsd, 75);
+    assert.equal(publicProfile.acceptsNewLearners, true);
+    assert.equal('verificationStatus' in publicProfile, false);
+    assert.equal('verificationCaseStatus' in publicProfile, false);
   });
 
   it('keeps approval separate from verification and blocks self-governance', () => {
@@ -915,6 +958,57 @@ describe('lifecycle dashboards', () => {
       contracts: [normalizeContract({ ...draftContract(), status: LEARNING_CONTRACT_STATUS.completed })],
     });
     assert.equal(legacy, 'build_legacy');
+  });
+});
+
+describe('mentor offering', () => {
+  it('allows premium only for accomplished mentors', () => {
+    assert.equal(
+      commercialModeAllowedForMentorType(MENTOR_TYPE.accomplished, COMMERCIAL_MODE.premium),
+      true,
+    );
+    assert.equal(
+      commercialModeAllowedForMentorType(MENTOR_TYPE.competencyCoach, COMMERCIAL_MODE.premium),
+      false,
+    );
+    assert.equal(
+      commercialModeAllowedForMentorType(MENTOR_TYPE.learningGuide, COMMERCIAL_MODE.premium),
+      false,
+    );
+  });
+
+  it('defaults legacy mentor documents to accomplished + giving back', () => {
+    const profile = normalizeMentorProfile(emptyMentorProfile('mentor-1', 'Ben'));
+    assert.equal(profile.mentorType, MENTOR_TYPE.accomplished);
+    assert.equal(profile.commercialMode, COMMERCIAL_MODE.givingBack);
+    assert.equal(profile.sessionPriceUsd, null);
+    assert.equal(profile.messagingIncluded, true);
+  });
+
+  it('validates paid modes and rejects premium for coaches', () => {
+    assert.equal(
+      validateMentorOffering({
+        mentorType: MENTOR_TYPE.learningGuide,
+        commercialMode: COMMERCIAL_MODE.premium,
+      }).ok,
+      false,
+    );
+    assert.equal(
+      validateMentorOffering({
+        mentorType: MENTOR_TYPE.accomplished,
+        commercialMode: COMMERCIAL_MODE.professional,
+        sessionPriceUsd: 120,
+      }).ok,
+      true,
+    );
+    assert.equal(
+      validateMentorOffering({
+        mentorType: MENTOR_TYPE.accomplished,
+        commercialMode: COMMERCIAL_MODE.givingBack,
+        sessionPriceUsd: 50,
+      }).ok,
+      false,
+    );
   });
 });
 

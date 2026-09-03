@@ -2,6 +2,9 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import {
   USER_ROLE,
+  COMMERCIAL_MODE,
+  COMMERCIAL_MODE_LABEL,
+  MENTOR_TYPE_LABEL,
   looksLikeFirebaseUid,
   type MentorProfile,
   type PublicProfile,
@@ -131,7 +134,15 @@ function MentorBody({
         <Text variant="h1">{name}</Text>
         {identity ? <Text>{identity}</Text> : null}
         {location ? <Text variant="small">{location}</Text> : null}
-        {view ? <ApplyMentorship slug={slug} displayName={name} approvalStatus={view.approvalStatus} /> : null}
+        {view ? <MentorOfferingSummary profile={view} /> : null}
+        {view ? (
+          <ApplyMentorship
+            slug={slug}
+            displayName={name}
+            approvalStatus={view.approvalStatus}
+            acceptsNewLearners={view.acceptsNewLearners !== false}
+          />
+        ) : null}
         {isOwner && own && own.verificationStatus !== 'approved' ? (
           <Text variant="small">Public visitors see this profile after participation is approved.</Text>
         ) : null}
@@ -222,5 +233,37 @@ function MentorBody({
 
       {isOwner && own ? <ProfileEditor role="mentor" profile={own} /> : null}
     </Stack>
+  );
+}
+
+function MentorOfferingSummary({ profile }: { profile: PublicProfile }) {
+  if (!profile.mentorType || !profile.commercialMode) return null;
+  const price =
+    profile.commercialMode !== COMMERCIAL_MODE.givingBack && profile.sessionPriceUsd
+      ? `$${profile.sessionPriceUsd}`
+      : 'Free';
+  const duration = profile.sessionDurationMinutes
+    ? `${profile.sessionDurationMinutes} minutes`
+    : null;
+
+  return (
+    <Card>
+      <Stack gap={12}>
+        <Text variant="h2">Mentorship offering</Text>
+        <Text variant="small">
+          {MENTOR_TYPE_LABEL[profile.mentorType]} · {COMMERCIAL_MODE_LABEL[profile.commercialMode]}
+        </Text>
+        {profile.servicesDescription ? <Text>{profile.servicesDescription}</Text> : null}
+        <Text variant="small">
+          {price}
+          {duration ? ` · ${duration} per session` : null}
+        </Text>
+        {profile.offersVideoSessions ? <Text variant="small">Video sessions available</Text> : null}
+        {profile.messagingIncluded ? <Text variant="small">Messaging included</Text> : null}
+        {profile.acceptsNewLearners === false ? (
+          <Text variant="small">Not currently accepting new learners</Text>
+        ) : null}
+      </Stack>
+    </Card>
   );
 }
