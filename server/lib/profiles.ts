@@ -60,11 +60,11 @@ export type ProfileUpdateBody = {
   photoPath?: string | null;
   mentorType?: MentorType;
   commercialMode?: CommercialMode;
-  servicesDescription?: string;
-  sessionPriceUsd?: number | null;
+  serviceDescription?: string;
+  baseSessionPriceUsd?: number | null;
   sessionDurationMinutes?: number | null;
   offersVideoSessions?: boolean;
-  messagingIncluded?: boolean;
+  includedMessaging?: boolean;
   acceptsNewLearners?: boolean;
 };
 
@@ -284,11 +284,11 @@ export async function applyProfileUpdate(account: User, body: ProfileUpdateBody)
     const offeringPatch = {
       mentorType: body.mentorType,
       commercialMode: body.commercialMode,
-      servicesDescription: body.servicesDescription,
-      sessionPriceUsd: body.sessionPriceUsd,
+      serviceDescription: body.serviceDescription,
+      baseSessionPriceUsd: body.baseSessionPriceUsd,
       sessionDurationMinutes: body.sessionDurationMinutes,
       offersVideoSessions: body.offersVideoSessions,
-      messagingIncluded: body.messagingIncluded,
+      includedMessaging: body.includedMessaging,
       acceptsNewLearners: body.acceptsNewLearners,
     };
     const hasOfferingField = Object.values(offeringPatch).some((value) => value !== undefined);
@@ -353,16 +353,16 @@ export async function applyProfileUpdate(account: User, body: ProfileUpdateBody)
   assign('photoPath', body.photoPath);
   assign('mentorType', body.mentorType);
   assign('commercialMode', body.commercialMode);
-  assign('servicesDescription', body.servicesDescription);
-  assign('sessionPriceUsd', body.sessionPriceUsd);
+  assign('serviceDescription', body.serviceDescription);
+  assign('baseSessionPriceUsd', body.baseSessionPriceUsd);
   assign('sessionDurationMinutes', body.sessionDurationMinutes);
   assign('offersVideoSessions', body.offersVideoSessions);
-  assign('messagingIncluded', body.messagingIncluded);
+  assign('includedMessaging', body.includedMessaging);
   assign('acceptsNewLearners', body.acceptsNewLearners);
 
   if (account.role === USER_ROLE.mentor && body.commercialMode !== undefined) {
     if (body.commercialMode === COMMERCIAL_MODE.givingBack) {
-      patch.sessionPriceUsd = null;
+      patch.baseSessionPriceUsd = null;
     }
   }
 

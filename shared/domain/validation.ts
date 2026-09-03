@@ -2,10 +2,9 @@ import { APPLICATION_MESSAGE } from './applications.js';
 import {
   COMMERCIAL_MODE,
   COMMERCIAL_MODES_FOR_MENTOR_TYPE,
-  MENTOR_SERVICES_DESCRIPTION,
+  MENTOR_SERVICE_DESCRIPTION,
   MENTOR_TYPE,
   SESSION_DURATION,
-  SESSION_PRICE_USD,
   commercialModeAllowedForMentorType,
   isCommercialMode,
   isMentorType,
@@ -13,6 +12,7 @@ import {
   type MentorOfferingFields,
   type MentorType,
 } from './mentorOffering.js';
+import { BASE_SESSION_PRICE_USD, isValidPriceCents, readSessionPriceCents } from './money.js';
 import {
   EVIDENCE_TYPE,
   isEvidenceComplete,
@@ -285,33 +285,43 @@ export function validateMentorOffering(input: MentorOfferingFields): ValidationR
     return fail(`Premium is only available to Accomplished Mentors. Choose one of: ${allowed}.`);
   }
 
-  if (input.servicesDescription !== undefined) {
-    const description = input.servicesDescription.trim();
-    if (description.length > MENTOR_SERVICES_DESCRIPTION.maxLength) {
+  const descriptionText = (input.serviceDescription ?? input.servicesDescription)?.trim();
+  if (descriptionText !== undefined) {
+    if (descriptionText.length > MENTOR_SERVICE_DESCRIPTION.maxLength) {
       return fail(
-        `Services description must be at most ${MENTOR_SERVICES_DESCRIPTION.maxLength} characters`,
+        `Service description must be at most ${MENTOR_SERVICE_DESCRIPTION.maxLength} characters`,
       );
     }
   }
 
   const mode = isCommercialMode(input.commercialMode) ? input.commercialMode : commercialMode;
+  const priceProvided =
+    input.baseSessionPriceUsd !== undefined ||
+    input.sessionPriceUsd !== undefined;
+  const priceCents = readSessionPriceCents(input);
 
-  if (input.sessionPriceUsd !== undefined && input.sessionPriceUsd !== null) {
-    const price = input.sessionPriceUsd;
-    if (!Number.isFinite(price) || price < 0) {
-      return fail('Session price must be a non-negative number in USD');
+  if (priceProvided && priceCents !== undefined && priceCents !== null) {
+    if (!isValidPriceCents(priceCents)) {
+      return fail('Session price must be a valid whole number of cents in USD');
     }
-    if (price > SESSION_PRICE_USD.max) {
-      return fail(`Session price cannot exceed $${SESSION_PRICE_USD.max}`);
+    if (priceCents > BASE_SESSION_PRICE_USD.maxCents) {
+      return fail(
+        `Session price cannot exceed ${new Intl.NumberFormat('en-US', {
+          style: 'currency',
+          currency: 'USD',
+        }).format(BASE_SESSION_PRICE_USD.maxCents / 100)}`,
+      );
     }
-    if (mode === COMMERCIAL_MODE.givingBack && price > 0) {
+    if (mode === COMMERCIAL_MODE.givingBack && priceCents > 0) {
       return fail('Giving Back mentors cannot set a session price');
     }
-    if (
-      (mode === COMMERCIAL_MODE.professional || mode === COMMERCIAL_MODE.premium) &&
-      price <= 0 &&
-      (input.commercialMode !== undefined || input.sessionPriceUsd !== null)
-    ) {
+  }
+
+  if (
+    (mode === COMMERCIAL_MODE.professional || mode === COMMERCIAL_MODE.premium) &&
+    (input.commercialMode !== undefined || priceProvided)
+  ) {
+    if (priceCents == null || priceCents <= 0) {
       return fail('Paid mentorship requires a session price greater than zero');
     }
   }

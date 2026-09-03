@@ -8,6 +8,7 @@ import {
   type CommercialMode,
   type MentorType,
 } from './mentorOffering.js';
+import { formatUsdCents } from './money.js';
 
 /** Uppercase public-facing mentor type labels for marketplace presentation. */
 export const MENTOR_TYPE_PUBLIC_LABEL: Record<MentorType, string> = {
@@ -29,14 +30,14 @@ export function isPaidCommercialMode(mode: CommercialMode): boolean {
 
 export function formatMentorPriceDisplay(input: {
   commercialMode: CommercialMode;
-  sessionPriceUsd: number | null;
+  baseSessionPriceUsd: number | null;
   sessionDurationMinutes?: number | null;
 }): string {
   if (input.commercialMode === COMMERCIAL_MODE.givingBack) {
     return 'Free mentorship';
   }
-  if (input.sessionPriceUsd != null && input.sessionPriceUsd > 0) {
-    const price = `$${input.sessionPriceUsd}`;
+  if (input.baseSessionPriceUsd != null && input.baseSessionPriceUsd > 0) {
+    const price = formatUsdCents(input.baseSessionPriceUsd);
     if (input.sessionDurationMinutes != null && input.sessionDurationMinutes > 0) {
       return `${price} / ${input.sessionDurationMinutes} min`;
     }
@@ -61,8 +62,8 @@ export function mentorVideoSessionCopy(offersVideoSessions: boolean | undefined)
   return offersVideoSessions ? 'Video sessions available' : 'Video sessions not offered';
 }
 
-export function mentorMessagingCopy(messagingIncluded: boolean | undefined): string {
-  return messagingIncluded === false ? 'Messaging not included' : 'Messaging included';
+export function mentorMessagingCopy(includedMessaging: boolean | undefined): string {
+  return includedMessaging === false ? 'Messaging not included' : 'Messaging included';
 }
 
 export function mentorTypeTitle(mentorType: MentorType | undefined): string {
@@ -100,12 +101,12 @@ export function commercialModeDescription(commercialMode: CommercialMode | undef
 }
 
 export function mentorHelpSummary(input: {
-  servicesDescription?: string;
+  serviceDescription?: string;
   mentoringInterests?: string;
   areasOfExpertise?: string[];
   professionalIdentity?: string;
 }): string {
-  const services = input.servicesDescription?.trim();
+  const services = input.serviceDescription?.trim();
   if (services) return services;
   const interests = input.mentoringInterests?.trim();
   if (interests) return interests;

@@ -32,7 +32,7 @@ export type MentorApplyOffering = {
   serviceModelLabel: string;
   serviceModelDescription: string;
   offersVideoSessions: boolean;
-  messagingIncluded: boolean;
+  includedMessaging: boolean;
 };
 
 type ApplyMentorshipProps = {
@@ -188,7 +188,7 @@ export function ApplyMentorship({
           ) : null}
           <Text variant="small">
             {mentorVideoSessionCopy(offering.offersVideoSessions)} ·{' '}
-            {mentorMessagingCopy(offering.messagingIncluded)}
+            {mentorMessagingCopy(offering.includedMessaging)}
           </Text>
         </Stack>
       </Modal>

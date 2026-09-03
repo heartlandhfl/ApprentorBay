@@ -201,7 +201,7 @@ function MentorBody({
         </Card>
       ) : null}
 
-      {mentoring.trim() && mentoring !== view?.servicesDescription ? (
+      {mentoring.trim() && mentoring !== view?.serviceDescription ? (
         <Card>
           <Stack gap={16}>
             <Text variant="h2">Mentoring interests</Text>
