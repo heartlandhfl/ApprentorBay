@@ -1,4 +1,9 @@
 import type { DeliverableRef } from './deliverables.js';
+import {
+  normalizeMentorOfferingFields,
+  type CommercialMode,
+  type MentorType,
+} from './mentorOffering.js';
 import { USER_ROLE, type SignupRole, type UserRole } from './identities.js';
 import {
   ACCOUNT_STATUS,
@@ -130,6 +135,26 @@ export interface MentorProfile {
   verificationCaseStatus: VerificationCaseStatus;
   verifiedClaims: VerifiedClaim[];
   public: boolean;
+  /** Primary mentor classification. Optional on older documents. */
+  mentorType?: MentorType;
+  /** Commercial tier separate from mentor type. Optional on older documents. */
+  commercialMode?: CommercialMode;
+  /** Short plain-text description of what the mentor offers. */
+  serviceDescription?: string;
+  /** Base session price in integer USD cents. Null for free (giving back) mentors. */
+  baseSessionPriceUsd?: number | null;
+  /** Optional session length in minutes. */
+  sessionDurationMinutes?: number | null;
+  offersVideoSessions?: boolean;
+  includedMessaging?: boolean;
+  /** Whether the mentor is open to new learner applications. */
+  acceptsNewLearners?: boolean;
+  /** @deprecated Legacy field. Use serviceDescription. */
+  servicesDescription?: string;
+  /** @deprecated Legacy whole-dollar field. Use baseSessionPriceUsd (cents). */
+  sessionPriceUsd?: number | null;
+  /** @deprecated Legacy field. Use includedMessaging. */
+  messagingIncluded?: boolean;
 }
 
 export interface AdminCounts {
@@ -336,6 +361,19 @@ export function normalizeMentorProfile(
   const status = Object.values(VERIFICATION_STATUS).includes(input.verificationStatus as VerificationStatus)
     ? (input.verificationStatus as VerificationStatus)
     : empty.verificationStatus;
+  const offering = normalizeMentorOfferingFields({
+    mentorType: input.mentorType,
+    commercialMode: input.commercialMode,
+    serviceDescription: input.serviceDescription ?? input.servicesDescription,
+    baseSessionPriceUsd: input.baseSessionPriceUsd,
+    sessionPriceUsd: input.sessionPriceUsd,
+    sessionDurationMinutes: input.sessionDurationMinutes,
+    offersVideoSessions: input.offersVideoSessions,
+    includedMessaging: input.includedMessaging ?? input.messagingIncluded,
+    acceptsNewLearners: input.acceptsNewLearners,
+    public: input.public,
+    verificationStatus: status,
+  });
   return {
     ...empty,
     ...input,
@@ -363,6 +401,14 @@ export function normalizeMentorProfile(
       : empty.verificationCaseStatus,
     verifiedClaims: asClaims(input.verifiedClaims),
     public: input.public !== false,
+    mentorType: offering.mentorType,
+    commercialMode: offering.commercialMode,
+    serviceDescription: offering.serviceDescription,
+    baseSessionPriceUsd: offering.baseSessionPriceUsd,
+    sessionDurationMinutes: offering.sessionDurationMinutes,
+    offersVideoSessions: offering.offersVideoSessions,
+    includedMessaging: offering.includedMessaging,
+    acceptsNewLearners: offering.acceptsNewLearners,
     displayName: asText(input.displayName).trim() || empty.displayName,
     userId: input.userId,
   };

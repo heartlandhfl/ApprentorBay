@@ -1,5 +1,19 @@
 import { APPLICATION_MESSAGE } from './applications.js';
 import {
+  COMMERCIAL_MODE,
+  COMMERCIAL_MODES_FOR_MENTOR_TYPE,
+  MENTOR_SERVICE_DESCRIPTION,
+  MENTOR_TYPE,
+  SESSION_DURATION,
+  commercialModeAllowedForMentorType,
+  isCommercialMode,
+  isMentorType,
+  type CommercialMode,
+  type MentorOfferingFields,
+  type MentorType,
+} from './mentorOffering.js';
+import { BASE_SESSION_PRICE_USD, isValidPriceCents, readSessionPriceCents } from './money.js';
+import {
   EVIDENCE_TYPE,
   isEvidenceComplete,
   isEvidenceType,
@@ -282,5 +296,87 @@ export function validateFinalDeliverable(input: {
       return fail('File path does not match this learner and contract');
     }
   }
+  return ok;
+}
+
+export function validateMentorOffering(input: MentorOfferingFields): ValidationResult {
+  if (input.mentorType !== undefined && !isMentorType(input.mentorType)) {
+    return fail('Choose a valid mentor type');
+  }
+  if (input.commercialMode !== undefined && !isCommercialMode(input.commercialMode)) {
+    return fail('Choose a valid commercial mode');
+  }
+
+  const mentorType: MentorType = isMentorType(input.mentorType)
+    ? input.mentorType
+    : MENTOR_TYPE.accomplished;
+  const commercialMode: CommercialMode = isCommercialMode(input.commercialMode)
+    ? input.commercialMode
+    : COMMERCIAL_MODE.givingBack;
+
+  if (
+    input.mentorType !== undefined &&
+    input.commercialMode !== undefined &&
+    !commercialModeAllowedForMentorType(mentorType, commercialMode)
+  ) {
+    const allowed = COMMERCIAL_MODES_FOR_MENTOR_TYPE[mentorType]
+      .map((mode) => mode.replace('_', ' '))
+      .join(', ');
+    return fail(`Premium is only available to Accomplished Mentors. Choose one of: ${allowed}.`);
+  }
+
+  const descriptionText = (input.serviceDescription ?? input.servicesDescription)?.trim();
+  if (descriptionText !== undefined) {
+    if (descriptionText.length > MENTOR_SERVICE_DESCRIPTION.maxLength) {
+      return fail(
+        `Service description must be at most ${MENTOR_SERVICE_DESCRIPTION.maxLength} characters`,
+      );
+    }
+  }
+
+  const mode = isCommercialMode(input.commercialMode) ? input.commercialMode : commercialMode;
+  const priceProvided =
+    input.baseSessionPriceUsd !== undefined ||
+    input.sessionPriceUsd !== undefined;
+  const priceCents = readSessionPriceCents(input);
+
+  if (priceProvided && priceCents !== undefined && priceCents !== null) {
+    if (!isValidPriceCents(priceCents)) {
+      return fail('Session price must be a valid whole number of cents in USD');
+    }
+    if (priceCents > BASE_SESSION_PRICE_USD.maxCents) {
+      return fail(
+        `Session price cannot exceed ${new Intl.NumberFormat('en-US', {
+          style: 'currency',
+          currency: 'USD',
+        }).format(BASE_SESSION_PRICE_USD.maxCents / 100)}`,
+      );
+    }
+    if (mode === COMMERCIAL_MODE.givingBack && priceCents > 0) {
+      return fail('Giving Back mentors cannot set a session price');
+    }
+  }
+
+  if (
+    (mode === COMMERCIAL_MODE.professional || mode === COMMERCIAL_MODE.premium) &&
+    (input.commercialMode !== undefined || priceProvided)
+  ) {
+    if (priceCents == null || priceCents <= 0) {
+      return fail('Paid mentorship requires a session price greater than zero');
+    }
+  }
+
+  if (input.sessionDurationMinutes !== undefined && input.sessionDurationMinutes !== null) {
+    const duration = input.sessionDurationMinutes;
+    if (!Number.isInteger(duration)) {
+      return fail('Session duration must be a whole number of minutes');
+    }
+    if (duration < SESSION_DURATION.minMinutes || duration > SESSION_DURATION.maxMinutes) {
+      return fail(
+        `Session duration must be between ${SESSION_DURATION.minMinutes} and ${SESSION_DURATION.maxMinutes} minutes`,
+      );
+    }
+  }
+
   return ok;
 }

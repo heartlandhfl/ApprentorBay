@@ -154,6 +154,10 @@ profilesRouter.get(
         sendApiError(res, 403, 'forbidden', 'This mentor is not open for applications');
         return;
       }
+      if (loaded.profile.acceptsNewLearners === false) {
+        sendApiError(res, 403, 'forbidden', 'This mentor is not accepting new learners');
+        return;
+      }
       res.json({ mentorId: record.userId, slug: record.slug });
     } catch (error) {
       next(error);

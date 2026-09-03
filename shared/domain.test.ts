@@ -65,13 +65,24 @@ import {
   normalizeContract,
   isPublicPhotoPath,
   looksLikeFirebaseUid,
+  COMMERCIAL_MODE,
+  MENTOR_TYPE,
+  commercialModeAllowedForMentorType,
+  centsToDisplayDollars,
+  formatMentorPriceDisplay,
+  formatUsdCents,
+  mentorPrimaryActionLabel,
+  parseUsdToCents,
+  readSessionPriceCents,
   normalizeLearnerProfile,
+  normalizeMentorProfile,
   ownPublicProfilePath,
   profilePhotoStoragePath,
   publicProfileOmitsPrivateFields,
   publicProfilePath,
   suggestSlug,
   toStoredPublicProfile,
+  validateMentorOffering,
   validateProfileSlug,
   canConfirmCompletion,
   completionRequirements,
@@ -82,6 +93,20 @@ import {
   parsePasswordResetAction,
   validateNewPassword,
   validatePasswordResetEmail,
+  EMPTY_MENTOR_DISCOVERY_FILTERS,
+  filterListedMentors,
+  hasActiveDiscoveryFilters,
+  mentorDiscoveryExpertiseLabel,
+  REQUEST_TYPE,
+  applicationCommercialFieldsFromSnapshot,
+  buildMentorshipCommercialSnapshot,
+  buildMentorshipCommercialSnapshotFromProfile,
+  canAccessPaidMentorshipServices,
+  normalizeApplicationCommercialFields,
+  paidMentorshipServicesBlocked,
+  relationshipCommercialFromApplication,
+  requestTypeFromCommercialMode,
+  validateMentorApplicationTarget,
 } from './domain/index.js';
 
 describe('domain identities', () => {
@@ -236,6 +261,8 @@ describe('domain permissions and validation', () => {
   const approvedMentor = {
     userId: 'mentor-1',
     verificationStatus: VERIFICATION_STATUS.approved,
+    public: true,
+    acceptsNewLearners: true,
   };
 
   it('lets a learner apply to an approved mentor with a message', () => {
@@ -243,6 +270,14 @@ describe('domain permissions and validation', () => {
     assert.equal(canApplyForMentorship(mentor, approvedMentor, 'I want to learn joinery'), false);
     assert.equal(
       canApplyForMentorship(learner, { ...approvedMentor, verificationStatus: VERIFICATION_STATUS.pending }, 'Hi'),
+      false,
+    );
+    assert.equal(
+      canApplyForMentorship(learner, { ...approvedMentor, public: false }, 'Hi'),
+      false,
+    );
+    assert.equal(
+      canApplyForMentorship(learner, { ...approvedMentor, acceptsNewLearners: false }, 'Hi'),
       false,
     );
   });
@@ -539,6 +574,34 @@ describe('public profile system', () => {
     assert.equal(listed.verifiedClaims.length, 1);
     assert.equal(listed.verifiedClaims[0]?.type, VERIFIED_CLAIM_TYPE.identity);
     assert.notEqual(APPROVAL_STATUS_LABEL[APPROVAL_STATUS.approved], 'Verified');
+  });
+
+  it('projects mentor offering fields without private verification metadata', () => {
+    const profile = normalizeMentorProfile({
+      ...emptyMentorProfile('mentor-1', 'Ben'),
+      slug: 'ben',
+      public: true,
+      verificationStatus: APPROVAL_STATUS.approved,
+      mentorType: MENTOR_TYPE.competencyCoach,
+      commercialMode: COMMERCIAL_MODE.professional,
+      serviceDescription: 'Weekly shop coaching',
+      baseSessionPriceUsd: 7500,
+      sessionDurationMinutes: 60,
+      offersVideoSessions: true,
+      includedMessaging: true,
+      acceptsNewLearners: true,
+    });
+    const publicProfile = buildPublicMentorProfile({
+      profile,
+      mentoredDeliverables: [],
+      now: '2026-09-01T00:00:00.000Z',
+    });
+    assert.equal(publicProfile.mentorType, MENTOR_TYPE.competencyCoach);
+    assert.equal(publicProfile.commercialMode, COMMERCIAL_MODE.professional);
+    assert.equal(publicProfile.baseSessionPriceUsd, 7500);
+    assert.equal(publicProfile.acceptsNewLearners, true);
+    assert.equal('verificationStatus' in publicProfile, false);
+    assert.equal('verificationCaseStatus' in publicProfile, false);
   });
 
   it('keeps approval separate from verification and blocks self-governance', () => {
@@ -916,6 +979,365 @@ describe('lifecycle dashboards', () => {
       contracts: [normalizeContract({ ...draftContract(), status: LEARNING_CONTRACT_STATUS.completed })],
     });
     assert.equal(legacy, 'build_legacy');
+  });
+});
+
+describe('mentor offering', () => {
+  it('allows premium only for accomplished mentors', () => {
+    assert.equal(
+      commercialModeAllowedForMentorType(MENTOR_TYPE.accomplished, COMMERCIAL_MODE.premium),
+      true,
+    );
+    assert.equal(
+      commercialModeAllowedForMentorType(MENTOR_TYPE.competencyCoach, COMMERCIAL_MODE.premium),
+      false,
+    );
+    assert.equal(
+      commercialModeAllowedForMentorType(MENTOR_TYPE.learningGuide, COMMERCIAL_MODE.premium),
+      false,
+    );
+  });
+
+  it('defaults legacy mentor documents to accomplished + giving back', () => {
+    const profile = normalizeMentorProfile(emptyMentorProfile('mentor-1', 'Ben'));
+    assert.equal(profile.mentorType, MENTOR_TYPE.accomplished);
+    assert.equal(profile.commercialMode, COMMERCIAL_MODE.givingBack);
+    assert.equal(profile.baseSessionPriceUsd, null);
+    assert.equal(profile.includedMessaging, true);
+  });
+
+  it('validates paid modes and rejects premium for coaches', () => {
+    assert.equal(
+      validateMentorOffering({
+        mentorType: MENTOR_TYPE.learningGuide,
+        commercialMode: COMMERCIAL_MODE.premium,
+      }).ok,
+      false,
+    );
+    assert.equal(
+      validateMentorOffering({
+        mentorType: MENTOR_TYPE.accomplished,
+        commercialMode: COMMERCIAL_MODE.professional,
+        baseSessionPriceUsd: 12_000,
+      }).ok,
+      true,
+    );
+    assert.equal(
+      validateMentorOffering({
+        mentorType: MENTOR_TYPE.accomplished,
+        commercialMode: COMMERCIAL_MODE.givingBack,
+        baseSessionPriceUsd: 5000,
+      }).ok,
+      false,
+    );
+    assert.equal(
+      validateMentorOffering({
+        mentorType: MENTOR_TYPE.accomplished,
+        commercialMode: COMMERCIAL_MODE.premium,
+        baseSessionPriceUsd: 0,
+      }).ok,
+      false,
+    );
+    assert.equal(
+      validateMentorOffering({
+        mentorType: MENTOR_TYPE.accomplished,
+        commercialMode: COMMERCIAL_MODE.professional,
+        baseSessionPriceUsd: Number.NaN,
+      }).ok,
+      false,
+    );
+  });
+});
+
+describe('mentor money', () => {
+  it('parses and formats USD amounts as integer cents', () => {
+    assert.equal(parseUsdToCents('75'), 7500);
+    assert.equal(parseUsdToCents('$75.50'), 7550);
+    assert.equal(parseUsdToCents('1,200.00'), 120_000);
+    assert.equal(parseUsdToCents(''), null);
+    assert.equal(parseUsdToCents('abc'), null);
+    assert.equal(formatUsdCents(7500), '$75');
+    assert.equal(formatUsdCents(7550), '$75.50');
+    assert.equal(centsToDisplayDollars(7500), '75');
+    assert.equal(centsToDisplayDollars(7550), '75.50');
+  });
+
+  it('reads legacy whole-dollar session prices as cents', () => {
+    assert.equal(readSessionPriceCents({ sessionPriceUsd: 75 }), 7500);
+    assert.equal(readSessionPriceCents({ baseSessionPriceUsd: 7500 }), 7500);
+    assert.equal(readSessionPriceCents({ baseSessionPriceUsd: null }), null);
+  });
+
+  it('normalizes legacy mentor documents with old field names', () => {
+    const profile = normalizeMentorProfile({
+      ...emptyMentorProfile('mentor-1', 'Ben'),
+      commercialMode: COMMERCIAL_MODE.professional,
+      servicesDescription: 'Shop coaching',
+      sessionPriceUsd: 120,
+      messagingIncluded: false,
+      verificationStatus: APPROVAL_STATUS.approved,
+    });
+    assert.equal(profile.serviceDescription, 'Shop coaching');
+    assert.equal(profile.baseSessionPriceUsd, 12_000);
+    assert.equal(profile.includedMessaging, false);
+  });
+});
+
+describe('mentor presentation', () => {
+  it('formats free and paid prices from configured mentor data only', () => {
+    assert.equal(
+      formatMentorPriceDisplay({
+        commercialMode: COMMERCIAL_MODE.givingBack,
+        baseSessionPriceUsd: null,
+      }),
+      'Free mentorship',
+    );
+    assert.equal(
+      formatMentorPriceDisplay({
+        commercialMode: COMMERCIAL_MODE.professional,
+        baseSessionPriceUsd: 7500,
+      }),
+      '$75 / session',
+    );
+    assert.equal(
+      formatMentorPriceDisplay({
+        commercialMode: COMMERCIAL_MODE.premium,
+        baseSessionPriceUsd: 15_000,
+        sessionDurationMinutes: 60,
+      }),
+      '$150 / 60 min',
+    );
+    assert.equal(
+      formatMentorPriceDisplay({
+        commercialMode: COMMERCIAL_MODE.premium,
+        baseSessionPriceUsd: null,
+      }),
+      'Paid mentorship',
+    );
+  });
+
+  it('chooses primary actions by commercial mode', () => {
+    assert.equal(mentorPrimaryActionLabel(COMMERCIAL_MODE.givingBack), 'Request mentorship');
+    assert.equal(mentorPrimaryActionLabel(COMMERCIAL_MODE.premium), 'View mentorship options');
+  });
+});
+
+describe('mentor discovery', () => {
+  const mentors = [
+    buildPublicMentorProfile({
+      profile: normalizeMentorProfile({
+        ...emptyMentorProfile('mentor-1', 'Alex Rivera'),
+        slug: 'alex',
+        public: true,
+        verificationStatus: APPROVAL_STATUS.approved,
+        mentorType: MENTOR_TYPE.accomplished,
+        commercialMode: COMMERCIAL_MODE.premium,
+        serviceDescription: 'Executive coaching for product leaders',
+        baseSessionPriceUsd: 20_000,
+        offersVideoSessions: true,
+        acceptsNewLearners: true,
+        areasOfExpertise: ['Product strategy', 'Leadership'],
+      }),
+      mentoredDeliverables: [],
+      now: '2026-09-01T00:00:00.000Z',
+    }),
+    buildPublicMentorProfile({
+      profile: normalizeMentorProfile({
+        ...emptyMentorProfile('mentor-2', 'Sam Chen'),
+        slug: 'sam',
+        public: true,
+        verificationStatus: APPROVAL_STATUS.approved,
+        mentorType: MENTOR_TYPE.learningGuide,
+        commercialMode: COMMERCIAL_MODE.givingBack,
+        serviceDescription: 'Accountability for early-career writers',
+        offersVideoSessions: false,
+        acceptsNewLearners: true,
+        areasOfExpertise: ['Writing', 'Editing'],
+      }),
+      mentoredDeliverables: [],
+      now: '2026-09-01T00:00:00.000Z',
+    }),
+  ];
+
+  it('filters by mentor type, commercial model, and availability flags', () => {
+    assert.equal(
+      filterListedMentors(mentors, {
+        ...EMPTY_MENTOR_DISCOVERY_FILTERS,
+        mentorTypes: [MENTOR_TYPE.learningGuide],
+      }).length,
+      1,
+    );
+    assert.equal(
+      filterListedMentors(mentors, {
+        ...EMPTY_MENTOR_DISCOVERY_FILTERS,
+        commercialModes: [COMMERCIAL_MODE.premium],
+      })[0]?.displayName,
+      'Alex Rivera',
+    );
+    assert.equal(
+      filterListedMentors(mentors, {
+        ...EMPTY_MENTOR_DISCOVERY_FILTERS,
+        videoSessionsOnly: true,
+      }).length,
+      1,
+    );
+  });
+
+  it('searches names, service descriptions, and demonstrated skills', () => {
+    assert.equal(
+      filterListedMentors(mentors, {
+        ...EMPTY_MENTOR_DISCOVERY_FILTERS,
+        query: 'product leaders',
+      }).length,
+      1,
+    );
+    assert.equal(
+      filterListedMentors(mentors, {
+        ...EMPTY_MENTOR_DISCOVERY_FILTERS,
+        skillsQuery: 'writing',
+      })[0]?.displayName,
+      'Sam Chen',
+    );
+    assert.equal(hasActiveDiscoveryFilters(EMPTY_MENTOR_DISCOVERY_FILTERS), false);
+    assert.equal(
+      hasActiveDiscoveryFilters({ ...EMPTY_MENTOR_DISCOVERY_FILTERS, query: 'sam' }),
+      true,
+    );
+  });
+
+  it('summarises expertise for mentor cards', () => {
+    assert.equal(
+      mentorDiscoveryExpertiseLabel(mentors[0]!),
+      'Product strategy · Leadership',
+    );
+  });
+});
+
+describe('mentorship commercial requests', () => {
+  const learner = { uid: 'learner-1', role: USER_ROLE.learner, active: true, accountStatus: ACCOUNT_STATUS.active };
+  const approvedMentorBase = {
+    userId: 'mentor-1',
+    verificationStatus: VERIFICATION_STATUS.approved,
+    public: true,
+    acceptsNewLearners: true,
+  };
+
+  it('derives free and paid request types from mentor commercial mode', () => {
+    const freeProfile = normalizeMentorProfile({
+      ...emptyMentorProfile('mentor-1', 'Sam'),
+      ...approvedMentorBase,
+      commercialMode: COMMERCIAL_MODE.givingBack,
+    });
+    const paidProfile = normalizeMentorProfile({
+      ...emptyMentorProfile('mentor-2', 'Alex'),
+      ...approvedMentorBase,
+      userId: 'mentor-2',
+      commercialMode: COMMERCIAL_MODE.professional,
+      baseSessionPriceUsd: 7500,
+    });
+    assert.equal(requestTypeFromCommercialMode(COMMERCIAL_MODE.givingBack), REQUEST_TYPE.freeRequest);
+    assert.equal(requestTypeFromCommercialMode(COMMERCIAL_MODE.premium), REQUEST_TYPE.paidRequest);
+    assert.equal(buildMentorshipCommercialSnapshotFromProfile(freeProfile).requestType, REQUEST_TYPE.freeRequest);
+    assert.equal(buildMentorshipCommercialSnapshotFromProfile(paidProfile).requestType, REQUEST_TYPE.paidRequest);
+    assert.equal(
+      applicationCommercialFieldsFromSnapshot(buildMentorshipCommercialSnapshotFromProfile(paidProfile))
+        .baseSessionPriceUsd,
+      7500,
+    );
+  });
+
+  it('allows free mentor applications and rejects invalid paid targets', () => {
+    const freeMentor = normalizeMentorProfile({
+      ...emptyMentorProfile('mentor-1', 'Sam'),
+      ...approvedMentorBase,
+      commercialMode: COMMERCIAL_MODE.givingBack,
+    });
+    const unpaidPaidMentor = normalizeMentorProfile({
+      ...emptyMentorProfile('mentor-2', 'Alex'),
+      ...approvedMentorBase,
+      userId: 'mentor-2',
+      commercialMode: COMMERCIAL_MODE.professional,
+      baseSessionPriceUsd: null,
+    });
+    assert.equal(canApplyForMentorship(learner, freeMentor, 'I want to learn joinery'), true);
+    assert.equal(validateMentorApplicationTarget(freeMentor).ok, true);
+    assert.equal(canApplyForMentorship(learner, unpaidPaidMentor, 'Please mentor me'), false);
+    assert.equal(validateMentorApplicationTarget(unpaidPaidMentor).ok, false);
+  });
+
+  it('snapshots paid requests even if the mentor later switches to free', () => {
+    const paidSnapshot = buildMentorshipCommercialSnapshot({
+      commercialMode: COMMERCIAL_MODE.professional,
+      baseSessionPriceUsd: 12_000,
+      sessionDurationMinutes: 60,
+    });
+    const application = {
+      id: 'app-1',
+      learnerId: 'learner-1',
+      mentorId: 'mentor-1',
+      message: 'Please mentor me',
+      status: APPLICATION_STATUS.pending,
+      createdAt: '2026-09-01T00:00:00.000Z',
+      ...applicationCommercialFieldsFromSnapshot(paidSnapshot),
+    };
+    const laterFreeMentor = normalizeMentorProfile({
+      ...emptyMentorProfile('mentor-1', 'Alex'),
+      ...approvedMentorBase,
+      commercialMode: COMMERCIAL_MODE.givingBack,
+    });
+    assert.equal(normalizeApplicationCommercialFields(application).requestType, REQUEST_TYPE.paidRequest);
+    assert.equal(buildMentorshipCommercialSnapshotFromProfile(laterFreeMentor).requestType, REQUEST_TYPE.freeRequest);
+    assert.equal(
+      relationshipCommercialFromApplication(application).paymentRequired,
+      true,
+    );
+    assert.equal(
+      relationshipCommercialFromApplication(application).paymentSatisfied,
+      false,
+    );
+  });
+
+  it('treats legacy applications and relationships without commercial fields as free', () => {
+    const legacyApplication = {
+      id: 'legacy-app',
+      learnerId: 'learner-1',
+      mentorId: 'mentor-1',
+      message: 'Hello',
+      status: APPLICATION_STATUS.pending,
+      createdAt: '2026-09-01T00:00:00.000Z',
+    };
+    const legacyRelationship = normalizeRelationship({
+      id: 'rel-1',
+      learnerId: 'learner-1',
+      mentorId: 'mentor-1',
+      status: RELATIONSHIP_STATUS.active,
+      createdAt: '2026-09-01T00:00:00.000Z',
+    });
+    assert.equal(normalizeApplicationCommercialFields(legacyApplication).requestType, REQUEST_TYPE.freeRequest);
+    assert.equal(canStartLearningJourney(learner, legacyRelationship), true);
+    assert.equal(paidMentorshipServicesBlocked(legacyRelationship), false);
+    assert.equal(canAccessPaidMentorshipServices(legacyRelationship), true);
+  });
+
+  it('blocks learning journeys for paid requests until payment is satisfied', () => {
+    const paidRelationship = normalizeRelationship({
+      id: 'rel-paid',
+      learnerId: 'learner-1',
+      mentorId: 'mentor-1',
+      status: RELATIONSHIP_STATUS.active,
+      createdAt: '2026-09-01T00:00:00.000Z',
+      requestType: REQUEST_TYPE.paidRequest,
+      commercialMode: COMMERCIAL_MODE.professional,
+      baseSessionPriceUsd: 7500,
+      paymentRequired: true,
+      paymentSatisfied: false,
+    });
+    assert.equal(paidMentorshipServicesBlocked(paidRelationship), true);
+    assert.equal(canStartLearningJourney(learner, paidRelationship), false);
+    assert.equal(
+      canStartLearningJourney(learner, { ...paidRelationship, paymentSatisfied: true }),
+      true,
+    );
   });
 });
 

@@ -31,6 +31,7 @@ export type {
   LearningContract,
   LearningContractStatus,
   MentorProfile,
+  MentorType,
   Mentorship,
   MentorshipApplication,
   MentorshipRelationship,
@@ -54,6 +55,7 @@ export type {
   VerificationDecision,
   VerificationStatus,
   VerifiedClaim,
+  CommercialMode,
 } from './domain/index.js';
 
 export interface FirebaseClientStatus {

@@ -9,6 +9,7 @@ import { USER_ROLE } from './identities.js';
 import { canParticipate } from './administration.js';
 import { isAccountActive, type MentorProfile, type User } from './users.js';
 import { isPendingApplication, type MentorshipApplication } from './applications.js';
+import { validateMentorApplicationTarget, canAccessPaidMentorshipServices } from './mentorshipRequest.js';
 import {
   isOpenRelationship,
   isPairingMember,
@@ -31,14 +32,33 @@ export function canAdminister(actor: PermissionActor | null | undefined): boolea
 
 export function canApplyForMentorship(
   actor: PermissionActor | null | undefined,
-  mentor: Pick<MentorProfile, 'userId' | 'verificationStatus'>,
+  mentor: Pick<
+    MentorProfile,
+    | 'userId'
+    | 'verificationStatus'
+    | 'public'
+    | 'acceptsNewLearners'
+    | 'commercialMode'
+    | 'baseSessionPriceUsd'
+    | 'sessionPriceUsd'
+    | 'sessionDurationMinutes'
+    | 'mentorType'
+    | 'serviceDescription'
+    | 'servicesDescription'
+    | 'includedMessaging'
+    | 'messagingIncluded'
+    | 'offersVideoSessions'
+  >,
   message: string,
 ): boolean {
   if (!actor || !canParticipate(actor)) return false;
   if (actor.role !== USER_ROLE.learner) return false;
   if (actor.uid === mentor.userId) return false;
   if (mentor.verificationStatus !== VERIFICATION_STATUS.approved) return false;
-  return validateApplicationMessage(message).ok;
+  if (mentor.public === false) return false;
+  if (mentor.acceptsNewLearners === false) return false;
+  if (!validateApplicationMessage(message).ok) return false;
+  return validateMentorApplicationTarget(mentor).ok;
 }
 
 export function canAcceptApplication(
@@ -123,7 +143,8 @@ export function canStartLearningJourney(
   if (!actor || !canParticipate(actor)) return false;
   if (actor.role !== USER_ROLE.learner) return false;
   if (relationship.learnerId !== actor.uid) return false;
-  return relationship.status === RELATIONSHIP_STATUS.active;
+  if (relationship.status !== RELATIONSHIP_STATUS.active) return false;
+  return canAccessPaidMentorshipServices(relationship);
 }
 
 export function canPauseRelationship(

@@ -70,6 +70,74 @@ export { COLLECTIONS, RESERVED_COLLECTIONS } from './collections.js';
 export type { CollectionName, ReservedCollectionName } from './collections.js';
 
 export {
+  COMMERCIAL_MODE,
+  COMMERCIAL_MODE_DESCRIPTION,
+  COMMERCIAL_MODE_EDITOR_DESCRIPTION,
+  COMMERCIAL_MODE_LABEL,
+  COMMERCIAL_MODES_FOR_MENTOR_TYPE,
+  MENTOR_SERVICE_DESCRIPTION,
+  MENTOR_SERVICES_DESCRIPTION,
+  MENTOR_TYPE,
+  MENTOR_TYPE_DESCRIPTION,
+  MENTOR_TYPE_LABEL,
+  SESSION_DURATION,
+  commercialModeAllowedForMentorType,
+  isCommercialMode,
+  isMentorType,
+  normalizeMentorOfferingFields,
+  resolveMentorOffering,
+} from './mentorOffering.js';
+export type {
+  CommercialMode,
+  MentorOfferingFields,
+  MentorType,
+  ResolvedMentorOffering,
+} from './mentorOffering.js';
+
+export {
+  BASE_SESSION_PRICE_USD,
+  centsToDisplayDollars,
+  formatUsdCents,
+  isValidPriceCents,
+  parseUsdToCents,
+  readSessionPriceCents,
+} from './money.js';
+
+export {
+  COMMERCIAL_MODE_DISCOVERY_LABEL,
+  COMMERCIAL_MODE_PUBLIC_LABEL,
+  MENTOR_TYPE_PUBLIC_LABEL,
+  commercialModeDescription,
+  commercialModeDiscoveryLabel,
+  commercialModePublicTitle,
+  commercialModeTitle,
+  formatMentorPriceDisplay,
+  isPaidCommercialMode,
+  mentorAvailabilityCopy,
+  mentorHelpSummary,
+  mentorMessagingCopy,
+  mentorCardServiceDescription,
+  mentorPrimaryActionLabel,
+  mentorTypeDescription,
+  mentorTypePublicTitle,
+  mentorTypeTitle,
+  mentorVideoSessionCopy,
+} from './mentorPresentation.js';
+
+export {
+  EMPTY_MENTOR_DISCOVERY_FILTERS,
+  MENTOR_DISCOVERY_COMMERCIAL_MODES,
+  MENTOR_DISCOVERY_MENTOR_TYPES,
+  filterListedMentors,
+  hasActiveDiscoveryFilters,
+  mentorDiscoveryExpertiseLabel,
+  mentorDiscoverySearchHaystack,
+  mentorDiscoverySkillsHaystack,
+  mentorMatchesDiscoveryFilters,
+} from './mentorDiscovery.js';
+export type { MentorDiscoveryFilters } from './mentorDiscovery.js';
+
+export {
   emptyLearnerProfile,
   emptyMentorProfile,
   isAccountActive,
@@ -93,8 +161,28 @@ export type {
   VerificationDecision,
 } from './users.js';
 
-export { APPLICATION_MESSAGE, isPendingApplication } from './applications.js';
+export {
+  APPLICATION_MESSAGE,
+  isPendingApplication,
+} from './applications.js';
 export type { MentorApplication, MentorshipApplication } from './applications.js';
+
+export {
+  REQUEST_TYPE,
+  REQUEST_TYPE_PUBLIC_LABEL,
+  applicationCommercialFieldsFromSnapshot,
+  buildMentorshipCommercialSnapshot,
+  buildMentorshipCommercialSnapshotFromProfile,
+  canAccessPaidMentorshipServices,
+  isRequestType,
+  normalizeApplicationCommercialFields,
+  paidMentorshipServicesBlocked,
+  relationshipCommercialFromApplication,
+  requestTypeFromCommercialMode,
+  requestTypePublicLabel,
+  validateMentorApplicationTarget,
+} from './mentorshipRequest.js';
+export type { MentorshipCommercialSnapshot, RequestType } from './mentorshipRequest.js';
 
 export {
   RELATIONSHIP_STATUS_LABEL,
@@ -377,6 +465,7 @@ export {
   validateFinalDeliverable,
   validateGoalDraft,
   validateMentorPlan,
+  validateMentorOffering,
   validateMessageText,
   validateMilestoneFeedback,
   validateNewPassword,

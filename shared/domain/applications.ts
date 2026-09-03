@@ -1,5 +1,7 @@
 import type { IsoDateString } from './users.js';
 import { APPLICATION_STATUS, type ApplicationStatus } from './statuses.js';
+import type { CommercialMode } from './mentorOffering.js';
+import type { RequestType } from './mentorshipRequest.js';
 
 /**
  * Mentor Application — persisted as `mentorshipApplications`.
@@ -17,6 +19,11 @@ export interface MentorshipApplication {
   mentorDisplayName?: string;
   learnerSlug?: string | null;
   mentorSlug?: string | null;
+  /** Server-derived snapshot at apply time. Legacy docs omit this (treated as free). */
+  requestType?: RequestType;
+  commercialMode?: CommercialMode;
+  baseSessionPriceUsd?: number | null;
+  sessionDurationMinutes?: number | null;
 }
 
 export type MentorApplication = MentorshipApplication;

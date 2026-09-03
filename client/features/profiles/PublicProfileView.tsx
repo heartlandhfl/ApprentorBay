@@ -94,7 +94,13 @@ export function PortfolioSection({
   );
 }
 
-export function MentorBadges({ profile }: { profile: PublicProfile }) {
+export function MentorBadges({
+  profile,
+  compact = false,
+}: {
+  profile: PublicProfile;
+  compact?: boolean;
+}) {
   const claims = profile.verifiedClaims.filter((item) => item.verified);
   return (
     <Stack gap={8}>
@@ -108,7 +114,7 @@ export function MentorBadges({ profile }: { profile: PublicProfile }) {
           </Badge>
         ))}
       </Cluster>
-      <Text variant="small">{APPROVAL_DISCLAIMER}</Text>
+      {compact ? null : <Text variant="small">{APPROVAL_DISCLAIMER}</Text>}
     </Stack>
   );
 }

@@ -16,7 +16,11 @@ import {
 } from '../components';
 import { ApplyMentorship } from '../features/mentorship';
 import { ProfileEditor } from '../features/profiles/ProfileEditor';
-import { MentorBadges, PortfolioSection, ProfilePhoto } from '../features/profiles/PublicProfileView';
+import {
+  MentorMarketplaceHero,
+  mentorOfferingForApply,
+} from '../features/profiles/MentorMarketplaceProfile';
+import { PortfolioSection } from '../features/profiles/PublicProfileView';
 import { watchMentorProfile, watchPublicProfile } from '../features/profiles';
 import { useAuth } from '../lib/auth';
 import { getOwnProfile } from '../lib/api';
@@ -124,18 +128,27 @@ function MentorBody({
 
   return (
     <Stack gap={32}>
-      <Stack gap={16}>
-        <Text variant="caption">Mentor</Text>
-        {view ? <MentorBadges profile={view} /> : null}
-        <ProfilePhoto path={view?.photoPath ?? own?.photoPath ?? null} name={name} />
-        <Text variant="h1">{name}</Text>
-        {identity ? <Text>{identity}</Text> : null}
-        {location ? <Text variant="small">{location}</Text> : null}
-        {view ? <ApplyMentorship slug={slug} displayName={name} approvalStatus={view.approvalStatus} /> : null}
-        {isOwner && own && own.verificationStatus !== 'approved' ? (
-          <Text variant="small">Public visitors see this profile after participation is approved.</Text>
-        ) : null}
-      </Stack>
+      {view ? (
+        <MentorMarketplaceHero
+          profile={view}
+          name={name}
+          identity={identity}
+          location={location}
+          photoPath={view.photoPath ?? own?.photoPath ?? null}
+        >
+          <ApplyMentorship
+            slug={slug}
+            displayName={name}
+            approvalStatus={view.approvalStatus}
+            acceptsNewLearners={view.acceptsNewLearners !== false}
+            offering={mentorOfferingForApply(view)}
+          />
+        </MentorMarketplaceHero>
+      ) : null}
+
+      {isOwner && own && own.verificationStatus !== 'approved' ? (
+        <Text variant="small">Public visitors see this profile after participation is approved.</Text>
+      ) : null}
 
       <Card>
         <Stack gap={16}>
@@ -170,30 +183,32 @@ function MentorBody({
         </Stack>
       </Card>
 
-      <Card>
-        <Stack gap={16}>
-          <Text variant="h2">Areas of expertise</Text>
-          {expertise.length === 0 ? (
-            <EmptyState title="No expertise listed yet" />
-          ) : (
+      {expertise.length > 0 ? (
+        <Card>
+          <Stack gap={16}>
+            <Text variant="h2">Areas of expertise</Text>
             <Text>{expertise.join(', ')}</Text>
-          )}
-        </Stack>
-      </Card>
+          </Stack>
+        </Card>
+      ) : null}
 
-      <Card>
-        <Stack gap={16}>
-          <Text variant="h2">Professional goals / interests</Text>
-          {goals.trim() ? <Text>{goals}</Text> : <EmptyState title="No professional goals listed yet" />}
-        </Stack>
-      </Card>
+      {goals.trim() ? (
+        <Card>
+          <Stack gap={16}>
+            <Text variant="h2">Professional goals / interests</Text>
+            <Text>{goals}</Text>
+          </Stack>
+        </Card>
+      ) : null}
 
-      <Card>
-        <Stack gap={16}>
-          <Text variant="h2">Mentoring interests</Text>
-          {mentoring.trim() ? <Text>{mentoring}</Text> : <EmptyState title="No mentoring interests listed yet" />}
-        </Stack>
-      </Card>
+      {mentoring.trim() && mentoring !== view?.serviceDescription ? (
+        <Card>
+          <Stack gap={16}>
+            <Text variant="h2">Mentoring interests</Text>
+            <Text>{mentoring}</Text>
+          </Stack>
+        </Card>
+      ) : null}
 
       <PortfolioSection
         title="Mentored deliverables"

@@ -1,4 +1,10 @@
 import { USER_ROLE, type UserRole } from './identities.js';
+import {
+  COMMERCIAL_MODE,
+  MENTOR_TYPE,
+  type CommercialMode,
+  type MentorType,
+} from './mentorOffering.js';
 import type { Showcase, ShowcaseEvidence } from './showcases.js';
 import {
   VERIFICATION_STATUS,
@@ -89,6 +95,20 @@ export interface PublicProfile {
   approvalStatus: ApprovalStatus;
   verifiedClaims: VerifiedClaim[];
   updatedAt: string;
+  mentorType?: MentorType;
+  commercialMode?: CommercialMode;
+  serviceDescription?: string;
+  baseSessionPriceUsd?: number | null;
+  sessionDurationMinutes?: number | null;
+  offersVideoSessions?: boolean;
+  includedMessaging?: boolean;
+  acceptsNewLearners?: boolean;
+  /** @deprecated Legacy field. Use serviceDescription. */
+  servicesDescription?: string;
+  /** @deprecated Legacy whole-dollar field. Use baseSessionPriceUsd (cents). */
+  sessionPriceUsd?: number | null;
+  /** @deprecated Legacy field. Use includedMessaging. */
+  messagingIncluded?: boolean;
 }
 
 export interface ProfileSlugRecord {
@@ -143,6 +163,14 @@ export function toStoredPublicProfile(profile: PublicProfile): PublicProfile {
     approvalStatus: profile.approvalStatus,
     verifiedClaims: profile.verifiedClaims,
     updatedAt: profile.updatedAt,
+    mentorType: profile.mentorType,
+    commercialMode: profile.commercialMode,
+    serviceDescription: profile.serviceDescription,
+    baseSessionPriceUsd: profile.baseSessionPriceUsd,
+    sessionDurationMinutes: profile.sessionDurationMinutes,
+    offersVideoSessions: profile.offersVideoSessions,
+    includedMessaging: profile.includedMessaging,
+    acceptsNewLearners: profile.acceptsNewLearners,
   };
 }
 
@@ -297,6 +325,14 @@ export function buildPublicMentorProfile(input: {
     approvalStatus: profile.verificationStatus,
     verifiedClaims: verifiedClaimsPublic(profile.verifiedClaims),
     updatedAt: now,
+    mentorType: profile.mentorType ?? MENTOR_TYPE.accomplished,
+    commercialMode: profile.commercialMode ?? COMMERCIAL_MODE.givingBack,
+    serviceDescription: profile.serviceDescription ?? '',
+    baseSessionPriceUsd: profile.baseSessionPriceUsd ?? null,
+    sessionDurationMinutes: profile.sessionDurationMinutes ?? null,
+    offersVideoSessions: profile.offersVideoSessions === true,
+    includedMessaging: profile.includedMessaging !== false,
+    acceptsNewLearners: profile.acceptsNewLearners === true,
   };
 }
 

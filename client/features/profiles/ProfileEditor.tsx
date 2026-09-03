@@ -1,12 +1,27 @@
 import { useState, type FormEvent } from 'react';
 import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
 import {
+  COMMERCIAL_MODE,
+  COMMERCIAL_MODE_EDITOR_DESCRIPTION,
+  COMMERCIAL_MODE_LABEL,
+  COMMERCIAL_MODES_FOR_MENTOR_TYPE,
+  MENTOR_TYPE,
+  MENTOR_TYPE_DESCRIPTION,
+  MENTOR_TYPE_LABEL,
+  SESSION_DURATION,
+  VERIFICATION_STATUS,
+  centsToDisplayDollars,
+  commercialModeAllowedForMentorType,
+  parseUsdToCents,
   profilePhotoStoragePath,
+  readSessionPriceCents,
+  type CommercialMode,
   type CredentialEntry,
   type EducationEntry,
   type ExperienceEntry,
   type LearnerProfile,
   type MentorProfile,
+  type MentorType,
 } from '@apprentorbay/shared';
 import { Button, Card, Checkbox, FileField, Input, Stack, Text, TextArea } from '../../components';
 import { getFirebaseStorage } from '../../lib/firebase';
@@ -47,10 +62,49 @@ export function ProfileEditor({ role, profile, onSaved }: ProfileEditorProps) {
   const [experience, setExperience] = useState(linesFromExperience(mentor?.experience ?? []));
   const [professionalGoals, setProfessionalGoals] = useState(mentor?.professionalGoals ?? '');
   const [mentoringInterests, setMentoringInterests] = useState(mentor?.mentoringInterests ?? '');
+  const [mentorType, setMentorType] = useState<MentorType>(
+    mentor?.mentorType ?? MENTOR_TYPE.accomplished,
+  );
+  const [commercialMode, setCommercialMode] = useState<CommercialMode>(
+    mentor?.commercialMode ?? COMMERCIAL_MODE.givingBack,
+  );
+  const [serviceDescription, setServiceDescription] = useState(
+    mentor?.serviceDescription ?? mentor?.servicesDescription ?? '',
+  );
+  const initialPriceCents = mentor
+    ? readSessionPriceCents({
+        baseSessionPriceUsd: mentor.baseSessionPriceUsd,
+        sessionPriceUsd: mentor.sessionPriceUsd,
+      })
+    : undefined;
+  const [sessionPriceInput, setSessionPriceInput] = useState(
+    initialPriceCents != null && initialPriceCents > 0
+      ? centsToDisplayDollars(initialPriceCents)
+      : '',
+  );
+  const [sessionDurationMinutes, setSessionDurationMinutes] = useState(
+    mentor?.sessionDurationMinutes != null ? String(mentor.sessionDurationMinutes) : '',
+  );
+  const [offersVideoSessions, setOffersVideoSessions] = useState(mentor?.offersVideoSessions === true);
+  const [includedMessaging, setIncludedMessaging] = useState(
+    mentor?.includedMessaging ?? mentor?.messagingIncluded !== false,
+  );
+  const [acceptsNewLearners, setAcceptsNewLearners] = useState(mentor?.acceptsNewLearners !== false);
   const [photo, setPhoto] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+
+  const mentorApproved = mentor?.verificationStatus === VERIFICATION_STATUS.approved;
+  const allowedCommercialModes = COMMERCIAL_MODES_FOR_MENTOR_TYPE[mentorType];
+
+  function onMentorTypeChange(nextType: MentorType) {
+    setMentorType(nextType);
+    if (!commercialModeAllowedForMentorType(nextType, commercialMode)) {
+      setCommercialMode(COMMERCIAL_MODE.givingBack);
+      setSessionPriceInput('');
+    }
+  }
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
@@ -83,6 +137,25 @@ export function ProfileEditor({ role, profile, onSaved }: ProfileEditorProps) {
         experience: parseExperience(experience),
         professionalGoals,
         mentoringInterests,
+        ...(role === 'mentor' && mentorApproved
+          ? {
+              mentorType,
+              commercialMode,
+              serviceDescription,
+              baseSessionPriceUsd:
+                commercialMode === COMMERCIAL_MODE.givingBack
+                  ? null
+                  : sessionPriceInput.trim()
+                    ? parseUsdToCents(sessionPriceInput)
+                    : null,
+              sessionDurationMinutes: sessionDurationMinutes.trim()
+                ? Number(sessionDurationMinutes)
+                : null,
+              offersVideoSessions,
+              includedMessaging,
+              acceptsNewLearners,
+            }
+          : {}),
       });
       setSaved(true);
       onSaved?.();
@@ -198,6 +271,105 @@ export function ProfileEditor({ role, profile, onSaved }: ProfileEditorProps) {
                 value={mentoringInterests}
                 onChange={(event) => setMentoringInterests(event.target.value)}
               />
+              {mentorApproved ? (
+                <Stack gap={16}>
+                  <Text variant="h3">Mentor service</Text>
+                  <Text variant="small">
+                    Configure how you offer mentorship on ApprentorBay. These settings appear on
+                    your public profile after you save. Payment collection and payouts are not
+                    handled in-app yet.
+                  </Text>
+                  <Stack gap={12}>
+                    <Text variant="small">Mentor type</Text>
+                    {(Object.values(MENTOR_TYPE) as MentorType[]).map((type) => (
+                      <label key={type} className="flex cursor-pointer gap-3">
+                        <input
+                          type="radio"
+                          name="mentorType"
+                          checked={mentorType === type}
+                          onChange={() => onMentorTypeChange(type)}
+                        />
+                        <Stack gap={4}>
+                          <Text>{MENTOR_TYPE_LABEL[type]}</Text>
+                          <Text variant="small">{MENTOR_TYPE_DESCRIPTION[type]}</Text>
+                        </Stack>
+                      </label>
+                    ))}
+                  </Stack>
+                  <Stack gap={12}>
+                    <Text variant="small">How do you want to offer mentorship?</Text>
+                    {allowedCommercialModes.map((mode) => (
+                      <label key={mode} className="flex cursor-pointer gap-3">
+                        <input
+                          type="radio"
+                          name="commercialMode"
+                          checked={commercialMode === mode}
+                          onChange={() => {
+                            setCommercialMode(mode);
+                            if (mode === COMMERCIAL_MODE.givingBack) setSessionPriceInput('');
+                          }}
+                        />
+                        <Stack gap={4}>
+                          <Text>{COMMERCIAL_MODE_LABEL[mode]}</Text>
+                          <Text variant="small">{COMMERCIAL_MODE_EDITOR_DESCRIPTION[mode]}</Text>
+                        </Stack>
+                      </label>
+                    ))}
+                  </Stack>
+                  <TextArea
+                    label="Service description"
+                    value={serviceDescription}
+                    onChange={(event) => setServiceDescription(event.target.value)}
+                    hint="A short summary of what learners can expect from working with you."
+                  />
+                  {commercialMode !== COMMERCIAL_MODE.givingBack ? (
+                    <>
+                      <Input
+                        label="Base session price (USD)"
+                        type="text"
+                        inputMode="decimal"
+                        value={sessionPriceInput}
+                        onChange={(event) => setSessionPriceInput(event.target.value)}
+                        hint="Required for paid mentorship. Shown on your public profile. Enter an amount like 75 or 75.00."
+                      />
+                      <Input
+                        label="Session duration (minutes, optional)"
+                        type="number"
+                        min={SESSION_DURATION.minMinutes}
+                        max={SESSION_DURATION.maxMinutes}
+                        step="15"
+                        value={sessionDurationMinutes}
+                        onChange={(event) => setSessionDurationMinutes(event.target.value)}
+                        hint={`Between ${SESSION_DURATION.minMinutes} and ${SESSION_DURATION.maxMinutes} minutes.`}
+                      />
+                    </>
+                  ) : (
+                    <Text variant="small">
+                      Giving Back mentors offer free mentorship. No price is shown on your profile.
+                    </Text>
+                  )}
+                  <Checkbox
+                    checked={offersVideoSessions}
+                    onChange={(event) => setOffersVideoSessions(event.target.checked)}
+                    label="I offer video sessions"
+                  />
+                  <Checkbox
+                    checked={includedMessaging}
+                    onChange={(event) => setIncludedMessaging(event.target.checked)}
+                    label="Messaging is included in my mentorship"
+                  />
+                  <Checkbox
+                    checked={acceptsNewLearners}
+                    onChange={(event) => setAcceptsNewLearners(event.target.checked)}
+                    label="I am accepting new learners"
+                  />
+                </Stack>
+              ) : (
+                <Text variant="small">
+                  After participation is approved, you can choose your mentor type and commercial
+                  mode here.
+                </Text>
+              )}
             </>
           )}
           <Checkbox

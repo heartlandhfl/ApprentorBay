@@ -1,9 +1,14 @@
 import {
   COLLECTIONS,
   USER_ROLE,
+  VERIFICATION_STATUS,
+  COMMERCIAL_MODE,
   canParticipate,
   buildPublicLearnerProfile,
   buildPublicMentorProfile,
+  commercialModeAllowedForMentorType,
+  isCommercialMode,
+  isMentorType,
   isPublicPhotoPath,
   looksLikeFirebaseUid,
   needsTermsAcceptance,
@@ -13,14 +18,17 @@ import {
   portfolioItemFromShowcase,
   publicProfileOmitsPrivateFields,
   suggestSlug,
+  validateMentorOffering,
   validateProfileSlug,
   toStoredPublicProfile,
+  type CommercialMode,
   type CredentialEntry,
   type EducationEntry,
   type ExperienceEntry,
   type CompetencyGoal,
   type LearnerProfile,
   type MentorProfile,
+  type MentorType,
   type PublicPortfolioItem,
   type PublicProfile,
   type Showcase,
@@ -50,6 +58,14 @@ export type ProfileUpdateBody = {
   public?: boolean;
   slug?: string;
   photoPath?: string | null;
+  mentorType?: MentorType;
+  commercialMode?: CommercialMode;
+  serviceDescription?: string;
+  baseSessionPriceUsd?: number | null;
+  sessionDurationMinutes?: number | null;
+  offersVideoSessions?: boolean;
+  includedMessaging?: boolean;
+  acceptsNewLearners?: boolean;
 };
 
 function nowIso() {
@@ -264,6 +280,51 @@ export async function applyProfileUpdate(account: User, body: ProfileUpdateBody)
     }
   }
 
+  if (account.role === USER_ROLE.mentor && loaded.role === 'mentor') {
+    const offeringPatch = {
+      mentorType: body.mentorType,
+      commercialMode: body.commercialMode,
+      serviceDescription: body.serviceDescription,
+      baseSessionPriceUsd: body.baseSessionPriceUsd,
+      sessionDurationMinutes: body.sessionDurationMinutes,
+      offersVideoSessions: body.offersVideoSessions,
+      includedMessaging: body.includedMessaging,
+      acceptsNewLearners: body.acceptsNewLearners,
+    };
+    const hasOfferingField = Object.values(offeringPatch).some((value) => value !== undefined);
+    if (hasOfferingField) {
+      if (loaded.profile.verificationStatus !== VERIFICATION_STATUS.approved) {
+        throw Object.assign(
+          new Error('Mentor type and commercial mode can be set after participation is approved'),
+          { status: 403 },
+        );
+      }
+      const mergedType = isMentorType(body.mentorType)
+        ? body.mentorType
+        : loaded.profile.mentorType;
+      const mergedMode = isCommercialMode(body.commercialMode)
+        ? body.commercialMode
+        : loaded.profile.commercialMode;
+      if (
+        mergedType &&
+        mergedMode &&
+        !commercialModeAllowedForMentorType(mergedType, mergedMode)
+      ) {
+        throw Object.assign(new Error('Premium is only available to Accomplished Mentors'), {
+          status: 400,
+        });
+      }
+      const offeringValidation = validateMentorOffering({
+        ...offeringPatch,
+        mentorType: mergedType,
+        commercialMode: mergedMode,
+      });
+      if (!offeringValidation.ok) {
+        throw Object.assign(new Error(offeringValidation.error), { status: 400 });
+      }
+    }
+  }
+
   const profileCollection =
     account.role === USER_ROLE.mentor ? COLLECTIONS.mentorProfiles : COLLECTIONS.learnerProfiles;
   const patch: Record<string, unknown> = {};
@@ -290,6 +351,20 @@ export async function applyProfileUpdate(account: User, body: ProfileUpdateBody)
   assign('mentoringInterests', body.mentoringInterests);
   assign('public', body.public);
   assign('photoPath', body.photoPath);
+  assign('mentorType', body.mentorType);
+  assign('commercialMode', body.commercialMode);
+  assign('serviceDescription', body.serviceDescription);
+  assign('baseSessionPriceUsd', body.baseSessionPriceUsd);
+  assign('sessionDurationMinutes', body.sessionDurationMinutes);
+  assign('offersVideoSessions', body.offersVideoSessions);
+  assign('includedMessaging', body.includedMessaging);
+  assign('acceptsNewLearners', body.acceptsNewLearners);
+
+  if (account.role === USER_ROLE.mentor && body.commercialMode !== undefined) {
+    if (body.commercialMode === COMMERCIAL_MODE.givingBack) {
+      patch.baseSessionPriceUsd = null;
+    }
+  }
 
   if (typeof patch.displayName === 'string' && patch.displayName.length > 0) {
     await adminDb().collection(COLLECTIONS.users).doc(account.uid).set(

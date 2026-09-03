@@ -2,6 +2,7 @@ import { collection, doc, getDoc, onSnapshot, query, where } from 'firebase/fire
 import {
   COLLECTIONS,
   emptyMentorProfile,
+  readSessionPriceCents,
   type LearnerProfile,
   type MentorProfile,
   type PublicProfile,
@@ -153,6 +154,18 @@ export function watchApprovedMentors(
         experience: row.experience,
         professionalGoals: row.professionalGoals,
         mentoringInterests: row.mentoringInterests,
+        mentorType: row.mentorType,
+        commercialMode: row.commercialMode,
+        serviceDescription: row.serviceDescription ?? row.servicesDescription,
+        baseSessionPriceUsd:
+          readSessionPriceCents({
+            baseSessionPriceUsd: row.baseSessionPriceUsd,
+            sessionPriceUsd: row.sessionPriceUsd,
+          }) ?? null,
+        sessionDurationMinutes: row.sessionDurationMinutes,
+        offersVideoSessions: row.offersVideoSessions,
+        includedMessaging: row.includedMessaging ?? row.messagingIncluded !== false,
+        acceptsNewLearners: row.acceptsNewLearners,
         verificationStatus: row.approvalStatus,
         verifiedClaims: row.verifiedClaims,
         public: row.published,
