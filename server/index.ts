@@ -14,6 +14,7 @@ import { contractsRouter } from './routes/contracts.js';
 import { healthRouter } from './routes/health.js';
 import { profilesRouter } from './routes/profiles.js';
 import { relationshipsRouter } from './routes/relationships.js';
+import { bookingsRouter } from './routes/bookings.js';
 import { supportRouter } from './routes/support.js';
 
 function thisDir(): string {
@@ -93,6 +94,7 @@ app.use('/api/admin', adminRouter);
 app.use('/api/profiles', profilesRouter);
 app.use('/api/applications', applicationsRouter);
 app.use('/api/relationships', relationshipsRouter);
+app.use('/api/bookings', bookingsRouter);
 app.use('/api/contracts', contractsRouter);
 app.use('/api/support', supportRouter);
 app.use('/api', notFound);

@@ -1,4 +1,10 @@
 import {
+  BOOKING_PAYMENT_STATUS,
+  BOOKING_STATUS,
+  type BookingPaymentStatus,
+  type BookingStatus,
+} from './bookings.js';
+import {
   APPLICATION_STATUS,
   LEARNING_CONTRACT_STATUS,
   MILESTONE_STATUS,
@@ -159,4 +165,39 @@ export function canTransitionContract(
 
 export function canTransitionMilestone(from: MilestoneStatus, to: MilestoneStatus): boolean {
   return canTransition(MILESTONE_TRANSITIONS, from, to);
+}
+
+export const BOOKING_STATUS_TRANSITIONS: TransitionMap<BookingStatus> = {
+  [BOOKING_STATUS.pendingPayment]: [
+    BOOKING_STATUS.paid,
+    BOOKING_STATUS.cancelled,
+    BOOKING_STATUS.failed,
+  ],
+  [BOOKING_STATUS.paid]: [BOOKING_STATUS.refunded],
+  [BOOKING_STATUS.cancelled]: [],
+  [BOOKING_STATUS.refunded]: [],
+  [BOOKING_STATUS.failed]: [],
+};
+
+export const BOOKING_PAYMENT_STATUS_TRANSITIONS: TransitionMap<BookingPaymentStatus> = {
+  [BOOKING_PAYMENT_STATUS.pendingPayment]: [
+    BOOKING_PAYMENT_STATUS.paid,
+    BOOKING_PAYMENT_STATUS.cancelled,
+    BOOKING_PAYMENT_STATUS.failed,
+  ],
+  [BOOKING_PAYMENT_STATUS.paid]: [BOOKING_PAYMENT_STATUS.refunded],
+  [BOOKING_PAYMENT_STATUS.cancelled]: [],
+  [BOOKING_PAYMENT_STATUS.refunded]: [],
+  [BOOKING_PAYMENT_STATUS.failed]: [],
+};
+
+export function canTransitionBookingStatus(from: BookingStatus, to: BookingStatus): boolean {
+  return canTransition(BOOKING_STATUS_TRANSITIONS, from, to);
+}
+
+export function canTransitionBookingPaymentStatus(
+  from: BookingPaymentStatus,
+  to: BookingPaymentStatus,
+): boolean {
+  return canTransition(BOOKING_PAYMENT_STATUS_TRANSITIONS, from, to);
 }

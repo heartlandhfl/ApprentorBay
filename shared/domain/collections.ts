@@ -16,6 +16,7 @@ export const COLLECTIONS = {
   profileSlugs: 'profileSlugs',
   auditLogs: 'adminAuditLogs',
   supportIssues: 'supportIssues',
+  bookings: 'mentorshipBookings',
   /** Console / operator list. Not the app user record — sync into `users` with role admin. */
   operatorAdmins: 'admins',
 } as const;

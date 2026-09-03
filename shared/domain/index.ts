@@ -196,6 +196,41 @@ export {
 } from './relationships.js';
 export type { MentorshipRelationship, PairingMemberIds } from './relationships.js';
 
+export {
+  BOOKING_CURRENCY,
+  BOOKING_PAYMENT_STATUS,
+  BOOKING_SERVICE_TYPE,
+  BOOKING_STATUS,
+  CLIENT_BOOKING_CREATE_FIELDS,
+  DEFAULT_PLATFORM_FEE_BPS,
+  FORBIDDEN_CLIENT_BOOKING_FIELDS,
+  bookingTitleFromOffering,
+  buildBookingFinancialSnapshot,
+  buildMentorshipBooking,
+  cancelMentorshipBooking,
+  computeMentorAmountCents,
+  computePlatformFeeCents,
+  detectClientBookingFieldTampering,
+  isBookingCurrency,
+  isBookingPaymentStatus,
+  isBookingServiceType,
+  isBookingStatus,
+  isOpenBookingPaymentStatus,
+  isOpenBookingStatus,
+  markMentorshipBookingPaid,
+  normalizeMentorshipBooking,
+  validateBookingRelationship,
+  validateCreateBookingBody,
+} from './bookings.js';
+export type {
+  BookingCurrency,
+  BookingFinancialSnapshot,
+  BookingPaymentStatus,
+  BookingServiceType,
+  BookingStatus,
+  MentorshipBooking,
+} from './bookings.js';
+
 export { MESSAGE_TEXT } from './messages.js';
 export type { Message } from './messages.js';
 
@@ -426,6 +461,9 @@ export {
   canSuspendAccount,
   canTerminateAccount,
   canTerminateRelationship,
+  canCreateBooking,
+  canReadBooking,
+  canCancelBooking,
 } from './permissions.js';
 export type { PermissionActor } from './permissions.js';
 
@@ -459,5 +497,9 @@ export {
   canTransitionMilestone,
   canTransitionRelationship,
   canTransitionVerification,
+  canTransitionBookingStatus,
+  canTransitionBookingPaymentStatus,
+  BOOKING_STATUS_TRANSITIONS,
+  BOOKING_PAYMENT_STATUS_TRANSITIONS,
 } from './transitions.js';
 export type { TransitionMap } from './transitions.js';

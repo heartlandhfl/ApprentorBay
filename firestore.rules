@@ -209,6 +209,11 @@ service cloud.firestore {
       allow create, update, delete: if false;
     }
 
+    match /mentorshipBookings/{bookingId} {
+      allow read: if isPairingMember() || isAdmin();
+      allow create, update, delete: if false;
+    }
+
     match /messages/{messageId} {
       allow read: if isRelationshipMember(resource.data.relationshipId) || isAdmin();
       allow create: if accountParticipates()
