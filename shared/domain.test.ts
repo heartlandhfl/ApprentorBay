@@ -129,6 +129,11 @@ describe('domain identities', () => {
     assert.equal(COLLECTIONS.auditLogs, 'adminAuditLogs');
     assert.equal(COLLECTIONS.supportIssues, 'supportIssues');
     assert.equal(COLLECTIONS.bookings, 'mentorshipBookings');
+    assert.equal(COLLECTIONS.paymentIntents, 'paymentIntents');
+    assert.equal(COLLECTIONS.checkoutSessions, 'checkoutSessions');
+    assert.equal(COLLECTIONS.paymentRefunds, 'paymentRefunds');
+    assert.equal(COLLECTIONS.paymentEvents, 'paymentEvents');
+    assert.equal(COLLECTIONS.paymentWebhookDedup, 'paymentWebhookDedup');
     assert.equal(COLLECTIONS.operatorAdmins, 'admins');
     assert.equal(RESERVED_COLLECTIONS.legacyMentorships, 'mentorships');
     assert.equal(RESERVED_COLLECTIONS.notifications, 'notifications');
