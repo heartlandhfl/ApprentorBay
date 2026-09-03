@@ -5,7 +5,9 @@ import {
   COLLECTIONS,
   RELATIONSHIP_STATUS,
   USER_ROLE,
+  applicationCommercialFieldsFromSnapshot,
   buildActiveRelationship,
+  buildMentorshipCommercialSnapshotFromProfile,
   canAcceptApplication,
   canApplyForMentorship,
   canDeclineApplication,
@@ -13,7 +15,9 @@ import {
   isClosedRelationship,
   isOpenRelationship,
   normalizeRelationship,
+  relationshipCommercialFromApplication,
   relationshipDocId,
+  validateMentorApplicationTarget,
   type MentorshipApplication,
   type MentorshipRelationship,
   type User,
@@ -57,10 +61,17 @@ applicationsRouter.post('/', async (req: AccountRequest, res, next) => {
       return;
     }
     const mentorUser = (await adminDb().collection(COLLECTIONS.users).doc(record.userId).get()).data() as User | undefined;
+    const offeringValidation = validateMentorApplicationTarget(loaded.profile);
+    if (!offeringValidation.ok) {
+      sendApiError(res, 400, 'invalid', offeringValidation.error);
+      return;
+    }
     if (!canParticipate(account) || !canParticipate(mentorUser) || !canApplyForMentorship(account, loaded.profile, message)) {
       sendApiError(res, 400, 'invalid', 'This mentor is not open for applications');
       return;
     }
+
+    const commercialSnapshot = buildMentorshipCommercialSnapshotFromProfile(loaded.profile);
 
     const pending = await adminDb()
       .collection(COLLECTIONS.applications)
@@ -88,6 +99,7 @@ applicationsRouter.post('/', async (req: AccountRequest, res, next) => {
       mentorDisplayName: loaded.profile.displayName,
       learnerSlug: account.profileSlug,
       mentorSlug: mentorSlug,
+      ...applicationCommercialFieldsFromSnapshot(commercialSnapshot),
     };
     await ref.set(application);
     res.status(201).json({ application });
@@ -180,6 +192,8 @@ applicationsRouter.post('/:id/accept', async (req: AccountRequest, res, next) =>
       let relationship: MentorshipRelationship;
       let created = false;
 
+      const commercial = relationshipCommercialFromApplication(current);
+
       if (existing && isClosedRelationship(existing)) {
         if (existing.status === RELATIONSHIP_STATUS.terminated) {
           throw Object.assign(new Error('This pairing was terminated'), { status: 403 });
@@ -187,6 +201,7 @@ applicationsRouter.post('/:id/accept', async (req: AccountRequest, res, next) =>
         relationship = {
           ...existing,
           applicationId: current.id,
+          ...commercial,
           status: RELATIONSHIP_STATUS.active,
           startedAt: now,
           updatedAt: now,
@@ -200,6 +215,7 @@ applicationsRouter.post('/:id/accept', async (req: AccountRequest, res, next) =>
           mentorId: current.mentorId,
           applicationId: current.id,
           now,
+          commercial,
         });
         tx.set(relRef, relationship);
         created = true;

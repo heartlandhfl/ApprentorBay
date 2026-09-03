@@ -9,7 +9,10 @@ import {
   mentorMessagingCopy,
   mentorPrimaryActionLabel,
   mentorVideoSessionCopy,
+  normalizeApplicationCommercialFields,
+  requestTypePublicLabel,
   type CommercialMode,
+  type RequestType,
 } from '@apprentorbay/shared';
 import {
   Badge,
@@ -58,6 +61,7 @@ export function ApplyMentorship({
   const [error, setError] = useState<string | null>(null);
   const [mentorId, setMentorId] = useState<string | null>(null);
   const [applicationStatus, setApplicationStatus] = useState<string | null>(null);
+  const [requestType, setRequestType] = useState<RequestType | null>(null);
   const [relationshipId, setRelationshipId] = useState<string | null>(null);
   const [relationshipOpen, setRelationshipOpen] = useState(false);
 
@@ -85,6 +89,11 @@ export function ApplyMentorship({
     }
     return watchPairing(account.uid, mentorId, (state) => {
       setApplicationStatus(state.application?.status ?? null);
+      setRequestType(
+        state.application
+          ? normalizeApplicationCommercialFields(state.application).requestType
+          : null,
+      );
       setRelationshipId(state.relationship?.id ?? null);
       setRelationshipOpen(Boolean(state.relationship && isOpenRelationship(state.relationship)));
     });
@@ -110,7 +119,11 @@ export function ApplyMentorship({
   }
 
   if (applicationStatus === APPLICATION_STATUS.pending) {
-    return <Badge tone="accent">Application pending</Badge>;
+    return (
+      <Badge tone="accent">
+        {requestTypePublicLabel(requestType ?? undefined)} pending
+      </Badge>
+    );
   }
 
   async function onSubmit(event: FormEvent) {
@@ -203,7 +216,7 @@ export function ApplyMentorship({
               Cancel
             </Button>
             <Button type="submit" form="apply-mentorship" loading={busy}>
-              Send request
+              {isPaid ? 'Send paid request' : 'Send free request'}
             </Button>
           </Cluster>
         }

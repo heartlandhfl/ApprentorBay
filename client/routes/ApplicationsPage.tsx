@@ -2,6 +2,10 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { MentorshipApplication } from '@apprentorbay/shared';
 import {
+  normalizeApplicationCommercialFields,
+  requestTypePublicLabel,
+} from '@apprentorbay/shared';
+import {
   Button,
   Cluster,
   EmptyState,
@@ -102,6 +106,15 @@ export function ApplicationsPage() {
                 key: 'learner',
                 header: 'Learner',
                 render: (row) => <Text>{row.learnerDisplayName || names[row.learnerId] || 'Learner'}</Text>,
+              },
+              {
+                key: 'requestType',
+                header: 'Request',
+                render: (row) => (
+                  <Text variant="small">
+                    {requestTypePublicLabel(normalizeApplicationCommercialFields(row).requestType)}
+                  </Text>
+                ),
               },
               {
                 key: 'message',
