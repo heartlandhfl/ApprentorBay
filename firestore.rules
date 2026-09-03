@@ -260,7 +260,7 @@ service cloud.firestore {
     }
 
     match /mentorshipSessions/{sessionId} {
-      allow read: if isRelationshipMember(resource.data.relationshipId) || isAdmin();
+      allow read: if isActiveRelationshipMember(resource.data.relationshipId) || isAdmin();
       allow create, update, delete: if false;
     }
 
