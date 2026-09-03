@@ -385,6 +385,16 @@ export async function getMentorshipBooking(bookingId: string): Promise<Mentorshi
   return body.booking;
 }
 
+export async function listMentorshipBookings(
+  relationshipId: string,
+): Promise<{ bookings: MentorshipBooking[] }> {
+  const response = await fetch(
+    `/api/bookings/relationship/${encodeURIComponent(relationshipId)}`,
+    { headers: await authHeaders() },
+  );
+  return readJson<{ bookings: MentorshipBooking[] }>(response);
+}
+
 export async function startPaymentCheckout(
   bookingId: string,
 ): Promise<{ checkoutUrl: string; paymentIntentId: string }> {

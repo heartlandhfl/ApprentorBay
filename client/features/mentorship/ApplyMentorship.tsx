@@ -22,12 +22,8 @@ import {
   TextArea,
 } from '../../components';
 import { useAuth } from '../../lib/auth';
-import {
-  applyToMentor,
-  createMentorshipBooking,
-  resolveMentorApplyTarget,
-  startPaymentCheckout,
-} from '../../lib/api';
+import { applyToMentor, resolveMentorApplyTarget } from '../../lib/api';
+import { startMentorshipPaymentCheckout } from './mentorshipCheckout';
 import {
   MentorshipOfferingCard,
   MentorshipOfferingCardButton,
@@ -163,9 +159,7 @@ export function ApplyMentorship({
     setBusy(true);
     setError(null);
     try {
-      const { booking } = await createMentorshipBooking({ relationshipId });
-      const checkout = await startPaymentCheckout(booking.id);
-      window.location.assign(checkout.checkoutUrl);
+      await startMentorshipPaymentCheckout(relationshipId);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not start checkout');
       setBusy(false);
