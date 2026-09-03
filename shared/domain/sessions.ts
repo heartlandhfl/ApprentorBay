@@ -153,3 +153,30 @@ export function assertSessionOwnership(
 export function isSessionMember(uid: string, session: PairingMemberIds): boolean {
   return isPairingMember(uid, session);
 }
+
+export interface SessionJoinPayload {
+  domain: string;
+  roomName: string;
+  userInfo: {
+    displayName: string;
+    email: string;
+  };
+}
+
+export function isUpcomingSession(
+  session: Pick<MentorshipSession, 'status' | 'scheduledEnd'>,
+  now: IsoDateString = new Date().toISOString(),
+): boolean {
+  if (session.status !== SESSION_STATUS.scheduled) return false;
+  return Date.parse(session.scheduledEnd) >= Date.parse(now);
+}
+
+export function isPastSession(
+  session: Pick<MentorshipSession, 'status' | 'scheduledEnd'>,
+  now: IsoDateString = new Date().toISOString(),
+): boolean {
+  if (session.status === SESSION_STATUS.cancelled || session.status === SESSION_STATUS.completed) {
+    return true;
+  }
+  return session.status === SESSION_STATUS.scheduled && Date.parse(session.scheduledEnd) < Date.parse(now);
+}

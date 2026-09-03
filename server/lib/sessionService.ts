@@ -1,8 +1,8 @@
 import {
-  AUDIT_EVENT,
   SESSION_STATUS,
   assertSessionOwnership,
   buildMentorshipSession,
+  canJoinSession,
   canCancelSession,
   canCompleteSession,
   canReadSession,
@@ -13,6 +13,7 @@ import {
   validateSessionScheduleInput,
   type MentorshipRelationship,
   type MentorshipSession,
+  type SessionJoinPayload,
   type User,
 } from '@apprentorbay/shared';
 
@@ -240,6 +241,49 @@ export async function completeMentorshipSession(
   };
   await store.saveSession(session);
   return { session, changed: true };
+}
+
+export function resolveJitsiDomain(): string {
+  return process.env.JITSI_DOMAIN?.trim() || 'meet.jit.si';
+}
+
+export async function joinMentorshipSession(
+  store: SessionStore,
+  account: User | undefined,
+  sessionId: string,
+  now: string = new Date().toISOString(),
+): Promise<SessionJoinPayload> {
+  const actor = requireActor(account);
+  const current = await store.getSession(sessionId);
+  if (!current) {
+    throw new SessionServiceError('not_found', 'Session not found', 404);
+  }
+
+  const relationship = await store.getRelationship(current.relationshipId);
+  if (!relationship || !assertSessionOwnership(relationship, current)) {
+    throw new SessionServiceError('forbidden', 'Session does not match its relationship', 403);
+  }
+
+  if (!canJoinSession(actor, current, relationship, now)) {
+    throw new SessionServiceError('forbidden', 'You cannot join this session yet', 403);
+  }
+
+  if (!current.startedAt) {
+    await store.saveSession({
+      ...current,
+      startedAt: now,
+      updatedAt: now,
+    });
+  }
+
+  return {
+    domain: resolveJitsiDomain(),
+    roomName: current.roomName,
+    userInfo: {
+      displayName: actor.displayName?.trim() || 'Participant',
+      email: actor.email?.trim() || '',
+    },
+  };
 }
 
 export function relationshipFromStoreData(

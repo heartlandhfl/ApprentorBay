@@ -8,8 +8,10 @@ import type {
   LearningContract,
   MentorshipApplication,
   MentorshipRelationship,
+  MentorshipSession,
   PendingMentorRow,
   RelationshipStatus,
+  SessionJoinPayload,
   SupportIssue,
   User,
   VerificationStatus,
@@ -297,4 +299,66 @@ export async function resolveMentorApplyTarget(slug: string) {
     headers: await authHeaders(),
   });
   return readJson<{ mentorId: string; slug: string }>(response);
+}
+
+export async function listMentorshipSessions(relationshipId: string): Promise<MentorshipSession[]> {
+  const response = await fetch(
+    `/api/sessions?relationshipId=${encodeURIComponent(relationshipId)}`,
+    { headers: await authHeaders() },
+  );
+  const body = await readJson<{ sessions: MentorshipSession[] }>(response);
+  return body.sessions;
+}
+
+export async function getMentorshipSession(sessionId: string): Promise<MentorshipSession> {
+  const response = await fetch(`/api/sessions/${encodeURIComponent(sessionId)}`, {
+    headers: await authHeaders(),
+  });
+  const body = await readJson<{ session: MentorshipSession }>(response);
+  return body.session;
+}
+
+export async function createMentorshipSession(input: {
+  relationshipId: string;
+  title: string;
+  scheduledStart: string;
+  scheduledEnd: string;
+}): Promise<MentorshipSession> {
+  const response = await fetch('/api/sessions', {
+    method: 'POST',
+    headers: await authHeaders(),
+    body: JSON.stringify(input),
+  });
+  const body = await readJson<{ session: MentorshipSession }>(response);
+  return body.session;
+}
+
+export async function cancelMentorshipSession(sessionId: string): Promise<MentorshipSession> {
+  const response = await fetch(`/api/sessions/${encodeURIComponent(sessionId)}/cancel`, {
+    method: 'POST',
+    headers: await authHeaders(),
+    body: JSON.stringify({}),
+  });
+  const body = await readJson<{ session: MentorshipSession }>(response);
+  return body.session;
+}
+
+export async function completeMentorshipSession(sessionId: string): Promise<MentorshipSession> {
+  const response = await fetch(`/api/sessions/${encodeURIComponent(sessionId)}/complete`, {
+    method: 'POST',
+    headers: await authHeaders(),
+    body: JSON.stringify({}),
+  });
+  const body = await readJson<{ session: MentorshipSession }>(response);
+  return body.session;
+}
+
+export async function joinMentorshipSession(sessionId: string): Promise<SessionJoinPayload> {
+  const response = await fetch(`/api/sessions/${encodeURIComponent(sessionId)}/join`, {
+    method: 'POST',
+    headers: await authHeaders(),
+    body: JSON.stringify({}),
+  });
+  const body = await readJson<{ join: SessionJoinPayload }>(response);
+  return body.join;
 }

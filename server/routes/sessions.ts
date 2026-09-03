@@ -7,6 +7,7 @@ import {
   completeMentorshipSession,
   createMentorshipSession,
   getMentorshipSession,
+  joinMentorshipSession,
   listMentorshipSessions,
   type CreateSessionInput,
 } from '../lib/sessionService.js';
@@ -88,6 +89,20 @@ sessionsRouter.get('/:id', async (req: AccountRequest, res, next) => {
       String(req.params.id ?? ''),
     );
     res.json({ session });
+  } catch (error) {
+    if (handleServiceError(res, error)) return;
+    next(error);
+  }
+});
+
+sessionsRouter.post('/:id/join', async (req: AccountRequest, res, next) => {
+  try {
+    const join = await joinMentorshipSession(
+      firestoreStore,
+      req.account,
+      String(req.params.id ?? ''),
+    );
+    res.json({ join });
   } catch (error) {
     if (handleServiceError(res, error)) return;
     next(error);
