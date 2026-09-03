@@ -67,6 +67,30 @@ export { COLLECTIONS, RESERVED_COLLECTIONS } from './collections.js';
 export type { CollectionName, ReservedCollectionName } from './collections.js';
 
 export {
+  COMMERCIAL_MODE,
+  COMMERCIAL_MODE_DESCRIPTION,
+  COMMERCIAL_MODE_LABEL,
+  COMMERCIAL_MODES_FOR_MENTOR_TYPE,
+  MENTOR_SERVICES_DESCRIPTION,
+  MENTOR_TYPE,
+  MENTOR_TYPE_DESCRIPTION,
+  MENTOR_TYPE_LABEL,
+  SESSION_DURATION,
+  SESSION_PRICE_USD,
+  commercialModeAllowedForMentorType,
+  isCommercialMode,
+  isMentorType,
+  normalizeMentorOfferingFields,
+  resolveMentorOffering,
+} from './mentorOffering.js';
+export type {
+  CommercialMode,
+  MentorOfferingFields,
+  MentorType,
+  ResolvedMentorOffering,
+} from './mentorOffering.js';
+
+export {
   emptyLearnerProfile,
   emptyMentorProfile,
   isAccountActive,
@@ -351,6 +375,7 @@ export {
   validateFinalDeliverable,
   validateGoalDraft,
   validateMentorPlan,
+  validateMentorOffering,
   validateMessageText,
   validateMilestoneFeedback,
   validateNewPassword,

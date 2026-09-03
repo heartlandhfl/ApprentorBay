@@ -1,4 +1,9 @@
 import type { DeliverableRef } from './deliverables.js';
+import {
+  normalizeMentorOfferingFields,
+  type CommercialMode,
+  type MentorType,
+} from './mentorOffering.js';
 import { USER_ROLE, type SignupRole, type UserRole } from './identities.js';
 import {
   ACCOUNT_STATUS,
@@ -130,6 +135,20 @@ export interface MentorProfile {
   verificationCaseStatus: VerificationCaseStatus;
   verifiedClaims: VerifiedClaim[];
   public: boolean;
+  /** Primary mentor classification. Optional on older documents. */
+  mentorType?: MentorType;
+  /** Commercial tier separate from mentor type. Optional on older documents. */
+  commercialMode?: CommercialMode;
+  /** Short plain-text description of what the mentor offers. */
+  servicesDescription?: string;
+  /** USD session price. Null for free (giving back) mentors. */
+  sessionPriceUsd?: number | null;
+  /** Optional session length in minutes. */
+  sessionDurationMinutes?: number | null;
+  offersVideoSessions?: boolean;
+  messagingIncluded?: boolean;
+  /** Whether the mentor is open to new learner applications. */
+  acceptsNewLearners?: boolean;
 }
 
 export interface AdminCounts {
@@ -336,6 +355,18 @@ export function normalizeMentorProfile(
   const status = Object.values(VERIFICATION_STATUS).includes(input.verificationStatus as VerificationStatus)
     ? (input.verificationStatus as VerificationStatus)
     : empty.verificationStatus;
+  const offering = normalizeMentorOfferingFields({
+    mentorType: input.mentorType,
+    commercialMode: input.commercialMode,
+    servicesDescription: input.servicesDescription,
+    sessionPriceUsd: input.sessionPriceUsd,
+    sessionDurationMinutes: input.sessionDurationMinutes,
+    offersVideoSessions: input.offersVideoSessions,
+    messagingIncluded: input.messagingIncluded,
+    acceptsNewLearners: input.acceptsNewLearners,
+    public: input.public,
+    verificationStatus: status,
+  });
   return {
     ...empty,
     ...input,
@@ -363,6 +394,14 @@ export function normalizeMentorProfile(
       : empty.verificationCaseStatus,
     verifiedClaims: asClaims(input.verifiedClaims),
     public: input.public !== false,
+    mentorType: offering.mentorType,
+    commercialMode: offering.commercialMode,
+    servicesDescription: offering.servicesDescription,
+    sessionPriceUsd: offering.sessionPriceUsd,
+    sessionDurationMinutes: offering.sessionDurationMinutes,
+    offersVideoSessions: offering.offersVideoSessions,
+    messagingIncluded: offering.messagingIncluded,
+    acceptsNewLearners: offering.acceptsNewLearners,
     displayName: asText(input.displayName).trim() || empty.displayName,
     userId: input.userId,
   };

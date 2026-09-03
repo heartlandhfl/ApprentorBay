@@ -1,12 +1,23 @@
 import { useState, type FormEvent } from 'react';
 import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
 import {
+  COMMERCIAL_MODE,
+  COMMERCIAL_MODE_DESCRIPTION,
+  COMMERCIAL_MODE_LABEL,
+  COMMERCIAL_MODES_FOR_MENTOR_TYPE,
+  MENTOR_TYPE,
+  MENTOR_TYPE_DESCRIPTION,
+  MENTOR_TYPE_LABEL,
+  VERIFICATION_STATUS,
+  commercialModeAllowedForMentorType,
   profilePhotoStoragePath,
+  type CommercialMode,
   type CredentialEntry,
   type EducationEntry,
   type ExperienceEntry,
   type LearnerProfile,
   type MentorProfile,
+  type MentorType,
 } from '@apprentorbay/shared';
 import { Button, Card, Checkbox, FileField, Input, Stack, Text, TextArea } from '../../components';
 import { getFirebaseStorage } from '../../lib/firebase';
@@ -47,10 +58,37 @@ export function ProfileEditor({ role, profile, onSaved }: ProfileEditorProps) {
   const [experience, setExperience] = useState(linesFromExperience(mentor?.experience ?? []));
   const [professionalGoals, setProfessionalGoals] = useState(mentor?.professionalGoals ?? '');
   const [mentoringInterests, setMentoringInterests] = useState(mentor?.mentoringInterests ?? '');
+  const [mentorType, setMentorType] = useState<MentorType>(
+    mentor?.mentorType ?? MENTOR_TYPE.accomplished,
+  );
+  const [commercialMode, setCommercialMode] = useState<CommercialMode>(
+    mentor?.commercialMode ?? COMMERCIAL_MODE.givingBack,
+  );
+  const [servicesDescription, setServicesDescription] = useState(mentor?.servicesDescription ?? '');
+  const [sessionPriceUsd, setSessionPriceUsd] = useState(
+    mentor?.sessionPriceUsd != null ? String(mentor.sessionPriceUsd) : '',
+  );
+  const [sessionDurationMinutes, setSessionDurationMinutes] = useState(
+    mentor?.sessionDurationMinutes != null ? String(mentor.sessionDurationMinutes) : '',
+  );
+  const [offersVideoSessions, setOffersVideoSessions] = useState(mentor?.offersVideoSessions === true);
+  const [messagingIncluded, setMessagingIncluded] = useState(mentor?.messagingIncluded !== false);
+  const [acceptsNewLearners, setAcceptsNewLearners] = useState(mentor?.acceptsNewLearners !== false);
   const [photo, setPhoto] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+
+  const mentorApproved = mentor?.verificationStatus === VERIFICATION_STATUS.approved;
+  const allowedCommercialModes = COMMERCIAL_MODES_FOR_MENTOR_TYPE[mentorType];
+
+  function onMentorTypeChange(nextType: MentorType) {
+    setMentorType(nextType);
+    if (!commercialModeAllowedForMentorType(nextType, commercialMode)) {
+      setCommercialMode(COMMERCIAL_MODE.givingBack);
+      setSessionPriceUsd('');
+    }
+  }
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
@@ -83,6 +121,25 @@ export function ProfileEditor({ role, profile, onSaved }: ProfileEditorProps) {
         experience: parseExperience(experience),
         professionalGoals,
         mentoringInterests,
+        ...(role === 'mentor' && mentorApproved
+          ? {
+              mentorType,
+              commercialMode,
+              servicesDescription,
+              sessionPriceUsd:
+                commercialMode === COMMERCIAL_MODE.givingBack
+                  ? null
+                  : sessionPriceUsd.trim()
+                    ? Number(sessionPriceUsd)
+                    : null,
+              sessionDurationMinutes: sessionDurationMinutes.trim()
+                ? Number(sessionDurationMinutes)
+                : null,
+              offersVideoSessions,
+              messagingIncluded,
+              acceptsNewLearners,
+            }
+          : {}),
       });
       setSaved(true);
       onSaved?.();
@@ -198,6 +255,100 @@ export function ProfileEditor({ role, profile, onSaved }: ProfileEditorProps) {
                 value={mentoringInterests}
                 onChange={(event) => setMentoringInterests(event.target.value)}
               />
+              {mentorApproved ? (
+                <Stack gap={16}>
+                  <Text variant="h3">Mentor offering</Text>
+                  <Text variant="small">
+                    Choose how you mentor on ApprentorBay. These settings appear on your public
+                    profile after you save.
+                  </Text>
+                  <Stack gap={12}>
+                    <Text variant="small">Mentor type</Text>
+                    {(Object.values(MENTOR_TYPE) as MentorType[]).map((type) => (
+                      <label key={type} className="flex cursor-pointer gap-3">
+                        <input
+                          type="radio"
+                          name="mentorType"
+                          checked={mentorType === type}
+                          onChange={() => onMentorTypeChange(type)}
+                        />
+                        <Stack gap={4}>
+                          <Text>{MENTOR_TYPE_LABEL[type]}</Text>
+                          <Text variant="small">{MENTOR_TYPE_DESCRIPTION[type]}</Text>
+                        </Stack>
+                      </label>
+                    ))}
+                  </Stack>
+                  <Stack gap={12}>
+                    <Text variant="small">Commercial mode</Text>
+                    {allowedCommercialModes.map((mode) => (
+                      <label key={mode} className="flex cursor-pointer gap-3">
+                        <input
+                          type="radio"
+                          name="commercialMode"
+                          checked={commercialMode === mode}
+                          onChange={() => {
+                            setCommercialMode(mode);
+                            if (mode === COMMERCIAL_MODE.givingBack) setSessionPriceUsd('');
+                          }}
+                        />
+                        <Stack gap={4}>
+                          <Text>{COMMERCIAL_MODE_LABEL[mode]}</Text>
+                          <Text variant="small">{COMMERCIAL_MODE_DESCRIPTION[mode]}</Text>
+                        </Stack>
+                      </label>
+                    ))}
+                  </Stack>
+                  <TextArea
+                    label="Services description"
+                    value={servicesDescription}
+                    onChange={(event) => setServicesDescription(event.target.value)}
+                    hint="A short summary of what learners can expect from working with you."
+                  />
+                  {commercialMode !== COMMERCIAL_MODE.givingBack ? (
+                    <>
+                      <Input
+                        label="Session price (USD)"
+                        type="number"
+                        min="1"
+                        step="1"
+                        value={sessionPriceUsd}
+                        onChange={(event) => setSessionPriceUsd(event.target.value)}
+                        hint="Displayed on your public profile. Payment collection is not handled in-app yet."
+                      />
+                      <Input
+                        label="Session duration (minutes, optional)"
+                        type="number"
+                        min="15"
+                        max="180"
+                        step="15"
+                        value={sessionDurationMinutes}
+                        onChange={(event) => setSessionDurationMinutes(event.target.value)}
+                      />
+                    </>
+                  ) : null}
+                  <Checkbox
+                    checked={offersVideoSessions}
+                    onChange={(event) => setOffersVideoSessions(event.target.checked)}
+                    label="I offer video sessions"
+                  />
+                  <Checkbox
+                    checked={messagingIncluded}
+                    onChange={(event) => setMessagingIncluded(event.target.checked)}
+                    label="Messaging is included in my mentorship"
+                  />
+                  <Checkbox
+                    checked={acceptsNewLearners}
+                    onChange={(event) => setAcceptsNewLearners(event.target.checked)}
+                    label="I am accepting new learners"
+                  />
+                </Stack>
+              ) : (
+                <Text variant="small">
+                  After participation is approved, you can choose your mentor type and commercial
+                  mode here.
+                </Text>
+              )}
             </>
           )}
           <Checkbox

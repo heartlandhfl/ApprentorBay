@@ -25,13 +25,18 @@ export function canAdminister(actor: PermissionActor | null | undefined): boolea
 
 export function canApplyForMentorship(
   actor: PermissionActor | null | undefined,
-  mentor: Pick<MentorProfile, 'userId' | 'verificationStatus'>,
+  mentor: Pick<
+    MentorProfile,
+    'userId' | 'verificationStatus' | 'public' | 'acceptsNewLearners'
+  >,
   message: string,
 ): boolean {
   if (!actor || !canParticipate(actor)) return false;
   if (actor.role !== USER_ROLE.learner) return false;
   if (actor.uid === mentor.userId) return false;
   if (mentor.verificationStatus !== VERIFICATION_STATUS.approved) return false;
+  if (mentor.public === false) return false;
+  if (mentor.acceptsNewLearners === false) return false;
   return validateApplicationMessage(message).ok;
 }
 

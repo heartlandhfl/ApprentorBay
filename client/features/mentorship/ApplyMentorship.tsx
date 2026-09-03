@@ -21,9 +21,15 @@ type ApplyMentorshipProps = {
   slug: string;
   displayName: string;
   approvalStatus: string;
+  acceptsNewLearners?: boolean;
 };
 
-export function ApplyMentorship({ slug, displayName, approvalStatus }: ApplyMentorshipProps) {
+export function ApplyMentorship({
+  slug,
+  displayName,
+  approvalStatus,
+  acceptsNewLearners = true,
+}: ApplyMentorshipProps) {
   const { account, loading } = useAuth();
   const [open, setOpen] = useState(false);
   const [message, setMessage] = useState('');
@@ -62,6 +68,7 @@ export function ApplyMentorship({ slug, displayName, approvalStatus }: ApplyMent
 
   if (loading) return null;
   if (approvalStatus !== APPROVAL_STATUS.approved) return null;
+  if (!acceptsNewLearners) return null;
   if (!account) {
     return (
       <Button variant="secondary" to="/login">
