@@ -47,9 +47,182 @@ export function formatMentorPriceDisplay(input: {
 }
 
 export function mentorPrimaryActionLabel(commercialMode: CommercialMode): string {
-  return commercialMode === COMMERCIAL_MODE.givingBack
-    ? 'Request mentorship'
-    : 'View mentorship options';
+  return commercialMode === COMMERCIAL_MODE.givingBack ? 'Request mentorship' : 'Book a session';
+}
+
+export function mentorshipSessionTitle(input: {
+  commercialMode: CommercialMode;
+  serviceDescription?: string;
+}): string {
+  const description = input.serviceDescription?.trim();
+  if (description) {
+    const firstLine = description.split('\n')[0]?.trim() ?? '';
+    if (firstLine.length > 0 && firstLine.length <= 80) {
+      return firstLine;
+    }
+  }
+  return `${commercialModeTitle(input.commercialMode)} mentorship`;
+}
+
+export function mentorshipDurationLabel(sessionDurationMinutes?: number | null): string | null {
+  if (sessionDurationMinutes == null || sessionDurationMinutes <= 0) return null;
+  return `${sessionDurationMinutes} minute${sessionDurationMinutes === 1 ? '' : 's'}`;
+}
+
+export function mentorshipPriceAmountLabel(input: {
+  commercialMode: CommercialMode;
+  baseSessionPriceUsd: number | null;
+}): string {
+  if (input.commercialMode === COMMERCIAL_MODE.givingBack) {
+    return 'Free';
+  }
+  if (input.baseSessionPriceUsd != null && input.baseSessionPriceUsd > 0) {
+    return formatUsdCents(input.baseSessionPriceUsd);
+  }
+  return 'Price on request';
+}
+
+export const MENTORSHIP_CURRENCY_CODE = 'USD' as const;
+
+export interface MentorshipOfferingView {
+  sessionTitle: string;
+  serviceModelTitle: string;
+  durationLabel: string | null;
+  priceAmountLabel: string;
+  currencyCode: typeof MENTORSHIP_CURRENCY_CODE;
+  priceSummary: string;
+  description: string;
+  isPaid: boolean;
+  primaryActionLabel: string;
+  nextSteps: readonly string[];
+  includesVideo: boolean;
+  includesMessaging: boolean;
+}
+
+export function mentorshipOfferingDescription(input: {
+  serviceDescription?: string;
+  mentoringInterests?: string;
+  areasOfExpertise?: string[];
+}): string {
+  const service = input.serviceDescription?.trim();
+  if (service) {
+    const remainder = service.includes('\n') ? service.split('\n').slice(1).join(' ').trim() : '';
+    if (remainder) return remainder;
+    if (service.length > 80) return service;
+  }
+  const interests = input.mentoringInterests?.trim();
+  if (interests) return interests;
+  const areas = (input.areasOfExpertise ?? []).map((item) => item.trim()).filter(Boolean);
+  if (areas.length > 0) {
+    return `One-to-one mentorship focused on ${areas.slice(0, 3).join(', ').toLowerCase()}.`;
+  }
+  return 'A focused one-to-one mentorship session tailored to your goals.';
+}
+
+export function mentorshipNextSteps(input: {
+  commercialMode: CommercialMode;
+  mentorName: string;
+  hasActiveRelationship: boolean;
+  paymentRequired: boolean;
+  paymentSatisfied: boolean;
+}): readonly string[] {
+  const mentorName = input.mentorName.trim() || 'your mentor';
+  if (!isPaidCommercialMode(input.commercialMode)) {
+    return [
+      'Send a mentorship request with a short introduction.',
+      `${mentorName} reviews your request.`,
+      'If accepted, message and schedule sessions together in your mentorship workspace.',
+    ];
+  }
+  if (input.hasActiveRelationship && input.paymentRequired && !input.paymentSatisfied) {
+    return [
+      'Book your mentorship session and confirm the price shown.',
+      'Complete secure checkout in USD.',
+      'Schedule your video session in the mentorship workspace.',
+      'Join the session when it is time to meet.',
+    ];
+  }
+  if (input.hasActiveRelationship && input.paymentSatisfied) {
+    return [
+      'Open your mentorship workspace.',
+      'Schedule your next session when you are ready.',
+      'Join the video session at the agreed time.',
+    ];
+  }
+  return [
+    'Request mentorship and introduce yourself.',
+    `If ${mentorName} accepts, book and pay for your session securely in USD.`,
+    'Schedule your video session together in the mentorship workspace.',
+    'Join the session when it is time to meet.',
+  ];
+}
+
+export function buildMentorshipOfferingView(input: {
+  commercialMode: CommercialMode;
+  mentorType?: MentorType;
+  baseSessionPriceUsd?: number | null;
+  sessionDurationMinutes?: number | null;
+  serviceDescription?: string;
+  mentoringInterests?: string;
+  areasOfExpertise?: string[];
+  offersVideoSessions?: boolean;
+  includedMessaging?: boolean;
+  mentorName?: string;
+  hasActiveRelationship?: boolean;
+  paymentRequired?: boolean;
+  paymentSatisfied?: boolean;
+}): MentorshipOfferingView {
+  const commercialMode = input.commercialMode;
+  const isPaid = isPaidCommercialMode(commercialMode);
+  const hasActiveRelationship = input.hasActiveRelationship === true;
+  const paymentRequired = input.paymentRequired === true;
+  const paymentSatisfied = input.paymentSatisfied === true;
+  return {
+    sessionTitle: mentorshipSessionTitle({
+      commercialMode,
+      serviceDescription: input.serviceDescription,
+    }),
+    serviceModelTitle: commercialModeTitle(commercialMode),
+    durationLabel: mentorshipDurationLabel(input.sessionDurationMinutes),
+    priceAmountLabel: mentorshipPriceAmountLabel({
+      commercialMode,
+      baseSessionPriceUsd: input.baseSessionPriceUsd ?? null,
+    }),
+    currencyCode: MENTORSHIP_CURRENCY_CODE,
+    priceSummary: formatMentorPriceDisplay({
+      commercialMode,
+      baseSessionPriceUsd: input.baseSessionPriceUsd ?? null,
+      sessionDurationMinutes: input.sessionDurationMinutes,
+    }),
+    description: mentorshipOfferingDescription(input),
+    isPaid,
+    primaryActionLabel: mentorPrimaryActionLabel(commercialMode),
+    nextSteps: mentorshipNextSteps({
+      commercialMode,
+      mentorName: input.mentorName ?? 'your mentor',
+      hasActiveRelationship,
+      paymentRequired,
+      paymentSatisfied,
+    }),
+    includesVideo: input.offersVideoSessions === true,
+    includesMessaging: input.includedMessaging !== false,
+  };
+}
+
+export function mentorExpertiseHeadline(areasOfExpertise?: string[]): string {
+  const areas = (areasOfExpertise ?? []).map((item) => item.trim()).filter(Boolean);
+  return areas.join(' · ');
+}
+
+export function mentorProfileQuote(input: {
+  mentoringInterests?: string;
+  serviceDescription?: string;
+}): string {
+  const interests = input.mentoringInterests?.trim();
+  if (interests) return interests;
+  const service = input.serviceDescription?.trim();
+  if (service) return service.split('\n')[0]?.trim() ?? '';
+  return '';
 }
 
 export function mentorAvailabilityCopy(acceptsNewLearners: boolean | undefined): string {

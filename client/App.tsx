@@ -26,6 +26,8 @@ import { SignupPage } from './routes/SignupPage';
 import { SupportPage } from './routes/SupportPage';
 import { DashboardPage } from './routes/DashboardPage';
 import { VerificationPage } from './routes/VerificationPage';
+import { BookingPaymentReturnPage } from './routes/BookingPaymentReturnPage';
+import { BookingPaymentCancelPage } from './routes/BookingPaymentCancelPage';
 
 export function App() {
   return (
@@ -45,6 +47,22 @@ export function App() {
           <Route path="/learners/:id" element={<LearnerProfilePage />} />
           <Route path="/mentors" element={<MentorsPage />} />
           <Route path="/mentors/:id" element={<MentorProfilePage />} />
+          <Route
+            path="/bookings/:bookingId/payment/return"
+            element={
+              <RequireAuth>
+                <BookingPaymentReturnPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/bookings/:bookingId/payment/cancel"
+            element={
+              <RequireAuth>
+                <BookingPaymentCancelPage />
+              </RequireAuth>
+            }
+          />
           <Route
             path="/admin"
             element={

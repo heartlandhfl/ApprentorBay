@@ -2,12 +2,11 @@ import { useEffect, useState } from 'react';
 import { getDownloadURL, ref } from 'firebase/storage';
 import {
   COMMERCIAL_MODE,
+  buildMentorshipOfferingView,
   commercialModeDiscoveryLabel,
-  formatMentorPriceDisplay,
-  mentorCardServiceDescription,
   mentorDiscoveryExpertiseLabel,
-  mentorPrimaryActionLabel,
-  mentorTypeTitle,
+  mentorExpertiseHeadline,
+  mentorTypePublicTitle,
   type PublicProfile,
 } from '@apprentorbay/shared';
 import { Badge, Button, Card, Cluster, Stack, Text } from '../../components';
@@ -21,13 +20,19 @@ type MentorDiscoveryCardProps = {
 export function MentorDiscoveryCard({ mentor }: MentorDiscoveryCardProps) {
   const commercialMode = mentor.commercialMode ?? COMMERCIAL_MODE.givingBack;
   const expertise = mentorDiscoveryExpertiseLabel(mentor);
-  const serviceDescription = mentorCardServiceDescription(mentor);
-  const priceLabel = formatMentorPriceDisplay({
+  const headline = mentorExpertiseHeadline(mentor.areasOfExpertise);
+  const offering = buildMentorshipOfferingView({
     commercialMode,
+    mentorType: mentor.mentorType,
     baseSessionPriceUsd: mentor.baseSessionPriceUsd ?? null,
     sessionDurationMinutes: mentor.sessionDurationMinutes,
+    serviceDescription: mentor.serviceDescription,
+    mentoringInterests: mentor.mentoringInterests,
+    areasOfExpertise: mentor.areasOfExpertise,
+    offersVideoSessions: mentor.offersVideoSessions,
+    includedMessaging: mentor.includedMessaging,
+    mentorName: mentor.displayName || 'Mentor',
   });
-  const actionLabel = mentorPrimaryActionLabel(commercialMode);
 
   return (
     <Card padding="lg">
@@ -35,12 +40,14 @@ export function MentorDiscoveryCard({ mentor }: MentorDiscoveryCardProps) {
         <div className="flex gap-4">
           <MentorAvatar name={mentor.displayName || 'Mentor'} photoPath={mentor.photoPath} />
           <Stack gap={8}>
+            <Text variant="caption">{mentorTypePublicTitle(mentor.mentorType)}</Text>
             <Text variant="h2" as="h2">
               {mentor.displayName || 'Mentor'}
             </Text>
             {mentor.professionalIdentity ? (
               <Text variant="muted">{mentor.professionalIdentity}</Text>
             ) : null}
+            {headline ? <Text variant="small">{headline}</Text> : null}
             <MentorBadges profile={mentor} compact />
           </Stack>
         </div>
@@ -50,17 +57,26 @@ export function MentorDiscoveryCard({ mentor }: MentorDiscoveryCardProps) {
           <Text>{expertise}</Text>
         </Stack>
 
-        {serviceDescription ? (
-          <p className="line-clamp-3 font-sans text-small text-ink-muted">{serviceDescription}</p>
-        ) : null}
+        <div className="rounded-sm border border-line bg-paper-raised p-4">
+          <Stack gap={12}>
+            <Cluster gap={8}>
+              <Text variant="h3" as="h3">
+                {offering.sessionTitle}
+              </Text>
+              <Badge tone={offering.isPaid ? 'neutral' : 'success'}>
+                {commercialModeDiscoveryLabel(commercialMode)}
+              </Badge>
+            </Cluster>
+            <Cluster gap={12}>
+              {offering.durationLabel ? <Text variant="small">{offering.durationLabel}</Text> : null}
+              <Text variant="h3">{offering.priceSummary}</Text>
+            </Cluster>
+            <p className="line-clamp-3 text-small text-ink-muted">{offering.description}</p>
+          </Stack>
+        </div>
 
         <Stack gap={12}>
-          <Text variant="caption">Mentoring approach</Text>
           <Cluster gap={8}>
-            <Badge tone="accent">{mentorTypeTitle(mentor.mentorType)}</Badge>
-            <Badge tone={commercialMode === COMMERCIAL_MODE.givingBack ? 'success' : 'neutral'}>
-              {commercialModeDiscoveryLabel(commercialMode)}
-            </Badge>
             {mentor.offersVideoSessions ? <Badge>Video sessions</Badge> : null}
             {mentor.acceptsNewLearners === false ? (
               <Badge tone="neutral">Not accepting learners</Badge>
@@ -69,10 +85,9 @@ export function MentorDiscoveryCard({ mentor }: MentorDiscoveryCardProps) {
         </Stack>
 
         <div className="border-t border-line pt-4">
-          <Stack gap={12}>
-            <Text variant="h3">{priceLabel}</Text>
-            <Button to={`/mentors/${mentor.slug}`}>{actionLabel}</Button>
-          </Stack>
+          <Button to={`/mentors/${mentor.slug}`} className="w-full sm:w-auto">
+            {offering.primaryActionLabel}
+          </Button>
         </div>
       </Stack>
     </Card>
