@@ -15,6 +15,7 @@ import {
   completeMentorshipSession,
   createMentorshipSession,
   getMentorshipSession,
+  joinMentorshipSession,
   listMentorshipSessions,
   type SessionStore,
 } from './sessionService.js';
@@ -239,5 +240,29 @@ describe('sessionService', () => {
     const sessions = await listMentorshipSessions(store, learner, relationship().id);
     assert.equal(sessions.length, 2);
     await expectForbidden(listMentorshipSessions(store, stranger, relationship().id));
+  });
+
+  it('authorises join and records startedAt', async () => {
+    const store = new MemorySessionStore();
+    const created = await createMentorshipSession(store, mentor, createBody(), NOW);
+    const joinAt = '2026-09-10T13:55:00.000Z';
+    const join = await joinMentorshipSession(store, learner, created.id, joinAt);
+
+    assert.equal(join.roomName, created.roomName);
+    assert.equal(join.userInfo.displayName, learner.displayName);
+    const updated = await store.getSession(created.id);
+    assert.equal(updated?.startedAt, joinAt);
+  });
+
+  it('denies join for unrelated users', async () => {
+    const store = new MemorySessionStore();
+    const created = await createMentorshipSession(store, mentor, createBody(), NOW);
+    await expectForbidden(joinMentorshipSession(store, stranger, created.id, START));
+  });
+
+  it('denies join outside the join window', async () => {
+    const store = new MemorySessionStore();
+    const created = await createMentorshipSession(store, mentor, createBody(), NOW);
+    await expectForbidden(joinMentorshipSession(store, learner, created.id, NOW));
   });
 });

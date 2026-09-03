@@ -207,13 +207,15 @@ export {
   buildSessionRoomName,
   durationMinutesBetween,
   isLiveSession,
+  isPastSession,
   isSessionMember,
   isTerminalSessionStatus,
+  isUpcomingSession,
   normalizeSession,
   pairingMatchesSession,
   sessionJoinWindow,
 } from './sessions.js';
-export type { MentorshipSession } from './sessions.js';
+export type { MentorshipSession, SessionJoinPayload } from './sessions.js';
 
 export { MESSAGE_TEXT } from './messages.js';
 export type { Message } from './messages.js';
