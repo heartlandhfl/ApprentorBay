@@ -101,9 +101,11 @@ export {
 } from './money.js';
 
 export {
+  COMMERCIAL_MODE_DISCOVERY_LABEL,
   COMMERCIAL_MODE_PUBLIC_LABEL,
   MENTOR_TYPE_PUBLIC_LABEL,
   commercialModeDescription,
+  commercialModeDiscoveryLabel,
   commercialModePublicTitle,
   commercialModeTitle,
   formatMentorPriceDisplay,
@@ -111,12 +113,26 @@ export {
   mentorAvailabilityCopy,
   mentorHelpSummary,
   mentorMessagingCopy,
+  mentorCardServiceDescription,
   mentorPrimaryActionLabel,
   mentorTypeDescription,
   mentorTypePublicTitle,
   mentorTypeTitle,
   mentorVideoSessionCopy,
 } from './mentorPresentation.js';
+
+export {
+  EMPTY_MENTOR_DISCOVERY_FILTERS,
+  MENTOR_DISCOVERY_COMMERCIAL_MODES,
+  MENTOR_DISCOVERY_MENTOR_TYPES,
+  filterListedMentors,
+  hasActiveDiscoveryFilters,
+  mentorDiscoveryExpertiseLabel,
+  mentorDiscoverySearchHaystack,
+  mentorDiscoverySkillsHaystack,
+  mentorMatchesDiscoveryFilters,
+} from './mentorDiscovery.js';
+export type { MentorDiscoveryFilters } from './mentorDiscovery.js';
 
 export {
   emptyLearnerProfile,

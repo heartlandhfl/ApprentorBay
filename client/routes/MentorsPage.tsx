@@ -1,134 +1,95 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   APPROVAL_DISCLAIMER,
-  COMMERCIAL_MODE,
-  formatMentorPriceDisplay,
-  mentorTypePublicTitle,
-  VERIFIED_CLAIM_LABEL,
+  EMPTY_MENTOR_DISCOVERY_FILTERS,
+  filterListedMentors,
+  hasActiveDiscoveryFilters,
+  type MentorDiscoveryFilters,
   type PublicProfile,
 } from '@apprentorbay/shared';
+import { Card, EmptyState, Grid, Page, Stack, Text } from '../components';
 import {
-  Badge,
-  Button,
-  Card,
-  EmptyState,
-  Grid,
-  Input,
-  Page,
-  Stack,
-  Text,
-} from '../components';
-import { watchListedMentors } from '../features/profiles';
+  MentorDiscoveryCard,
+  MentorDiscoveryFiltersPanel,
+  watchListedMentors,
+} from '../features/profiles';
 
 export function MentorsPage() {
   const [mentors, setMentors] = useState<PublicProfile[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [query, setQuery] = useState('');
+  const [filters, setFilters] = useState<MentorDiscoveryFilters>(EMPTY_MENTOR_DISCOVERY_FILTERS);
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
 
   useEffect(() => {
     return watchListedMentors(setMentors, (err) => setError(err.message));
   }, []);
 
-  const filtered = useMemo(() => {
-    const needle = query.trim().toLowerCase();
-    if (!needle) return mentors ?? [];
-    return (mentors ?? []).filter((mentor) => mentorMatches(mentor, needle));
-  }, [mentors, query]);
+  const filtered = useMemo(
+    () => filterListedMentors(mentors ?? [], filters),
+    [mentors, filters],
+  );
+  const filtersActive = hasActiveDiscoveryFilters(filters);
 
   return (
     <Page>
       <Stack gap={32}>
         <Stack gap={12}>
-          <Text variant="caption">Directory</Text>
-          <Text variant="h1">Approved mentors</Text>
+          <Text variant="caption">Discover mentors</Text>
+          <Text variant="h1">Find the right mentor for your goals</Text>
           <Text variant="muted">
-            Public profiles only. A mentor appears here after the platform approves
-            participation. {APPROVAL_DISCLAIMER}
+            Browse approved mentors by experience type, commercial model, and what they help with.
+            {` ${APPROVAL_DISCLAIMER}`}
           </Text>
-          <Input
-            label="Search by name or expertise"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="College Writing, App Development, display name…"
-          />
         </Stack>
 
-        {error ? <Text variant="danger">{error}</Text> : null}
+        <div className="lg:hidden">
+          <button
+            type="button"
+            className="w-full rounded-sm border border-line bg-paper-raised px-4 py-3 text-left text-body"
+            onClick={() => setMobileFiltersOpen((open) => !open)}
+            aria-expanded={mobileFiltersOpen}
+          >
+            {mobileFiltersOpen ? 'Hide filters' : 'Show filters'}
+            {filtersActive ? ' · filters active' : ''}
+          </button>
+        </div>
 
-        {mentors === null ? (
-          <Text variant="muted">Loading mentors…</Text>
-        ) : filtered.length === 0 ? (
-          <EmptyState
-            title={query.trim() ? 'No mentors match that search' : 'No approved mentors yet'}
-            description={
-              query.trim()
-                ? 'Try a different name or area of expertise.'
-                : 'Approved mentors will appear here for anyone, including visitors who are not signed in.'
-            }
-          />
-        ) : (
-          <Grid cols={3}>
-            {filtered.map((mentor) => (
-              <MentorCard key={mentor.slug} mentor={mentor} />
-            ))}
-          </Grid>
-        )}
+        <div className="grid gap-8 lg:grid-cols-[minmax(17rem,20rem)_minmax(0,1fr)] lg:items-start">
+          <div className={mobileFiltersOpen ? 'block' : 'hidden lg:block'}>
+            <Card padding="lg">
+              <MentorDiscoveryFiltersPanel
+                filters={filters}
+                onChange={setFilters}
+                resultCount={filtered.length}
+                totalCount={mentors?.length ?? 0}
+              />
+            </Card>
+          </div>
+
+          <Stack gap={24}>
+            {error ? <Text variant="danger">{error}</Text> : null}
+
+            {mentors === null ? (
+              <Text variant="muted">Loading mentors…</Text>
+            ) : filtered.length === 0 ? (
+              <EmptyState
+                title={filtersActive ? 'No mentors match these filters' : 'No approved mentors yet'}
+                description={
+                  filtersActive
+                    ? 'Try removing a filter or broadening your search.'
+                    : 'Approved mentors will appear here for anyone, including visitors who are not signed in.'
+                }
+              />
+            ) : (
+              <Grid cols={2}>
+                {filtered.map((mentor) => (
+                  <MentorDiscoveryCard key={mentor.slug} mentor={mentor} />
+                ))}
+              </Grid>
+            )}
+          </Stack>
+        </div>
       </Stack>
     </Page>
   );
-}
-
-function MentorCard({ mentor }: { mentor: PublicProfile }) {
-  const craft = mentor.areasOfExpertise[0] || mentor.professionalIdentity || 'Mentor';
-  const priceLabel = formatMentorPriceDisplay({
-    commercialMode: mentor.commercialMode ?? COMMERCIAL_MODE.givingBack,
-    baseSessionPriceUsd: mentor.baseSessionPriceUsd ?? null,
-    sessionDurationMinutes: mentor.sessionDurationMinutes,
-  });
-
-  return (
-    <Card>
-      <Stack gap={16}>
-        <Stack gap={8}>
-          <Badge tone="success">Approved</Badge>
-          {mentor.verifiedClaims
-            .filter((item) => item.verified)
-            .map((item) => (
-              <Badge key={item.type}>
-                {VERIFIED_CLAIM_LABEL[item.type as keyof typeof VERIFIED_CLAIM_LABEL] ?? 'Verified claim'}
-              </Badge>
-            ))}
-          <Text variant="h3">{mentor.displayName || 'Mentor'}</Text>
-          <Text variant="small">{craft}</Text>
-          <Text variant="caption">{mentorTypePublicTitle(mentor.mentorType)}</Text>
-          <Text variant="small">{priceLabel}</Text>
-        </Stack>
-        {mentor.mentoredDeliverables.length > 0 ? (
-          <Text variant="small">
-            {mentor.mentoredDeliverables.length} mentored deliverable
-            {mentor.mentoredDeliverables.length === 1 ? '' : 's'}
-          </Text>
-        ) : (
-          <Text variant="small">No public deliverables yet</Text>
-        )}
-        <Button variant="secondary" to={`/mentors/${mentor.slug}`}>
-          View profile
-        </Button>
-      </Stack>
-    </Card>
-  );
-}
-
-function mentorMatches(mentor: PublicProfile, needle: string): boolean {
-  const haystack = [
-    mentor.displayName,
-    mentor.professionalIdentity,
-    mentor.serviceDescription,
-    ...mentor.areasOfExpertise,
-    ...mentor.experience.map((item) => `${item.title} ${item.organization} ${item.summary}`),
-    ...mentor.education.map((item) => `${item.credential} ${item.institution}`),
-  ]
-    .join(' ')
-    .toLowerCase();
-  return haystack.includes(needle);
 }

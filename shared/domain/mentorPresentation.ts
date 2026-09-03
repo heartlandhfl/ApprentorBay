@@ -100,6 +100,30 @@ export function commercialModeDescription(commercialMode: CommercialMode | undef
     : COMMERCIAL_MODE_DESCRIPTION[COMMERCIAL_MODE.givingBack];
 }
 
+/** Discovery-facing commercial labels (Free instead of Giving Back). */
+export const COMMERCIAL_MODE_DISCOVERY_LABEL: Record<CommercialMode, string> = {
+  [COMMERCIAL_MODE.givingBack]: 'Free',
+  [COMMERCIAL_MODE.professional]: 'Professional',
+  [COMMERCIAL_MODE.premium]: 'Premium',
+};
+
+export function commercialModeDiscoveryLabel(commercialMode: CommercialMode | undefined): string {
+  return commercialMode
+    ? COMMERCIAL_MODE_DISCOVERY_LABEL[commercialMode]
+    : COMMERCIAL_MODE_DISCOVERY_LABEL[COMMERCIAL_MODE.givingBack];
+}
+
+export function mentorCardServiceDescription(mentor: {
+  serviceDescription?: string;
+  servicesDescription?: string;
+  mentoringInterests?: string;
+}): string {
+  const description =
+    mentor.serviceDescription?.trim() || mentor.servicesDescription?.trim() || '';
+  if (description) return description;
+  return mentor.mentoringInterests?.trim() ?? '';
+}
+
 export function mentorHelpSummary(input: {
   serviceDescription?: string;
   mentoringInterests?: string;
