@@ -5,12 +5,14 @@ import {
   LEARNING_JOURNEY_STEPS,
   RELATIONSHIP_STATUS,
   USER_ROLE,
+  canStartLearningJourney,
   contractProgress,
   contractTitle,
   isContractCompleted,
   isContractWorkspaceView,
   journeyStepIndex,
   nextActionCopy,
+  paidMentorshipServicesBlocked,
   waitingOn,
   workspaceFocus,
   workspacePartyLabel,
@@ -19,7 +21,11 @@ import {
   type User,
 } from '@apprentorbay/shared';
 import { Badge, Button, Card, Cluster, Stack, Text } from '../../components';
-import { startLearningJourney } from '../../lib/api';
+import {
+  createMentorshipBooking,
+  startLearningJourney,
+  startPaymentCheckout,
+} from '../../lib/api';
 import { watchContractForRelationship } from './repository';
 
 type JourneyEntryProps = {
@@ -53,6 +59,22 @@ export function JourneyEntry({ relationship, account, otherName }: JourneyEntryP
     }
   }
 
+  async function completePayment() {
+    setBusy(true);
+    setError(null);
+    try {
+      const { booking } = await createMentorshipBooking({ relationshipId: relationship.id });
+      const checkout = await startPaymentCheckout(booking.id);
+      window.location.assign(checkout.checkoutUrl);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not start checkout');
+      setBusy(false);
+    }
+  }
+
+  const paymentBlocked = paidMentorshipServicesBlocked(relationship);
+  const canStart = canStartLearningJourney(account, relationship);
+
   if (contract === undefined) {
     return (
       <Card>
@@ -71,9 +93,22 @@ export function JourneyEntry({ relationship, account, otherName }: JourneyEntryP
           </Text>
           {account.role === USER_ROLE.learner &&
           relationship.status === RELATIONSHIP_STATUS.active ? (
-            <Button onClick={() => void start()} loading={busy}>
-              Start Learning Goal Builder
-            </Button>
+            canStart ? (
+              <Button onClick={() => void start()} loading={busy}>
+                Start Learning Goal Builder
+              </Button>
+            ) : paymentBlocked ? (
+              <Stack gap={12}>
+                <Text variant="small">
+                  Complete payment to unlock the Learning Goal Builder for this mentorship.
+                </Text>
+                <Button onClick={() => void completePayment()} loading={busy}>
+                  Complete payment to start
+                </Button>
+              </Stack>
+            ) : (
+              <Text variant="muted">You cannot start the Learning Goal Builder right now.</Text>
+            )
           ) : (
             <Text variant="muted">
               {relationship.status === RELATIONSHIP_STATUS.active

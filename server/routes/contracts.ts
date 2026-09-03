@@ -2,10 +2,8 @@ import { Router } from 'express';
 import { FieldValue, type DocumentReference } from 'firebase-admin/firestore';
 import {
   COLLECTIONS,
-  RELATIONSHIP_STATUS,
   USER_ROLE,
   buildShowcase,
-  createDraftContract,
   deliverableRefFromShowcase,
   mergeShowcaseRecord,
   canParticipate,
@@ -19,6 +17,11 @@ import {
   type Showcase,
   type User,
 } from '@apprentorbay/shared';
+import {
+  LearningContractCreateError,
+  buildLearningContractForRelationship,
+  validateCreateLearningContract,
+} from '../lib/learningContractCreate.js';
 import { adminDb } from '../lib/firebase.js';
 import { writePublicProfile } from '../lib/profiles.js';
 import { requireAccount, sendApiError, type AccountRequest } from '../middleware/requireAccount.js';
@@ -49,20 +52,6 @@ async function contractByRelationship(relationshipId: string) {
 
 contractsRouter.post('/', async (req: AccountRequest, res, next) => {
   try {
-    const account = req.account;
-    if (!account) {
-      sendApiError(res, 401, 'unauthenticated', 'Sign in required');
-      return;
-    }
-    if (account.role !== USER_ROLE.learner) {
-      sendApiError(res, 403, 'forbidden', 'Only the learner can start a learning journey');
-      return;
-    }
-    if (!canParticipate(account)) {
-      sendApiError(res, 403, 'forbidden', 'This account cannot start a learning journey');
-      return;
-    }
-
     const relationshipId =
       typeof req.body?.relationshipId === 'string' ? req.body.relationshipId : '';
     if (!relationshipId) {
@@ -71,14 +60,19 @@ contractsRouter.post('/', async (req: AccountRequest, res, next) => {
     }
 
     const relSnap = await adminDb().collection(COLLECTIONS.relationships).doc(relationshipId).get();
-    const relationship = relSnap.data() as MentorshipRelationship | undefined;
-    if (!relationship || relationship.status !== RELATIONSHIP_STATUS.active) {
-      sendApiError(res, 404, 'not_found', 'Active relationship not found');
-      return;
-    }
-    if (relationship.learnerId !== account.uid) {
-      sendApiError(res, 403, 'forbidden', 'This is not your relationship');
-      return;
+    const rawRelationship = relSnap.exists
+      ? ({ ...(relSnap.data() as MentorshipRelationship), id: relSnap.id })
+      : null;
+
+    let relationship: MentorshipRelationship;
+    try {
+      relationship = validateCreateLearningContract(req.account, rawRelationship);
+    } catch (error) {
+      if (error instanceof LearningContractCreateError) {
+        sendApiError(res, error.status, error.code, error.message);
+        return;
+      }
+      throw error;
     }
 
     const existing = await contractByRelationship(relationshipId);
@@ -88,12 +82,9 @@ contractsRouter.post('/', async (req: AccountRequest, res, next) => {
     }
 
     const ref = adminDb().collection(COLLECTIONS.contracts).doc();
-    const contract = createDraftContract({
-      id: ref.id,
-      relationshipId,
-      learnerId: relationship.learnerId,
-      mentorId: relationship.mentorId,
-      now: new Date().toISOString(),
+    const contract = buildLearningContractForRelationship({
+      contractId: ref.id,
+      relationship,
     });
     await ref.set(contract);
     res.status(201).json({ contract });
