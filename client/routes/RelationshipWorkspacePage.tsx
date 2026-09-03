@@ -28,6 +28,7 @@ import {
 import { JourneyEntry } from '../features/learning-contracts';
 import { SessionsPanel } from '../features/sessions';
 import {
+  RelationshipPaymentBanner,
   firestoreDenied,
   sendMessage,
   watchMessages,
@@ -236,6 +237,8 @@ export function RelationshipWorkspacePage() {
             </Button>
           ) : null}
         </Cluster>
+
+        <RelationshipPaymentBanner relationship={relationship} account={account} />
 
         <Stack gap={16}>
           <Text variant="h2">People</Text>

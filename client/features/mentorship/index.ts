@@ -1,4 +1,6 @@
 export { ApplyMentorship } from './ApplyMentorship';
+export { RelationshipPaymentBanner } from './RelationshipPaymentBanner';
+export { findOpenPendingBooking, startMentorshipPaymentCheckout } from './mentorshipCheckout';
 export {
   acceptApplication,
   createApplication,
