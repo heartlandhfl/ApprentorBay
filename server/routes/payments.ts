@@ -6,6 +6,7 @@ import {
   normalizeCheckoutSession,
   normalizeMentorshipBooking,
   normalizePaymentIntent,
+  validateCheckoutIdempotencyKey,
   validateCreateCheckoutBody,
   type CheckoutSession,
   type MentorshipBooking,
@@ -37,10 +38,13 @@ async function loadPaymentIntent(paymentIntentId: string) {
   });
 }
 
-function idempotencyKeyFromRequest(req: AccountRequest): string {
-  const header = req.header('Idempotency-Key')?.trim();
-  if (header) return header.slice(0, 128);
-  return `checkout-${req.account?.uid ?? 'anon'}-${Date.now()}`;
+function requireCheckoutIdempotencyKey(req: AccountRequest, res: Parameters<typeof sendApiError>[0]): string | null {
+  const parsed = validateCheckoutIdempotencyKey(req.header('Idempotency-Key') ?? undefined);
+  if (!parsed.ok) {
+    sendApiError(res, 400, 'invalid', parsed.error);
+    return null;
+  }
+  return parsed.key!;
 }
 
 paymentsRouter.post('/checkout', async (req: AccountRequest, res, next) => {
@@ -50,6 +54,9 @@ paymentsRouter.post('/checkout', async (req: AccountRequest, res, next) => {
       sendApiError(res, 401, 'unauthenticated', 'Sign in required');
       return;
     }
+
+    const idempotencyKey = requireCheckoutIdempotencyKey(req, res);
+    if (!idempotencyKey) return;
 
     const parsed = validateCreateCheckoutBody(req.body);
     if (!parsed.ok) {
@@ -71,7 +78,7 @@ paymentsRouter.post('/checkout', async (req: AccountRequest, res, next) => {
     const result = await paymentService.createCheckout({
       booking,
       learnerId: account.uid,
-      idempotencyKey: idempotencyKeyFromRequest(req),
+      idempotencyKey,
     });
 
     res.status(201).json({

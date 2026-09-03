@@ -20,6 +20,7 @@ import {
   reducePaymentIntent,
   reducePaymentRefund,
   validateCreateCheckoutBody,
+  validateCheckoutIdempotencyKey,
   validatePaymentMatchesBooking,
   type PaymentRefund,
 } from './domain/index.js';
@@ -187,6 +188,12 @@ describe('payment request tampering', () => {
   it('accepts only bookingId for checkout creation', () => {
     const valid = validateCreateCheckoutBody({ bookingId: 'booking-1' });
     assert.equal(valid.ok, true);
+  });
+
+  it('requires an Idempotency-Key header for checkout creation', () => {
+    assert.equal(validateCheckoutIdempotencyKey(undefined).ok, false);
+    assert.equal(validateCheckoutIdempotencyKey('   ').ok, false);
+    assert.equal(validateCheckoutIdempotencyKey('checkout-req-uuid').ok, true);
   });
 
   it('rejects amount tampering on checkout requests', () => {

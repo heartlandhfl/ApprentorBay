@@ -249,6 +249,7 @@ export {
   reducePaymentIntent,
   reducePaymentRefund,
   validateCreateCheckoutBody,
+  validateCheckoutIdempotencyKey,
   validatePaymentMatchesBooking,
   canTransitionBookingStatus,
   canTransitionBookingPaymentStatus,

@@ -28,13 +28,21 @@ import {
   type PaymentRefund,
 } from '@apprentorbay/shared';
 import { recordAudit } from '../audit.js';
-import { adminDb } from '../firebase.js';
+import { adminDb, getAdminFirebase } from '../firebase.js';
 import { paymentCheckoutCancelUrl, paymentCheckoutSuccessUrl } from './paymentConfig.js';
+import {
+  bookingAcceptsIncomingPayment,
+  selectCheckoutForBooking,
+} from './paymentCheckoutPolicy.js';
+import { firestorePaymentRepository, type PaymentRepository } from './paymentRepository.js';
 import { getPaymentProvider } from './registry.js';
 import type { PaymentProvider, ProviderWebhookEvent } from './types.js';
 
 export class PaymentService {
-  constructor(private readonly provider: PaymentProvider = getPaymentProvider()) {}
+  constructor(
+    private readonly provider: PaymentProvider = getPaymentProvider(),
+    private readonly repository: PaymentRepository = firestorePaymentRepository,
+  ) {}
 
   async createCheckout(input: {
     booking: MentorshipBooking;
@@ -43,15 +51,29 @@ export class PaymentService {
     now?: string;
   }): Promise<{ paymentIntent: PaymentIntent; checkoutSession: CheckoutSession; checkoutUrl: string }> {
     const now = input.now ?? new Date().toISOString();
-    const existing = await this.findCheckoutByIdempotencyKey(input.idempotencyKey);
-    if (existing) {
-      return existing;
+    const existingByKey = await this.repository.findCheckoutByIdempotencyKey(input.idempotencyKey);
+    if (existingByKey) {
+      return existingByKey;
     }
 
-    const intentRef = adminDb().collection(COLLECTIONS.paymentIntents).doc();
-    const sessionRef = adminDb().collection(COLLECTIONS.checkoutSessions).doc();
+    const bookingSessions = await this.repository.listCheckoutSessionsForBooking(input.booking.id);
+    const reusableSession = selectCheckoutForBooking(
+      bookingSessions,
+      input.booking.id,
+      input.idempotencyKey,
+      now,
+    );
+    if (reusableSession) {
+      const reusable = await this.repository.loadCheckoutBundle(reusableSession);
+      if (reusable) {
+        return reusable;
+      }
+    }
+
+    const intentId = crypto.randomUUID();
+    const sessionId = crypto.randomUUID();
     const intent = buildPaymentIntentFromBooking({
-      id: intentRef.id,
+      id: intentId,
       booking: input.booking,
       provider: this.provider.id,
       idempotencyKey: input.idempotencyKey,
@@ -83,14 +105,14 @@ export class PaymentService {
       intent,
       {
         type: 'CHECKOUT_CREATED',
-        checkoutSessionId: sessionRef.id,
+        checkoutSessionId: sessionId,
         providerPaymentIntentId: providerResult.providerPaymentIntentId,
       },
       now,
     );
 
     const checkoutSession: CheckoutSession = {
-      id: sessionRef.id,
+      id: sessionId,
       paymentIntentId: intent.id,
       bookingId: input.booking.id,
       learnerId: input.learnerId,
@@ -104,40 +126,28 @@ export class PaymentService {
       updatedAt: now,
     };
 
-    await adminDb().runTransaction(async (tx) => {
-      tx.set(intentRef, nextIntent);
-      tx.set(sessionRef, checkoutSession);
-      const eventRef = adminDb().collection(COLLECTIONS.paymentEvents).doc();
-      tx.set(
-        eventRef,
-        buildPaymentEvent({
-          id: eventRef.id,
-          entityType: PAYMENT_EVENT_ENTITY.paymentIntent,
-          entityId: nextIntent.id,
-          eventType: 'payment_intent.checkout_created',
-          fromStatus: intent.status,
-          toStatus: nextIntent.status,
-          actorId: input.learnerId,
-          idempotencyKey: input.idempotencyKey,
-          payload: {
-            bookingId: input.booking.id,
-            providerCheckoutSessionId: providerResult.providerCheckoutSessionId,
-          },
-          now,
-        }),
-      );
+    await this.repository.persistNewCheckout({
+      paymentIntent: nextIntent,
+      checkoutSession,
+      learnerId: input.learnerId,
+      idempotencyKey: input.idempotencyKey,
+      now,
+      fromStatus: intent.status,
+      providerCheckoutSessionId: providerResult.providerCheckoutSessionId,
     });
 
-    await recordAudit({
-      actorId: input.learnerId,
-      action: AUDIT_EVENT.paymentCheckoutCreated,
-      targetUserId: input.booking.mentorId,
-      metadata: {
-        bookingId: input.booking.id,
-        paymentIntentId: nextIntent.id,
-        checkoutSessionId: checkoutSession.id,
-      },
-    });
+    if (getAdminFirebase().initialized) {
+      await recordAudit({
+        actorId: input.learnerId,
+        action: AUDIT_EVENT.paymentCheckoutCreated,
+        targetUserId: input.booking.mentorId,
+        metadata: {
+          bookingId: input.booking.id,
+          paymentIntentId: nextIntent.id,
+          checkoutSessionId: checkoutSession.id,
+        },
+      });
+    }
 
     return {
       paymentIntent: nextIntent,
@@ -149,14 +159,12 @@ export class PaymentService {
   async handleWebhookEvents(events: ProviderWebhookEvent[]): Promise<void> {
     for (const event of events) {
       const dedupId = `${this.provider.id}_${event.providerEventId}`;
-      const dedupRef = adminDb().collection(COLLECTIONS.paymentWebhookDedup).doc(dedupId);
-      const dedupSnap = await dedupRef.get();
-      if (dedupSnap.exists) continue;
+      if (await this.repository.isWebhookEventProcessed(dedupId)) continue;
 
       const now = new Date().toISOString();
-      await adminDb().runTransaction(async (tx) => {
-        const freshDedup = await tx.get(dedupRef);
-        if (freshDedup.exists) return;
+      await this.repository.runTransaction(async (tx) => {
+        const claimed = await this.repository.claimWebhookEvent(dedupId, now, tx);
+        if (!claimed) return;
 
         switch (event.type) {
           case 'checkout_completed':
@@ -183,12 +191,6 @@ export class PaymentService {
           default:
             break;
         }
-
-        tx.set(dedupRef, {
-          provider: this.provider.id,
-          providerEventId: event.providerEventId,
-          processedAt: now,
-        });
       });
     }
   }
@@ -208,7 +210,7 @@ export class PaymentService {
       if (!intent.providerPaymentIntentId) continue;
       const providerStatus = await this.provider.getPaymentStatus(intent.providerPaymentIntentId);
       if (providerStatus === 'paid' && intent.status !== PAYMENT_STATUS.paid) {
-        await adminDb().runTransaction(async (tx) => {
+        await this.repository.runTransaction(async (tx) => {
           await this.applyPaymentSucceeded(
             tx,
             {
@@ -347,30 +349,7 @@ export class PaymentService {
   }
 
   private async findCheckoutByIdempotencyKey(idempotencyKey: string) {
-    const snap = await adminDb()
-      .collection(COLLECTIONS.checkoutSessions)
-      .where('idempotencyKey', '==', idempotencyKey)
-      .limit(1)
-      .get();
-    if (snap.empty) return null;
-    const checkoutSession = normalizeCheckoutSession({
-      ...(snap.docs[0].data() as CheckoutSession),
-      id: snap.docs[0].id,
-    });
-    const intentSnap = await adminDb()
-      .collection(COLLECTIONS.paymentIntents)
-      .doc(checkoutSession.paymentIntentId)
-      .get();
-    if (!intentSnap.exists) return null;
-    const paymentIntent = normalizePaymentIntent({
-      ...(intentSnap.data() as PaymentIntent),
-      id: intentSnap.id,
-    });
-    return {
-      paymentIntent,
-      checkoutSession,
-      checkoutUrl: checkoutSession.checkoutUrl ?? '',
-    };
+    return this.repository.findCheckoutByIdempotencyKey(idempotencyKey);
   }
 
   private async findRefundByIdempotencyKey(idempotencyKey: string) {
@@ -472,30 +451,28 @@ export class PaymentService {
     now: string,
     source: 'webhook' | 'reconciliation',
   ) {
-    const intent = await this.loadIntentByProviderId(event.providerPaymentIntentId, tx);
+    const intent = await this.repository.loadIntentByProviderId(event.providerPaymentIntentId, tx);
     if (!intent) return;
     if (intent.status === PAYMENT_STATUS.paid) return;
 
-    const bookingRef = adminDb().collection(COLLECTIONS.bookings).doc(intent.bookingId);
-    const relationshipRef = adminDb()
-      .collection(COLLECTIONS.relationships)
-      .doc(intent.relationshipId);
-    const bookingDoc = await tx.get(bookingRef);
-    const relationshipDoc = await tx.get(relationshipRef);
-    if (!bookingDoc.exists || !relationshipDoc.exists) {
+    const booking = await this.repository.loadBooking(intent.bookingId, tx);
+    const relationship = await this.repository.loadRelationship(intent.relationshipId, tx);
+    if (!booking || !relationship) {
       throw Object.assign(new Error('Booking/payment mismatch'), { status: 409 });
     }
 
-    const booking = normalizeMentorshipBooking({
-      ...(bookingDoc.data() as MentorshipBooking),
-      id: bookingDoc.id,
-    });
+    if (!bookingAcceptsIncomingPayment(booking)) {
+      console.warn(
+        `[payments] Ignoring ${source} payment_succeeded for booking ${booking.id} in status ${booking.paymentStatus}`,
+      );
+      return;
+    }
+
     const match = validatePaymentMatchesBooking(intent, booking);
     if (!match.ok) {
       throw Object.assign(new Error(match.error), { status: 409 });
     }
 
-    const intentRef = adminDb().collection(COLLECTIONS.paymentIntents).doc(intent.id);
     const nextIntent = reducePaymentIntent(
       intent,
       source === 'webhook'
@@ -504,25 +481,17 @@ export class PaymentService {
       now,
     );
     const nextBooking = markMentorshipBookingPaid(booking, now);
-    const relationship = normalizeRelationship({
-      ...(relationshipDoc.data() as MentorshipRelationship),
-      id: relationshipDoc.id,
-    });
     const nextRelationship: MentorshipRelationship = {
       ...relationship,
       paymentSatisfied: true,
       updatedAt: now,
     };
 
-    tx.set(intentRef, nextIntent);
-    tx.set(bookingRef, nextBooking);
-    tx.set(relationshipRef, nextRelationship);
-
-    const eventRef = adminDb().collection(COLLECTIONS.paymentEvents).doc();
-    tx.set(
-      eventRef,
-      buildPaymentEvent({
-        id: eventRef.id,
+    await this.repository.saveIntent(nextIntent, tx);
+    await this.repository.saveBooking(nextBooking, tx);
+    await this.repository.saveRelationship(nextRelationship, tx);
+    await this.repository.appendPaymentEvent(
+      {
         entityType: PAYMENT_EVENT_ENTITY.paymentIntent,
         entityId: intent.id,
         eventType: source === 'webhook' ? 'payment_intent.paid' : 'payment_intent.reconciled',
@@ -531,7 +500,8 @@ export class PaymentService {
         providerEventId: event.providerEventId,
         payload: { bookingId: booking.id, relationshipId: relationship.id },
         now,
-      }),
+      },
+      tx,
     );
   }
 
@@ -622,4 +592,17 @@ export class PaymentService {
   }
 }
 
-export const paymentService = new PaymentService();
+let paymentServiceSingleton: PaymentService | undefined;
+
+export function getPaymentService(): PaymentService {
+  paymentServiceSingleton ??= new PaymentService();
+  return paymentServiceSingleton;
+}
+
+export const paymentService: PaymentService = new Proxy({} as PaymentService, {
+  get(_target, prop) {
+    const service = getPaymentService();
+    const value = service[prop as keyof PaymentService];
+    return typeof value === 'function' ? value.bind(service) : value;
+  },
+});

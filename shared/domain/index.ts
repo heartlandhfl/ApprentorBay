@@ -266,6 +266,7 @@ export {
   normalizePaymentIntent,
   normalizePaymentRefund,
   validateCreateCheckoutBody,
+  validateCheckoutIdempotencyKey,
   validatePaymentMatchesBooking,
 } from './payments.js';
 export type {
