@@ -37,6 +37,7 @@ export type {
   MentorshipRelationship,
   MentorshipSession,
   SessionJoinPayload,
+  ClientMentorshipSession,
   MentorshipStatus,
   Message,
   Milestone,

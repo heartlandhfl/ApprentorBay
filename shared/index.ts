@@ -411,6 +411,8 @@ export {
   sessionJoinWindow,
   sessionPaymentAccessGranted,
   sessionsOverlap,
+  sanitizeMentorshipSessionForClient,
+  sanitizeMentorshipSessionsForClient,
   allRequiredMilestonesApproved,
   buildShowcase,
   canConfirmCompletion,
@@ -535,4 +537,5 @@ export type {
   MilestoneParty,
   MentorDiscoveryFilters,
   MentorshipOfferingView,
+  ClientMentorshipSession,
 } from './domain/index.js';

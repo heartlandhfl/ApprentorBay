@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import jwt from 'jsonwebtoken';
+import { beforeEach, describe, it } from 'node:test';
 import {
   ACCOUNT_STATUS,
   BOOKING_PAYMENT_STATUS,
@@ -22,6 +23,7 @@ import {
   joinMentorshipSession,
   type SessionStore,
 } from './sessionService.js';
+import { applyTestJitsiEnv } from './test/jitsiTestKeys.js';
 
 const NOW = '2026-09-03T12:00:00.000Z';
 const START = '2026-09-10T14:00:00.000Z';
@@ -129,6 +131,10 @@ function fullBooking(sessionId: string): MentorshipBooking {
 }
 
 describe('paid session service lifecycle', () => {
+  beforeEach(() => {
+    applyTestJitsiEnv();
+  });
+
   it('denies join for paid sessions until booking payment is verified', async () => {
     const store = new PaidSessionStore();
     const session = await createMentorshipSession(
@@ -181,7 +187,9 @@ describe('paid session service lifecycle', () => {
       session.id,
       JOIN_AT,
     );
-    assert.equal(learnerJoin.roomName, session.roomName);
+    const stored = (await store.getSession(session.id))!;
+    assert.equal(learnerJoin.roomName, stored.roomName);
+    assert.ok(learnerJoin.jwt.length > 0);
 
     const mentorJoin = await joinMentorshipSession(
       store,
@@ -189,7 +197,10 @@ describe('paid session service lifecycle', () => {
       session.id,
       JOIN_AT,
     );
-    assert.equal(mentorJoin.roomName, session.roomName);
+    assert.equal(mentorJoin.roomName, stored.roomName);
+    assert.ok(mentorJoin.jwt.length > 0);
+    const learnerClaims = jwt.decode(learnerJoin.jwt) as jwt.JwtPayload | null;
+    assert.equal(learnerClaims?.room, `vpaas-magic-cookie-test/${stored.roomName}`);
   });
 
   it('revokes join access after refund', async () => {

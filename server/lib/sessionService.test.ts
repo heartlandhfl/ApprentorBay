@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import jwt from 'jsonwebtoken';
+import { describe, it, beforeEach } from 'node:test';
 import {
   ACCOUNT_STATUS,
   SESSION_STATUS,
@@ -20,6 +21,7 @@ import {
   listMentorshipSessions,
   type SessionStore,
 } from './sessionService.js';
+import { applyTestJitsiEnv } from './test/jitsiTestKeys.js';
 
 const NOW = '2026-09-03T12:00:00.000Z';
 const START = '2026-09-10T14:00:00.000Z';
@@ -129,6 +131,10 @@ async function expectConflict(promise: Promise<unknown>) {
 }
 
 describe('sessionService', () => {
+  beforeEach(() => {
+    applyTestJitsiEnv();
+  });
+
   it('creates a valid mentor session', async () => {
     const store = new MemorySessionStore();
     const session = await createMentorshipSession(store, mentor, createBody(), NOW);
@@ -137,7 +143,9 @@ describe('sessionService', () => {
     assert.equal(session.learnerId, learner.uid);
     assert.equal(session.relationshipId, relationship().id);
     assert.equal(session.status, SESSION_STATUS.scheduled);
-    assert.equal(session.roomName, `ab-${session.id}`);
+    assert.equal('roomName' in session, false);
+    const stored = await store.getSession(session.id);
+    assert.equal(stored?.roomName, `ab-${session.id}`);
     assert.equal(session.durationMinutes, 60);
   });
 
@@ -277,13 +285,37 @@ describe('sessionService', () => {
   it('authorises join and records startedAt', async () => {
     const store = new MemorySessionStore();
     const created = await createMentorshipSession(store, mentor, createBody(), NOW);
+    const stored = (await store.getSession(created.id))!;
     const joinAt = '2026-09-10T13:55:00.000Z';
     const join = await joinMentorshipSession(store, learner, created.id, joinAt);
 
-    assert.equal(join.roomName, created.roomName);
+    assert.equal(join.roomName, stored.roomName);
     assert.equal(join.userInfo.displayName, learner.displayName);
+    assert.ok(join.jwt.length > 0);
+    const decoded = jwt.decode(join.jwt) as jwt.JwtPayload | null;
+    assert.ok(decoded);
+    assert.equal(decoded.room, `vpaas-magic-cookie-test/${stored.roomName}`);
     const updated = await store.getSession(created.id);
     assert.equal(updated?.startedAt, joinAt);
+  });
+
+  it('does not expose roomName on get or list responses', async () => {
+    const store = new MemorySessionStore();
+    const created = await createMentorshipSession(store, mentor, createBody(), NOW);
+    const viewed = await getMentorshipSession(store, learner, created.id);
+    const listed = await listMentorshipSessions(store, learner, relationship().id);
+
+    assert.equal('roomName' in viewed, false);
+    assert.equal(listed.every((session) => !('roomName' in session)), true);
+  });
+
+  it('does not issue a room JWT to users who fail canJoinSession', async () => {
+    const store = new MemorySessionStore();
+    const created = await createMentorshipSession(store, mentor, createBody(), NOW);
+    const joinAt = '2026-09-10T13:55:00.000Z';
+
+    await expectForbidden(joinMentorshipSession(store, stranger, created.id, joinAt));
+    await expectForbidden(joinMentorshipSession(store, learner, created.id, NOW));
   });
 
   it('denies join for unrelated users', async () => {
