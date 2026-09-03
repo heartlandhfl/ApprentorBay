@@ -128,6 +128,7 @@ describe('domain identities', () => {
     assert.equal(COLLECTIONS.profileSlugs, 'profileSlugs');
     assert.equal(COLLECTIONS.auditLogs, 'adminAuditLogs');
     assert.equal(COLLECTIONS.supportIssues, 'supportIssues');
+    assert.equal(COLLECTIONS.bookings, 'mentorshipBookings');
     assert.equal(COLLECTIONS.operatorAdmins, 'admins');
     assert.equal(RESERVED_COLLECTIONS.legacyMentorships, 'mentorships');
     assert.equal(RESERVED_COLLECTIONS.notifications, 'notifications');

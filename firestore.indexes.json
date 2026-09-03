@@ -80,6 +80,30 @@
         { "fieldPath": "listed", "order": "ASCENDING" },
         { "fieldPath": "published", "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "mentorshipBookings",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "relationshipId", "order": "ASCENDING" },
+        { "fieldPath": "bookingStatus", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "mentorshipBookings",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "relationshipId", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "mentorshipBookings",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "learnerId", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

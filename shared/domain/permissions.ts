@@ -7,6 +7,12 @@ import {
 import { USER_ROLE } from './identities.js';
 import { canParticipate } from './administration.js';
 import { isAccountActive, type MentorProfile, type User } from './users.js';
+import {
+  isOpenBookingPaymentStatus,
+  isOpenBookingStatus,
+  validateBookingRelationship,
+  type MentorshipBooking,
+} from './bookings.js';
 import { isPendingApplication, type MentorshipApplication } from './applications.js';
 import { validateMentorApplicationTarget, canAccessPaidMentorshipServices } from './mentorshipRequest.js';
 import {
@@ -231,4 +237,39 @@ export function canChangeOwnRole(_actor: PermissionActor | null | undefined): bo
 
 export function canSelfApprove(_actor: PermissionActor | null | undefined): boolean {
   return false;
+}
+
+export function canCreateBooking(
+  actor: PermissionActor | null | undefined,
+  relationship: MentorshipRelationship,
+  existingOpenBookings: readonly Pick<MentorshipBooking, 'paymentStatus' | 'bookingStatus'>[] = [],
+): boolean {
+  if (!actor || !canParticipate(actor)) return false;
+  if (actor.role !== USER_ROLE.learner) return false;
+  if (relationship.learnerId !== actor.uid) return false;
+  if (!validateBookingRelationship(relationship).ok) return false;
+  const hasOpenBooking = existingOpenBookings.some(
+    (booking) => isOpenBookingPaymentStatus(booking.paymentStatus) || isOpenBookingStatus(booking.bookingStatus),
+  );
+  return !hasOpenBooking;
+}
+
+export function canReadBooking(
+  actor: PermissionActor | null | undefined,
+  booking: Pick<MentorshipBooking, 'learnerId' | 'mentorId'>,
+): boolean {
+  if (!actor || !isAccountActive(actor)) return false;
+  if (actor.role === USER_ROLE.admin) return true;
+  return isPairingMember(actor.uid, booking);
+}
+
+export function canCancelBooking(
+  actor: PermissionActor | null | undefined,
+  booking: MentorshipBooking,
+): boolean {
+  if (!canReadBooking(actor, booking)) return false;
+  if (!isOpenBookingStatus(booking.bookingStatus)) return false;
+  if (!isOpenBookingPaymentStatus(booking.paymentStatus)) return false;
+  if (actor?.role === USER_ROLE.admin) return true;
+  return isPairingMember(actor?.uid ?? '', booking);
 }

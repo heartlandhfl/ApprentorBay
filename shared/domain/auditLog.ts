@@ -24,6 +24,9 @@ export const AUDIT_EVENT = {
   accountTerminated: ADMIN_ACTION.terminateAccount,
   accountRestored: ADMIN_ACTION.restoreAccount,
   supportIssueResolved: ADMIN_ACTION.resolveSupportIssue,
+  bookingCreated: 'BOOKING_CREATED',
+  bookingCancelled: 'BOOKING_CANCELLED',
+  bookingPaid: 'BOOKING_PAID',
 } as const;
 
 export type AuditEvent = (typeof AUDIT_EVENT)[keyof typeof AUDIT_EVENT];
