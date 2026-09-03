@@ -207,6 +207,8 @@ export function isSessionMember(uid: string, session: PairingMemberIds): boolean
 export interface SessionJoinPayload {
   domain: string;
   roomName: string;
+  /** Short-lived RS256 token authorising this user for the room — required to connect. */
+  jwt: string;
   userInfo: {
     displayName: string;
     email: string;

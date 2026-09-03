@@ -36,6 +36,7 @@ export function JitsiMeetingEmbed({ join, onLeave }: JitsiMeetingEmbedProps) {
       <JitsiMeeting
         domain={join.domain}
         roomName={join.roomName}
+        jwt={join.jwt}
         userInfo={join.userInfo}
         configOverwrite={{
           startWithAudioMuted: false,

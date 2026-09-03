@@ -9,7 +9,7 @@
     "create-admin": "tsx createAdmin.ts",
     "build": "tsc",
     "typecheck": "tsc --noEmit",
-    "test": "tsx --test ./lib/privateKey.test.ts ./lib/payments/paymentFlow.test.ts ./lib/sessionService.test.ts ./lib/paidSessionLifecycle.test.ts"
+    "test": "tsx --test ./lib/privateKey.test.ts ./lib/payments/paymentFlow.test.ts ./lib/jitsiJwt.test.ts ./lib/sessionService.test.ts ./lib/paidSessionLifecycle.test.ts"
   },
   "dependencies": {
     "@apprentorbay/shared": "0.1.0",
@@ -20,10 +20,12 @@
     "dotenv": "^16.4.7",
     "express": "^5.1.0",
     "firebase-admin": "^13.5.0",
+    "jsonwebtoken": "^9.0.3",
     "stripe": "^17.7.0",
     "typescript": "^5.9.2"
   },
   "devDependencies": {
+    "@types/jsonwebtoken": "^9.0.10",
     "tsx": "^4.20.5"
   }
 }

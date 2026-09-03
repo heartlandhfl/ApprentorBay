@@ -11,13 +11,18 @@ import {
   findSchedulingConflict,
   normalizeRelationship,
   normalizeSession,
+  sanitizeMentorshipSessionForClient,
+  sanitizeMentorshipSessionsForClient,
   validateSessionScheduleInput,
+  type ClientMentorshipSession,
   type MentorshipBooking,
   type MentorshipRelationship,
   type MentorshipSession,
   type SessionJoinPayload,
   type User,
 } from '@apprentorbay/shared';
+import { JitsiConfigError, resolveJitsiAuthConfig } from './jitsiConfig.js';
+import { createJitsiRoomToken } from './jitsiJwt.js';
 
 export type SessionServiceErrorCode =
   | 'unauthenticated'
@@ -82,7 +87,7 @@ export async function createMentorshipSession(
   account: User | undefined,
   body: CreateSessionInput,
   now: string = new Date().toISOString(),
-): Promise<MentorshipSession> {
+): Promise<ClientMentorshipSession> {
   const actor = requireActor(account);
   rejectClientOwnershipFields(body);
 
@@ -135,14 +140,14 @@ export async function createMentorshipSession(
   });
 
   await store.saveSession(session);
-  return session;
+  return sanitizeMentorshipSessionForClient(session);
 }
 
 export async function getMentorshipSession(
   store: SessionStore,
   account: User | undefined,
   sessionId: string,
-): Promise<MentorshipSession> {
+): Promise<ClientMentorshipSession> {
   const actor = requireActor(account);
   const session = await store.getSession(sessionId);
   if (!session) {
@@ -151,14 +156,14 @@ export async function getMentorshipSession(
   if (!canReadSession(actor, session)) {
     throw new SessionServiceError('forbidden', 'You cannot view this session', 403);
   }
-  return session;
+  return sanitizeMentorshipSessionForClient(session);
 }
 
 export async function listMentorshipSessions(
   store: SessionStore,
   account: User | undefined,
   relationshipId: string,
-): Promise<MentorshipSession[]> {
+): Promise<ClientMentorshipSession[]> {
   const actor = requireActor(account);
   const relationship = await store.getRelationship(relationshipId);
   if (!relationship) {
@@ -167,7 +172,8 @@ export async function listMentorshipSessions(
   if (!canReadSession(actor, relationship)) {
     throw new SessionServiceError('forbidden', 'You cannot list sessions for this relationship', 403);
   }
-  return store.listSessions(relationshipId);
+  const sessions = await store.listSessions(relationshipId);
+  return sanitizeMentorshipSessionsForClient(sessions);
 }
 
 export async function cancelMentorshipSession(
@@ -175,7 +181,7 @@ export async function cancelMentorshipSession(
   account: User | undefined,
   sessionId: string,
   now: string = new Date().toISOString(),
-): Promise<{ session: MentorshipSession; changed: boolean }> {
+): Promise<{ session: ClientMentorshipSession; changed: boolean }> {
   const actor = requireActor(account);
   const current = await store.getSession(sessionId);
   if (!current) {
@@ -192,7 +198,7 @@ export async function cancelMentorshipSession(
   }
 
   if (current.status === SESSION_STATUS.cancelled) {
-    return { session: current, changed: false };
+    return { session: sanitizeMentorshipSessionForClient(current), changed: false };
   }
 
   if (!canCancelSession(actor, current)) {
@@ -211,7 +217,7 @@ export async function cancelMentorshipSession(
     cancelledById: actor.uid,
   };
   await store.saveSession(session);
-  return { session, changed: true };
+  return { session: sanitizeMentorshipSessionForClient(session), changed: true };
 }
 
 export async function completeMentorshipSession(
@@ -219,7 +225,7 @@ export async function completeMentorshipSession(
   account: User | undefined,
   sessionId: string,
   now: string = new Date().toISOString(),
-): Promise<{ session: MentorshipSession; changed: boolean }> {
+): Promise<{ session: ClientMentorshipSession; changed: boolean }> {
   const actor = requireActor(account);
   const current = await store.getSession(sessionId);
   if (!current) {
@@ -236,7 +242,7 @@ export async function completeMentorshipSession(
   }
 
   if (current.status === SESSION_STATUS.completed) {
-    return { session: current, changed: false };
+    return { session: sanitizeMentorshipSessionForClient(current), changed: false };
   }
 
   if (!canCompleteSession(actor, current)) {
@@ -255,11 +261,22 @@ export async function completeMentorshipSession(
     endedAt: now,
   };
   await store.saveSession(session);
-  return { session, changed: true };
+  return { session: sanitizeMentorshipSessionForClient(session), changed: true };
 }
 
-export function resolveJitsiDomain(): string {
-  return process.env.JITSI_DOMAIN?.trim() || 'meet.jit.si';
+function resolveJitsiJoinAuth() {
+  try {
+    return resolveJitsiAuthConfig();
+  } catch (error) {
+    if (error instanceof JitsiConfigError) {
+      throw new SessionServiceError(
+        'invalid',
+        'Video sessions are not configured for authenticated join',
+        503,
+      );
+    }
+    throw error;
+  }
 }
 
 export async function joinMentorshipSession(
@@ -293,13 +310,17 @@ export async function joinMentorshipSession(
     });
   }
 
+  const userInfo = {
+    displayName: actor.displayName?.trim() || 'Participant',
+    email: actor.email?.trim() || '',
+  };
+  const config = resolveJitsiJoinAuth();
+
   return {
-    domain: resolveJitsiDomain(),
+    domain: config.domain,
     roomName: current.roomName,
-    userInfo: {
-      displayName: actor.displayName?.trim() || 'Participant',
-      email: actor.email?.trim() || '',
-    },
+    jwt: createJitsiRoomToken(config, current.roomName, userInfo, Date.parse(now)),
+    userInfo,
   };
 }
 

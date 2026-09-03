@@ -318,6 +318,12 @@ export {
 } from './sessions.js';
 export type { MentorshipSession, SessionJoinPayload } from './sessions.js';
 
+export {
+  sanitizeMentorshipSessionForClient,
+  sanitizeMentorshipSessionsForClient,
+} from './sessionPresentation.js';
+export type { ClientMentorshipSession } from './sessionPresentation.js';
+
 export { MESSAGE_TEXT } from './messages.js';
 export type { Message } from './messages.js';
 
