@@ -258,6 +258,7 @@ export {
   normalizeApplicationCommercialFields,
   paidMentorshipServicesBlocked,
   relationshipCommercialFromApplication,
+  relationshipCommercialFromMentorProfile,
   requestTypeFromCommercialMode,
   requestTypePublicLabel,
   validateMentorApplicationTarget,

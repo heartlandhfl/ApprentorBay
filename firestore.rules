@@ -112,6 +112,17 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/mentorProfiles/$(mentorId)).data.verificationStatus == 'approved';
     }
 
+    // Commercial terms are server-derived only — never client-writable on applications.
+    function applicationCommercialFieldsAbsent() {
+      return !('requestType' in request.resource.data)
+        && !('commercialMode' in request.resource.data)
+        && !('baseSessionPriceUsd' in request.resource.data)
+        && !('sessionDurationMinutes' in request.resource.data)
+        && !('currency' in request.resource.data)
+        && !('paymentRequired' in request.resource.data)
+        && !('paymentSatisfied' in request.resource.data);
+    }
+
     match /users/{userId} {
       allow read: if isOwner(userId) || isAdmin();
       allow create: if isOwner(userId)
@@ -200,7 +211,8 @@ service cloud.firestore {
         && request.resource.data.message.size() > 0
         && request.resource.data.message.size() <= 1000
         && mentorIsApproved(request.resource.data.mentorId)
-        && userParticipates(request.resource.data.mentorId);
+        && userParticipates(request.resource.data.mentorId)
+        && applicationCommercialFieldsAbsent();
       allow update, delete: if false;
     }
 
