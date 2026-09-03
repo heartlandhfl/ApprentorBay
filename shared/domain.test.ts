@@ -105,7 +105,7 @@ import {
   canAccessPaidMentorshipServices,
   normalizeApplicationCommercialFields,
   paidMentorshipServicesBlocked,
-  relationshipCommercialFromApplication,
+  relationshipCommercialFromMentorProfile,
   requestTypeFromCommercialMode,
   validateMentorApplicationTarget,
 } from './domain/index.js';
@@ -1288,7 +1288,7 @@ describe('mentorship commercial requests', () => {
     assert.equal(validateMentorApplicationTarget(unpaidPaidMentor).ok, false);
   });
 
-  it('snapshots paid requests even if the mentor later switches to free', () => {
+  it('derives relationship commercial from mentor profile at accept time', () => {
     const paidSnapshot = buildMentorshipCommercialSnapshot({
       commercialMode: COMMERCIAL_MODE.professional,
       baseSessionPriceUsd: 12_000,
@@ -1309,14 +1309,13 @@ describe('mentorship commercial requests', () => {
       commercialMode: COMMERCIAL_MODE.givingBack,
     });
     assert.equal(normalizeApplicationCommercialFields(application).requestType, REQUEST_TYPE.paidRequest);
-    assert.equal(buildMentorshipCommercialSnapshotFromProfile(laterFreeMentor).requestType, REQUEST_TYPE.freeRequest);
     assert.equal(
-      relationshipCommercialFromApplication(application).paymentRequired,
-      true,
+      relationshipCommercialFromMentorProfile(laterFreeMentor).requestType,
+      REQUEST_TYPE.freeRequest,
     );
     assert.equal(
-      relationshipCommercialFromApplication(application).paymentSatisfied,
-      false,
+      relationshipCommercialFromMentorProfile(laterFreeMentor).paymentSatisfied,
+      true,
     );
   });
 

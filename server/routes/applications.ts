@@ -15,7 +15,7 @@ import {
   isClosedRelationship,
   isOpenRelationship,
   normalizeRelationship,
-  relationshipCommercialFromApplication,
+  relationshipCommercialFromMentorProfile,
   relationshipDocId,
   validateMentorApplicationTarget,
   type MentorshipApplication,
@@ -142,6 +142,19 @@ applicationsRouter.post('/:id/accept', async (req: AccountRequest, res, next) =>
       return;
     }
 
+    const { loadPrivateProfile } = await import('../lib/profiles.js');
+    const mentorLoaded = await loadPrivateProfile(loaded.data.mentorId, USER_ROLE.mentor);
+    if (!mentorLoaded || mentorLoaded.role !== USER_ROLE.mentor) {
+      sendApiError(res, 404, 'not_found', 'Mentor profile not found');
+      return;
+    }
+    const offeringValidation = validateMentorApplicationTarget(mentorLoaded.profile);
+    if (!offeringValidation.ok) {
+      sendApiError(res, 400, 'invalid', offeringValidation.error);
+      return;
+    }
+    const commercialFromMentor = relationshipCommercialFromMentorProfile(mentorLoaded.profile);
+
     const existingPair = await adminDb()
       .collection(COLLECTIONS.relationships)
       .where('learnerId', '==', loaded.data.learnerId)
@@ -192,7 +205,7 @@ applicationsRouter.post('/:id/accept', async (req: AccountRequest, res, next) =>
       let relationship: MentorshipRelationship;
       let created = false;
 
-      const commercial = relationshipCommercialFromApplication(current);
+      const commercial = commercialFromMentor;
 
       if (existing && isClosedRelationship(existing)) {
         if (existing.status === RELATIONSHIP_STATUS.terminated) {

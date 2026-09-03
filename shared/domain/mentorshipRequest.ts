@@ -147,6 +147,29 @@ export function applicationCommercialFieldsFromSnapshot(
   };
 }
 
+export function relationshipCommercialFromMentorProfile(
+  profile: Parameters<typeof buildMentorshipCommercialSnapshotFromProfile>[0],
+): Pick<
+  MentorshipRelationship,
+  | 'requestType'
+  | 'commercialMode'
+  | 'baseSessionPriceUsd'
+  | 'sessionDurationMinutes'
+  | 'paymentRequired'
+  | 'paymentSatisfied'
+> {
+  const snapshot = buildMentorshipCommercialSnapshotFromProfile(profile);
+  return {
+    requestType: snapshot.requestType,
+    commercialMode: snapshot.commercialMode,
+    baseSessionPriceUsd: snapshot.baseSessionPriceUsd,
+    sessionDurationMinutes: snapshot.sessionDurationMinutes,
+    paymentRequired: snapshot.paymentRequired,
+    paymentSatisfied: snapshot.paymentSatisfied,
+  };
+}
+
+/** Reads commercial fields stored on an application document (display only — not authoritative at accept). */
 export function relationshipCommercialFromApplication(
   application: Partial<MentorshipApplication>,
 ): Pick<
