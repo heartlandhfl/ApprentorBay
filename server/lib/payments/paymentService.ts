@@ -180,6 +180,9 @@ export class PaymentService {
           case 'refund_succeeded':
             await this.applyRefundSucceeded(tx, event, now);
             break;
+          case 'refund_failed':
+            await this.applyRefundFailed(tx, event, now);
+            break;
           default:
             break;
         }
@@ -284,36 +287,9 @@ export class PaymentService {
       { type: 'REFUND_SUBMITTED', providerRefundId: providerRefund.providerRefundId },
       now,
     );
-    refund = reducePaymentRefund(refund, { type: 'REFUND_SUCCEEDED', succeededAt: now }, now);
 
     await adminDb().runTransaction(async (tx) => {
-      const intentRef = adminDb().collection(COLLECTIONS.paymentIntents).doc(intent.id);
-      const bookingRef = adminDb().collection(COLLECTIONS.bookings).doc(intent.bookingId);
-      const intentDoc = await tx.get(intentRef);
-      const bookingDoc = await tx.get(bookingRef);
-      if (!intentDoc.exists || !bookingDoc.exists) {
-        throw Object.assign(new Error('Payment records missing'), { status: 404 });
-      }
-
-      const currentIntent = normalizePaymentIntent({
-        ...(intentDoc.data() as PaymentIntent),
-        id: intentDoc.id,
-      });
-      const booking = normalizeMentorshipBooking({
-        ...(bookingDoc.data() as MentorshipBooking),
-        id: bookingDoc.id,
-      });
-      const nextIntent = reducePaymentIntent(currentIntent, { type: 'REFUND_SUCCEEDED' }, now);
-      const nextBooking = {
-        ...booking,
-        paymentStatus: BOOKING_PAYMENT_STATUS.refunded,
-        bookingStatus: BOOKING_STATUS.refunded,
-        updatedAt: now,
-      };
-
       tx.set(refundRef, refund);
-      tx.set(intentRef, nextIntent);
-      tx.set(bookingRef, nextBooking);
       const eventRef = adminDb().collection(COLLECTIONS.paymentEvents).doc();
       tx.set(
         eventRef,
@@ -321,26 +297,19 @@ export class PaymentService {
           id: eventRef.id,
           entityType: PAYMENT_EVENT_ENTITY.refund,
           entityId: refund.id,
-          eventType: 'refund.succeeded',
-          fromStatus: currentIntent.status,
-          toStatus: nextIntent.status,
+          eventType: 'refund.submitted',
+          fromStatus: REFUND_STATUS.pending,
+          toStatus: REFUND_STATUS.pending,
           actorId: input.requestedBy,
           idempotencyKey: input.idempotencyKey,
-          payload: { paymentIntentId: intent.id, bookingId: intent.bookingId },
+          payload: {
+            paymentIntentId: intent.id,
+            bookingId: intent.bookingId,
+            providerRefundId: providerRefund.providerRefundId,
+          },
           now,
         }),
       );
-    });
-
-    await recordAudit({
-      actorId: input.requestedBy,
-      action: AUDIT_EVENT.paymentRefunded,
-      targetUserId: intent.learnerId,
-      metadata: {
-        paymentIntentId: intent.id,
-        bookingId: intent.bookingId,
-        refundId: refund.id,
-      },
     });
 
     return refund;
@@ -379,6 +348,19 @@ export class PaymentService {
       .where('idempotencyKey', '==', idempotencyKey)
       .limit(1)
       .get();
+    if (snap.empty) return null;
+    return normalizePaymentRefund({
+      ...(snap.docs[0].data() as PaymentRefund),
+      id: snap.docs[0].id,
+    });
+  }
+
+  private async loadRefundByProviderId(providerRefundId: string, tx?: Transaction) {
+    const query = adminDb()
+      .collection(COLLECTIONS.paymentRefunds)
+      .where('providerRefundId', '==', providerRefundId)
+      .limit(1);
+    const snap = tx ? await tx.get(query) : await query.get();
     if (snap.empty) return null;
     return normalizePaymentRefund({
       ...(snap.docs[0].data() as PaymentRefund),
@@ -602,11 +584,19 @@ export class PaymentService {
   ) {
     const intent = await this.loadIntentByProviderId(event.providerPaymentIntentId, tx);
     if (!intent || intent.status === PAYMENT_STATUS.refunded) return;
+
+    const refund = await this.loadRefundByProviderId(event.providerRefundId, tx);
     const intentRef = adminDb().collection(COLLECTIONS.paymentIntents).doc(intent.id);
     const bookingRef = adminDb().collection(COLLECTIONS.bookings).doc(intent.bookingId);
+    const relationshipRef = adminDb()
+      .collection(COLLECTIONS.relationships)
+      .doc(intent.relationshipId);
     const nextIntent = reducePaymentIntent(intent, { type: 'REFUND_SUCCEEDED' }, now);
     const bookingDoc = await tx.get(bookingRef);
+    const relationshipDoc = await tx.get(relationshipRef);
+
     tx.set(intentRef, nextIntent);
+
     if (bookingDoc.exists) {
       const booking = normalizeMentorshipBooking({
         ...(bookingDoc.data() as MentorshipBooking),
@@ -619,6 +609,74 @@ export class PaymentService {
         updatedAt: now,
       });
     }
+
+    if (relationshipDoc.exists) {
+      const relationship = normalizeRelationship({
+        ...(relationshipDoc.data() as MentorshipRelationship),
+        id: relationshipDoc.id,
+      });
+      tx.set(relationshipRef, {
+        ...relationship,
+        paymentSatisfied: false,
+        updatedAt: now,
+      });
+    }
+
+    if (refund && refund.status === REFUND_STATUS.pending) {
+      const refundRef = adminDb().collection(COLLECTIONS.paymentRefunds).doc(refund.id);
+      const nextRefund = reducePaymentRefund(
+        refund,
+        { type: 'REFUND_SUCCEEDED', succeededAt: now },
+        now,
+      );
+      tx.set(refundRef, nextRefund);
+      const eventRef = adminDb().collection(COLLECTIONS.paymentEvents).doc();
+      tx.set(
+        eventRef,
+        buildPaymentEvent({
+          id: eventRef.id,
+          entityType: PAYMENT_EVENT_ENTITY.refund,
+          entityId: refund.id,
+          eventType: 'refund.succeeded',
+          fromStatus: refund.status,
+          toStatus: nextRefund.status,
+          providerEventId: event.providerEventId,
+          payload: {
+            paymentIntentId: intent.id,
+            bookingId: intent.bookingId,
+            relationshipId: intent.relationshipId,
+          },
+          now,
+        }),
+      );
+    }
+  }
+
+  private async applyRefundFailed(
+    tx: Transaction,
+    event: Extract<ProviderWebhookEvent, { type: 'refund_failed' }>,
+    now: string,
+  ) {
+    const refund = await this.loadRefundByProviderId(event.providerRefundId, tx);
+    if (!refund || refund.status !== REFUND_STATUS.pending) return;
+    const refundRef = adminDb().collection(COLLECTIONS.paymentRefunds).doc(refund.id);
+    const nextRefund = reducePaymentRefund(refund, { type: 'REFUND_FAILED' }, now);
+    tx.set(refundRef, nextRefund);
+    const eventRef = adminDb().collection(COLLECTIONS.paymentEvents).doc();
+    tx.set(
+      eventRef,
+      buildPaymentEvent({
+        id: eventRef.id,
+        entityType: PAYMENT_EVENT_ENTITY.refund,
+        entityId: refund.id,
+        eventType: 'refund.failed',
+        fromStatus: refund.status,
+        toStatus: nextRefund.status,
+        providerEventId: event.providerEventId,
+        payload: { paymentIntentId: refund.paymentIntentId, bookingId: refund.bookingId },
+        now,
+      }),
+    );
   }
 }
 

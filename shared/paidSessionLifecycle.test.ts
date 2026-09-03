@@ -14,6 +14,7 @@ import {
   buildMentorshipBooking,
   buildMentorshipSession,
   canJoinSession,
+  canStartLearningJourney,
   markMentorshipBookingPaid,
   normalizeMentorOfferingFields,
   sessionPaymentAccessGranted,
@@ -44,7 +45,7 @@ function freeRelationship() {
   });
 }
 
-function paidRelationship() {
+function paidRelationship(overrides: { paymentSatisfied?: boolean } = {}) {
   return buildActiveRelationship({
     id: 'learner-1_mentor-1',
     learnerId: 'learner-1',
@@ -57,7 +58,7 @@ function paidRelationship() {
       baseSessionPriceUsd: 7500,
       sessionDurationMinutes: 60,
       paymentRequired: true,
-      paymentSatisfied: false,
+      paymentSatisfied: overrides.paymentSatisfied ?? false,
     },
   });
 }
@@ -185,7 +186,7 @@ describe('paid session lifecycle', () => {
   });
 
   it('revokes join access when booking is refunded', () => {
-    const relationship = paidRelationship();
+    const relationship = paidRelationship({ paymentSatisfied: true });
     const session = {
       ...buildMentorshipSession({
         id: 'session-1',
@@ -207,6 +208,22 @@ describe('paid session lifecycle', () => {
     assert.equal(
       canJoinSession(actor('learner-1', USER_ROLE.learner), session, relationship, refunded, JOIN_AT),
       false,
+    );
+  });
+
+  it('blocks learning journeys after refund clears relationship payment satisfaction', () => {
+    const relationship = paidRelationship({ paymentSatisfied: false });
+    assert.equal(
+      canStartLearningJourney(actor('learner-1', USER_ROLE.learner), relationship),
+      false,
+    );
+  });
+
+  it('still allows learning journeys while paymentSatisfied remains stale after refund', () => {
+    const relationship = paidRelationship({ paymentSatisfied: true });
+    assert.equal(
+      canStartLearningJourney(actor('learner-1', USER_ROLE.learner), relationship),
+      true,
     );
   });
 
