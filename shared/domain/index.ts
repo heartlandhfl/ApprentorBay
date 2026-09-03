@@ -158,8 +158,28 @@ export type {
   VerificationDecision,
 } from './users.js';
 
-export { APPLICATION_MESSAGE, isPendingApplication } from './applications.js';
+export {
+  APPLICATION_MESSAGE,
+  isPendingApplication,
+} from './applications.js';
 export type { MentorApplication, MentorshipApplication } from './applications.js';
+
+export {
+  REQUEST_TYPE,
+  REQUEST_TYPE_PUBLIC_LABEL,
+  applicationCommercialFieldsFromSnapshot,
+  buildMentorshipCommercialSnapshot,
+  buildMentorshipCommercialSnapshotFromProfile,
+  canAccessPaidMentorshipServices,
+  isRequestType,
+  normalizeApplicationCommercialFields,
+  paidMentorshipServicesBlocked,
+  relationshipCommercialFromApplication,
+  requestTypeFromCommercialMode,
+  requestTypePublicLabel,
+  validateMentorApplicationTarget,
+} from './mentorshipRequest.js';
+export type { MentorshipCommercialSnapshot, RequestType } from './mentorshipRequest.js';
 
 export {
   RELATIONSHIP_STATUS_LABEL,

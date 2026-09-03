@@ -97,6 +97,16 @@ import {
   filterListedMentors,
   hasActiveDiscoveryFilters,
   mentorDiscoveryExpertiseLabel,
+  REQUEST_TYPE,
+  applicationCommercialFieldsFromSnapshot,
+  buildMentorshipCommercialSnapshot,
+  buildMentorshipCommercialSnapshotFromProfile,
+  canAccessPaidMentorshipServices,
+  normalizeApplicationCommercialFields,
+  paidMentorshipServicesBlocked,
+  relationshipCommercialFromApplication,
+  requestTypeFromCommercialMode,
+  validateMentorApplicationTarget,
 } from './domain/index.js';
 
 describe('domain identities', () => {
@@ -1198,6 +1208,134 @@ describe('mentor discovery', () => {
     assert.equal(
       mentorDiscoveryExpertiseLabel(mentors[0]!),
       'Product strategy · Leadership',
+    );
+  });
+});
+
+describe('mentorship commercial requests', () => {
+  const learner = { uid: 'learner-1', role: USER_ROLE.learner, active: true, accountStatus: ACCOUNT_STATUS.active };
+  const approvedMentorBase = {
+    userId: 'mentor-1',
+    verificationStatus: VERIFICATION_STATUS.approved,
+    public: true,
+    acceptsNewLearners: true,
+  };
+
+  it('derives free and paid request types from mentor commercial mode', () => {
+    const freeProfile = normalizeMentorProfile({
+      ...emptyMentorProfile('mentor-1', 'Sam'),
+      ...approvedMentorBase,
+      commercialMode: COMMERCIAL_MODE.givingBack,
+    });
+    const paidProfile = normalizeMentorProfile({
+      ...emptyMentorProfile('mentor-2', 'Alex'),
+      ...approvedMentorBase,
+      userId: 'mentor-2',
+      commercialMode: COMMERCIAL_MODE.professional,
+      baseSessionPriceUsd: 7500,
+    });
+    assert.equal(requestTypeFromCommercialMode(COMMERCIAL_MODE.givingBack), REQUEST_TYPE.freeRequest);
+    assert.equal(requestTypeFromCommercialMode(COMMERCIAL_MODE.premium), REQUEST_TYPE.paidRequest);
+    assert.equal(buildMentorshipCommercialSnapshotFromProfile(freeProfile).requestType, REQUEST_TYPE.freeRequest);
+    assert.equal(buildMentorshipCommercialSnapshotFromProfile(paidProfile).requestType, REQUEST_TYPE.paidRequest);
+    assert.equal(
+      applicationCommercialFieldsFromSnapshot(buildMentorshipCommercialSnapshotFromProfile(paidProfile))
+        .baseSessionPriceUsd,
+      7500,
+    );
+  });
+
+  it('allows free mentor applications and rejects invalid paid targets', () => {
+    const freeMentor = normalizeMentorProfile({
+      ...emptyMentorProfile('mentor-1', 'Sam'),
+      ...approvedMentorBase,
+      commercialMode: COMMERCIAL_MODE.givingBack,
+    });
+    const unpaidPaidMentor = normalizeMentorProfile({
+      ...emptyMentorProfile('mentor-2', 'Alex'),
+      ...approvedMentorBase,
+      userId: 'mentor-2',
+      commercialMode: COMMERCIAL_MODE.professional,
+      baseSessionPriceUsd: null,
+    });
+    assert.equal(canApplyForMentorship(learner, freeMentor, 'I want to learn joinery'), true);
+    assert.equal(validateMentorApplicationTarget(freeMentor).ok, true);
+    assert.equal(canApplyForMentorship(learner, unpaidPaidMentor, 'Please mentor me'), false);
+    assert.equal(validateMentorApplicationTarget(unpaidPaidMentor).ok, false);
+  });
+
+  it('snapshots paid requests even if the mentor later switches to free', () => {
+    const paidSnapshot = buildMentorshipCommercialSnapshot({
+      commercialMode: COMMERCIAL_MODE.professional,
+      baseSessionPriceUsd: 12_000,
+      sessionDurationMinutes: 60,
+    });
+    const application = {
+      id: 'app-1',
+      learnerId: 'learner-1',
+      mentorId: 'mentor-1',
+      message: 'Please mentor me',
+      status: APPLICATION_STATUS.pending,
+      createdAt: '2026-09-01T00:00:00.000Z',
+      ...applicationCommercialFieldsFromSnapshot(paidSnapshot),
+    };
+    const laterFreeMentor = normalizeMentorProfile({
+      ...emptyMentorProfile('mentor-1', 'Alex'),
+      ...approvedMentorBase,
+      commercialMode: COMMERCIAL_MODE.givingBack,
+    });
+    assert.equal(normalizeApplicationCommercialFields(application).requestType, REQUEST_TYPE.paidRequest);
+    assert.equal(buildMentorshipCommercialSnapshotFromProfile(laterFreeMentor).requestType, REQUEST_TYPE.freeRequest);
+    assert.equal(
+      relationshipCommercialFromApplication(application).paymentRequired,
+      true,
+    );
+    assert.equal(
+      relationshipCommercialFromApplication(application).paymentSatisfied,
+      false,
+    );
+  });
+
+  it('treats legacy applications and relationships without commercial fields as free', () => {
+    const legacyApplication = {
+      id: 'legacy-app',
+      learnerId: 'learner-1',
+      mentorId: 'mentor-1',
+      message: 'Hello',
+      status: APPLICATION_STATUS.pending,
+      createdAt: '2026-09-01T00:00:00.000Z',
+    };
+    const legacyRelationship = normalizeRelationship({
+      id: 'rel-1',
+      learnerId: 'learner-1',
+      mentorId: 'mentor-1',
+      status: RELATIONSHIP_STATUS.active,
+      createdAt: '2026-09-01T00:00:00.000Z',
+    });
+    assert.equal(normalizeApplicationCommercialFields(legacyApplication).requestType, REQUEST_TYPE.freeRequest);
+    assert.equal(canStartLearningJourney(learner, legacyRelationship), true);
+    assert.equal(paidMentorshipServicesBlocked(legacyRelationship), false);
+    assert.equal(canAccessPaidMentorshipServices(legacyRelationship), true);
+  });
+
+  it('blocks learning journeys for paid requests until payment is satisfied', () => {
+    const paidRelationship = normalizeRelationship({
+      id: 'rel-paid',
+      learnerId: 'learner-1',
+      mentorId: 'mentor-1',
+      status: RELATIONSHIP_STATUS.active,
+      createdAt: '2026-09-01T00:00:00.000Z',
+      requestType: REQUEST_TYPE.paidRequest,
+      commercialMode: COMMERCIAL_MODE.professional,
+      baseSessionPriceUsd: 7500,
+      paymentRequired: true,
+      paymentSatisfied: false,
+    });
+    assert.equal(paidMentorshipServicesBlocked(paidRelationship), true);
+    assert.equal(canStartLearningJourney(learner, paidRelationship), false);
+    assert.equal(
+      canStartLearningJourney(learner, { ...paidRelationship, paymentSatisfied: true }),
+      true,
     );
   });
 });

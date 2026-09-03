@@ -1,5 +1,10 @@
 import { PAIRING_ID_FIELD, USER_ROLE } from './identities.js';
 import { RELATIONSHIP_STATUS, isRelationshipStatus, type RelationshipStatus } from './statuses.js';
+import type { CommercialMode } from './mentorOffering.js';
+import {
+  normalizeApplicationCommercialFields,
+  type RequestType,
+} from './mentorshipRequest.js';
 import type { IsoDateString, User } from './users.js';
 
 /**
@@ -19,6 +24,14 @@ export interface MentorshipRelationship {
   startedAt: IsoDateString;
   updatedAt: IsoDateString;
   endedAt: IsoDateString | null;
+  /** Snapshot from the accepted application. Legacy docs omit commercial fields. */
+  requestType?: RequestType;
+  commercialMode?: CommercialMode;
+  baseSessionPriceUsd?: number | null;
+  sessionDurationMinutes?: number | null;
+  /** True for paid requests until payment is recorded (future task). */
+  paymentRequired?: boolean;
+  paymentSatisfied?: boolean;
 }
 
 export type PairingMemberIds = Pick<MentorshipRelationship, 'learnerId' | 'mentorId'>;
@@ -84,6 +97,15 @@ export function buildActiveRelationship(input: {
   mentorId: string;
   applicationId: string;
   now: IsoDateString;
+  commercial?: Pick<
+    MentorshipRelationship,
+    | 'requestType'
+    | 'commercialMode'
+    | 'baseSessionPriceUsd'
+    | 'sessionDurationMinutes'
+    | 'paymentRequired'
+    | 'paymentSatisfied'
+  >;
 }): MentorshipRelationship {
   return {
     id: input.id,
@@ -95,6 +117,7 @@ export function buildActiveRelationship(input: {
     startedAt: input.now,
     updatedAt: input.now,
     endedAt: null,
+    ...input.commercial,
   };
 }
 
@@ -103,6 +126,16 @@ export function normalizeRelationship(
 ): MentorshipRelationship {
   const createdAt = raw.createdAt ?? '';
   const status = isRelationshipStatus(raw.status) ? raw.status : RELATIONSHIP_STATUS.active;
+  const commercial = normalizeApplicationCommercialFields({
+    requestType: raw.requestType,
+    commercialMode: raw.commercialMode,
+    baseSessionPriceUsd: raw.baseSessionPriceUsd,
+    sessionDurationMinutes: raw.sessionDurationMinutes,
+  });
+  const paymentRequired = raw.paymentRequired ?? commercial.paymentRequired;
+  const paymentSatisfied =
+    raw.paymentSatisfied ??
+    (paymentRequired ? false : true);
   return {
     id: raw.id ?? '',
     learnerId: raw.learnerId ?? '',
@@ -117,5 +150,11 @@ export function normalizeRelationship(
       (status === RELATIONSHIP_STATUS.ended || status === RELATIONSHIP_STATUS.terminated
         ? (raw.updatedAt ?? createdAt)
         : null),
+    requestType: raw.requestType ?? commercial.requestType,
+    commercialMode: raw.commercialMode ?? commercial.commercialMode,
+    baseSessionPriceUsd: raw.baseSessionPriceUsd ?? commercial.baseSessionPriceUsd,
+    sessionDurationMinutes: raw.sessionDurationMinutes ?? commercial.sessionDurationMinutes,
+    paymentRequired,
+    paymentSatisfied,
   };
 }
