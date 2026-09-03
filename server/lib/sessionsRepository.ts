@@ -1,7 +1,9 @@
 import {
   COLLECTIONS,
+  normalizeMentorshipBooking,
   normalizeRelationship,
   normalizeSession,
+  type MentorshipBooking,
   type MentorshipRelationship,
   type MentorshipSession,
 } from '@apprentorbay/shared';
@@ -46,6 +48,27 @@ export async function listSessionsForRelationship(
       id: doc.id,
     }),
   );
+}
+
+export async function getBookingForSession(
+  sessionId: string,
+): Promise<Pick<MentorshipBooking, 'id' | 'paymentStatus' | 'bookingStatus' | 'sessionId'> | null> {
+  const snap = await adminDb()
+    .collection(COLLECTIONS.bookings)
+    .where('sessionId', '==', sessionId)
+    .limit(1)
+    .get();
+  if (snap.empty) return null;
+  const booking = normalizeMentorshipBooking({
+    ...(snap.docs[0].data() as MentorshipBooking),
+    id: snap.docs[0].id,
+  });
+  return {
+    id: booking.id,
+    paymentStatus: booking.paymentStatus,
+    bookingStatus: booking.bookingStatus,
+    sessionId: booking.sessionId,
+  };
 }
 
 export function newSessionRef() {

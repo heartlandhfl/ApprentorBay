@@ -200,6 +200,92 @@ export {
 export type { MentorshipRelationship, PairingMemberIds } from './relationships.js';
 
 export {
+  BOOKING_CURRENCY,
+  BOOKING_PAYMENT_STATUS,
+  BOOKING_SERVICE_TYPE,
+  BOOKING_STATUS,
+  CLIENT_BOOKING_CREATE_FIELDS,
+  DEFAULT_PLATFORM_FEE_BPS,
+  FORBIDDEN_CLIENT_BOOKING_FIELDS,
+  bookingTitleFromOffering,
+  buildBookingFinancialSnapshot,
+  buildMentorshipBooking,
+  cancelMentorshipBooking,
+  computeMentorAmountCents,
+  computePlatformFeeCents,
+  detectClientBookingFieldTampering,
+  isBookingCurrency,
+  isBookingPaymentStatus,
+  isBookingServiceType,
+  isBookingStatus,
+  isOpenBookingPaymentStatus,
+  isOpenBookingStatus,
+  markMentorshipBookingPaid,
+  normalizeMentorshipBooking,
+  validateBookingRelationship,
+  validateCreateBookingBody,
+} from './bookings.js';
+export type {
+  BookingCurrency,
+  BookingFinancialSnapshot,
+  BookingPaymentStatus,
+  BookingServiceType,
+  BookingStatus,
+  MentorshipBooking,
+} from './bookings.js';
+
+export {
+  CHECKOUT_SESSION_STATUS,
+  CLIENT_CHECKOUT_CREATE_FIELDS,
+  FORBIDDEN_CLIENT_CHECKOUT_FIELDS,
+  PAYMENT_EVENT_ENTITY,
+  PAYMENT_PROVIDER_ID,
+  PAYMENT_STATUS,
+  REFUND_REASON,
+  REFUND_STATUS,
+  buildPaymentEvent,
+  buildPaymentIntentFromBooking,
+  isCheckoutSessionStatus,
+  isOpenPaymentStatus,
+  isPaymentStatus,
+  isRefundStatus,
+  isTerminalPaymentStatus,
+  marketplaceSplitFromBooking,
+  normalizeCheckoutSession,
+  normalizePaymentIntent,
+  normalizePaymentRefund,
+  validateCreateCheckoutBody,
+  validatePaymentMatchesBooking,
+} from './payments.js';
+export type {
+  CheckoutSession,
+  CheckoutSessionStatus,
+  MarketplaceSplit,
+  MoneyAmount,
+  PaymentEvent,
+  PaymentEventEntity,
+  PaymentIntent,
+  PaymentProviderId,
+  PaymentRefund,
+  PaymentStatus,
+  RefundReason,
+  RefundStatus,
+} from './payments.js';
+
+export {
+  canApplyPaymentIntentAction,
+  isTerminalCheckoutStatus,
+  reduceCheckoutSession,
+  reducePaymentIntent,
+  reducePaymentRefund,
+} from './paymentMachine.js';
+export type {
+  CheckoutSessionAction,
+  PaymentIntentAction,
+  RefundAction,
+} from './paymentMachine.js';
+
+export {
   SESSION_SCHEDULE,
   SESSION_STATUS_LABEL,
   assertSessionOwnership,
@@ -214,7 +300,9 @@ export {
   isUpcomingSession,
   normalizeSession,
   pairingMatchesSession,
+  relationshipRequiresPaidSessionAccess,
   sessionJoinWindow,
+  sessionPaymentAccessGranted,
   sessionsOverlap,
   SESSION_SCHEDULE_DURATION_OPTIONS,
 } from './sessions.js';
@@ -450,6 +538,12 @@ export {
   canSuspendAccount,
   canTerminateAccount,
   canTerminateRelationship,
+  canCreateBooking,
+  canReadBooking,
+  canCancelBooking,
+  canStartCheckout,
+  canReadPaymentIntent,
+  canRequestRefund,
   canReadSession,
   canScheduleSession,
   canCancelSession,
@@ -492,5 +586,9 @@ export {
   canTransitionRelationship,
   canTransitionSession,
   canTransitionVerification,
+  canTransitionBookingStatus,
+  canTransitionBookingPaymentStatus,
+  BOOKING_STATUS_TRANSITIONS,
+  BOOKING_PAYMENT_STATUS_TRANSITIONS,
 } from './transitions.js';
 export type { TransitionMap } from './transitions.js';

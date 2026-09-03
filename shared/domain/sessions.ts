@@ -1,3 +1,9 @@
+import {
+  BOOKING_PAYMENT_STATUS,
+  BOOKING_STATUS,
+  type MentorshipBooking,
+} from './bookings.js';
+import { REQUEST_TYPE } from './mentorshipRequest.js';
 import { isPairingMember, type MentorshipRelationship, type PairingMemberIds } from './relationships.js';
 import { SESSION_STATUS, isSessionStatus, type SessionStatus } from './statuses.js';
 import type { IsoDateString } from './users.js';
@@ -20,6 +26,10 @@ export interface MentorshipSession {
   endedAt: IsoDateString | null;
   cancelledAt: IsoDateString | null;
   cancelledById: string | null;
+  /** Set when a mentorship booking is created for this session. */
+  bookingId: string | null;
+  /** Snapshot at schedule time — paid relationships require verified payment before join. */
+  paymentRequired: boolean;
 }
 
 export const SESSION_SCHEDULE = {
@@ -87,9 +97,45 @@ export function pairingMatchesSession(
   return pairing.learnerId === session.learnerId && pairing.mentorId === session.mentorId;
 }
 
+export function relationshipRequiresPaidSessionAccess(
+  relationship: Pick<MentorshipRelationship, 'paymentRequired' | 'requestType'>,
+): boolean {
+  return (
+    relationship.paymentRequired === true || relationship.requestType === REQUEST_TYPE.paidRequest
+  );
+}
+
+export function isPaidBookingForSession(
+  booking: Pick<MentorshipBooking, 'paymentStatus' | 'bookingStatus' | 'sessionId'> | null | undefined,
+  sessionId: string,
+): boolean {
+  if (!booking || booking.sessionId !== sessionId) return false;
+  return (
+    booking.paymentStatus === BOOKING_PAYMENT_STATUS.paid &&
+    booking.bookingStatus === BOOKING_STATUS.paid
+  );
+}
+
+/** Authoritative gate: join access derives from booking/payment state, never client flags. */
+export function sessionPaymentAccessGranted(
+  session: Pick<MentorshipSession, 'id' | 'paymentRequired' | 'bookingId'>,
+  booking: Pick<MentorshipBooking, 'id' | 'paymentStatus' | 'bookingStatus' | 'sessionId'> | null | undefined,
+  relationship: Pick<MentorshipRelationship, 'paymentRequired' | 'requestType'>,
+): boolean {
+  const paymentRequired =
+    session.paymentRequired || relationshipRequiresPaidSessionAccess(relationship);
+  if (!paymentRequired) return true;
+  if (!booking) return false;
+  if (session.bookingId && booking.id !== session.bookingId) return false;
+  return isPaidBookingForSession(booking, session.id);
+}
+
 export function buildMentorshipSession(input: {
   id: string;
-  relationship: Pick<MentorshipRelationship, 'id' | 'learnerId' | 'mentorId'>;
+  relationship: Pick<
+    MentorshipRelationship,
+    'id' | 'learnerId' | 'mentorId' | 'paymentRequired' | 'requestType'
+  >;
   title: string;
   scheduledStart: IsoDateString;
   scheduledEnd: IsoDateString;
@@ -113,6 +159,8 @@ export function buildMentorshipSession(input: {
     endedAt: null,
     cancelledAt: null,
     cancelledById: null,
+    bookingId: null,
+    paymentRequired: relationshipRequiresPaidSessionAccess(input.relationship),
   };
 }
 
@@ -139,6 +187,8 @@ export function normalizeSession(
     endedAt: raw.endedAt ?? null,
     cancelledAt: raw.cancelledAt ?? (status === SESSION_STATUS.cancelled ? raw.updatedAt ?? null : null),
     cancelledById: raw.cancelledById ?? null,
+    bookingId: typeof raw.bookingId === 'string' ? raw.bookingId : null,
+    paymentRequired: raw.paymentRequired === true,
   };
 }
 

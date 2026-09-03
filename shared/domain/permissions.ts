@@ -8,6 +8,16 @@ import {
 import { USER_ROLE } from './identities.js';
 import { canParticipate } from './administration.js';
 import { isAccountActive, type MentorProfile, type User } from './users.js';
+import {
+  isOpenBookingPaymentStatus,
+  isOpenBookingStatus,
+  validateBookingRelationship,
+  type MentorshipBooking,
+} from './bookings.js';
+import {
+  PAYMENT_STATUS,
+  type PaymentIntent,
+} from './payments.js';
 import { isPendingApplication, type MentorshipApplication } from './applications.js';
 import { validateMentorApplicationTarget, canAccessPaidMentorshipServices } from './mentorshipRequest.js';
 import {
@@ -19,6 +29,7 @@ import {
 import {
   isTerminalSessionStatus,
   sessionJoinWindow,
+  sessionPaymentAccessGranted,
   type MentorshipSession,
 } from './sessions.js';
 import type { LearningContract } from './learningContracts.js';
@@ -239,6 +250,66 @@ export function canSelfApprove(_actor: PermissionActor | null | undefined): bool
   return false;
 }
 
+export function canCreateBooking(
+  actor: PermissionActor | null | undefined,
+  relationship: MentorshipRelationship,
+  existingOpenBookings: readonly Pick<MentorshipBooking, 'paymentStatus' | 'bookingStatus'>[] = [],
+): boolean {
+  if (!actor || !canParticipate(actor)) return false;
+  if (actor.role !== USER_ROLE.learner) return false;
+  if (relationship.learnerId !== actor.uid) return false;
+  if (!validateBookingRelationship(relationship).ok) return false;
+  const hasOpenBooking = existingOpenBookings.some(
+    (booking) => isOpenBookingPaymentStatus(booking.paymentStatus) || isOpenBookingStatus(booking.bookingStatus),
+  );
+  return !hasOpenBooking;
+}
+
+export function canReadBooking(
+  actor: PermissionActor | null | undefined,
+  booking: Pick<MentorshipBooking, 'learnerId' | 'mentorId'>,
+): boolean {
+  if (!actor || !isAccountActive(actor)) return false;
+  if (actor.role === USER_ROLE.admin) return true;
+  return isPairingMember(actor.uid, booking);
+}
+
+export function canCancelBooking(
+  actor: PermissionActor | null | undefined,
+  booking: MentorshipBooking,
+): boolean {
+  if (!canReadBooking(actor, booking)) return false;
+  if (!isOpenBookingStatus(booking.bookingStatus)) return false;
+  if (!isOpenBookingPaymentStatus(booking.paymentStatus)) return false;
+  if (actor?.role === USER_ROLE.admin) return true;
+  return isPairingMember(actor?.uid ?? '', booking);
+}
+
+export function canStartCheckout(
+  actor: PermissionActor | null | undefined,
+  booking: MentorshipBooking,
+): boolean {
+  if (!actor || !canParticipate(actor)) return false;
+  if (actor.role !== USER_ROLE.learner) return false;
+  if (booking.learnerId !== actor.uid) return false;
+  return isOpenBookingPaymentStatus(booking.paymentStatus) && isOpenBookingStatus(booking.bookingStatus);
+}
+
+export function canReadPaymentIntent(
+  actor: PermissionActor | null | undefined,
+  intent: Pick<PaymentIntent, 'learnerId' | 'mentorId'>,
+): boolean {
+  return canReadBooking(actor, intent);
+}
+
+export function canRequestRefund(
+  actor: PermissionActor | null | undefined,
+  intent: Pick<PaymentIntent, 'learnerId' | 'mentorId' | 'status'>,
+): boolean {
+  if (!canAdminister(actor)) return false;
+  return intent.status === PAYMENT_STATUS.paid || intent.status === PAYMENT_STATUS.partiallyRefunded;
+}
+
 export function canReadSession(
   actor: PermissionActor | null | undefined,
   session: Pick<MentorshipSession, 'learnerId' | 'mentorId'>,
@@ -281,6 +352,7 @@ export function canJoinSession(
   actor: PermissionActor | null | undefined,
   session: MentorshipSession,
   relationship: MentorshipRelationship,
+  booking: Pick<MentorshipBooking, 'id' | 'paymentStatus' | 'bookingStatus' | 'sessionId'> | null | undefined,
   now?: string,
 ): boolean {
   if (!actor || !canParticipate(actor)) return false;
@@ -290,5 +362,6 @@ export function canJoinSession(
   if (relationship.status !== RELATIONSHIP_STATUS.active) return false;
   if (actor.role === USER_ROLE.admin) return true;
   if (!isPairingMember(actor.uid, session)) return false;
+  if (!sessionPaymentAccessGranted(session, booking, relationship)) return false;
   return sessionJoinWindow(session, now).joinable;
 }

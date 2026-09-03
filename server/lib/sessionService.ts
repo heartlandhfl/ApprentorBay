@@ -12,6 +12,7 @@ import {
   normalizeRelationship,
   normalizeSession,
   validateSessionScheduleInput,
+  type MentorshipBooking,
   type MentorshipRelationship,
   type MentorshipSession,
   type SessionJoinPayload,
@@ -42,6 +43,9 @@ export interface SessionStore {
   saveSession(session: MentorshipSession): Promise<void>;
   listSessions(relationshipId: string): Promise<MentorshipSession[]>;
   newSessionId(): string;
+  getBookingForSession(
+    sessionId: string,
+  ): Promise<Pick<MentorshipBooking, 'id' | 'paymentStatus' | 'bookingStatus' | 'sessionId'> | null>;
 }
 
 export interface CreateSessionInput {
@@ -275,7 +279,9 @@ export async function joinMentorshipSession(
     throw new SessionServiceError('forbidden', 'Session does not match its relationship', 403);
   }
 
-  if (!canJoinSession(actor, current, relationship, now)) {
+  const booking = await store.getBookingForSession(sessionId);
+
+  if (!canJoinSession(actor, current, relationship, booking, now)) {
     throw new SessionServiceError('forbidden', 'You cannot join this session yet', 403);
   }
 

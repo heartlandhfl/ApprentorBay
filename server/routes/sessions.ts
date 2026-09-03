@@ -13,6 +13,7 @@ import {
 } from '../lib/sessionService.js';
 import {
   getRelationshipById,
+  getBookingForSession,
   getSessionById,
   listSessionsForRelationship,
   newSessionRef,
@@ -27,6 +28,7 @@ const firestoreStore: SessionStore = {
   saveSession,
   listSessions: listSessionsForRelationship,
   newSessionId: () => newSessionRef().id,
+  getBookingForSession,
 };
 
 export const sessionsRouter = Router();

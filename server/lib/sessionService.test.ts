@@ -5,6 +5,7 @@ import {
   SESSION_STATUS,
   USER_ROLE,
   buildActiveRelationship,
+  type MentorshipBooking,
   type MentorshipRelationship,
   type MentorshipSession,
   type User,
@@ -57,6 +58,7 @@ function relationship(): MentorshipRelationship {
 class MemorySessionStore implements SessionStore {
   relationships = new Map<string, MentorshipRelationship>();
   sessions = new Map<string, MentorshipSession>();
+  bookings = new Map<string, Pick<MentorshipBooking, 'id' | 'paymentStatus' | 'bookingStatus' | 'sessionId'>>();
   private counter = 0;
 
   constructor(seedRelationship = relationship()) {
@@ -84,6 +86,19 @@ class MemorySessionStore implements SessionStore {
   newSessionId() {
     this.counter += 1;
     return `session-${this.counter}`;
+  }
+
+  async getBookingForSession(sessionId: string) {
+    for (const booking of this.bookings.values()) {
+      if (booking.sessionId === sessionId) {
+        return booking;
+      }
+    }
+    return null;
+  }
+
+  linkBooking(booking: Pick<MentorshipBooking, 'id' | 'paymentStatus' | 'bookingStatus' | 'sessionId'>) {
+    this.bookings.set(booking.id, booking);
   }
 }
 

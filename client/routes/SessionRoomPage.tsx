@@ -174,7 +174,7 @@ export function SessionRoomPage() {
 
   const joinable =
     session.status === SESSION_STATUS.scheduled &&
-    canJoinSession(account, session, relationship);
+    canJoinSession(account, session, relationship, undefined);
 
   return (
     <Page>

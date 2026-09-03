@@ -138,7 +138,7 @@ export function SessionsPanel({
       render: (session) => {
         const joinable =
           session.status === SESSION_STATUS.scheduled &&
-          canJoinSession(account, session, relationship, now);
+          canJoinSession(account, session, relationship, undefined, now);
         const cancellable = canCancelSession(account, session);
 
         return (
@@ -231,7 +231,7 @@ export function SessionsPanel({
                   {upcoming.map((session) => {
                     const joinable =
                       session.status === SESSION_STATUS.scheduled &&
-                      canJoinSession(account, session, relationship, now);
+                      canJoinSession(account, session, relationship, undefined, now);
                     const cancellable = canCancelSession(account, session);
                     return (
                       <UpcomingSessionCard
