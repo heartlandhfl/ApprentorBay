@@ -27,7 +27,7 @@ import {
   type FinalDeliverableFile,
 } from './finalDeliverable.js';
 import { MESSAGE_TEXT } from './messages.js';
-import { SESSION_SCHEDULE } from './sessions.js';
+import { SESSION_SCHEDULE, SESSION_SCHEDULE_DURATION_OPTIONS, type SessionScheduleDuration } from './sessions.js';
 
 export type ValidationResult =
   | { ok: true }
@@ -136,6 +136,69 @@ export function validateSessionScheduleInput(input: {
 
   if (startMs < nowMs) return fail('Session must be scheduled in the future');
   if (endMs <= startMs) return fail('scheduledEnd must be after scheduledStart');
+
+  const durationMinutes = Math.round((endMs - startMs) / 60_000);
+  if (durationMinutes < SESSION_SCHEDULE.minDurationMinutes) {
+    return fail(`Session must be at least ${SESSION_SCHEDULE.minDurationMinutes} minutes`);
+  }
+  if (durationMinutes > SESSION_SCHEDULE.maxDurationMinutes) {
+    return fail(`Session must be at most ${SESSION_SCHEDULE.maxDurationMinutes} minutes`);
+  }
+
+  const horizonMs = SESSION_SCHEDULE.maxHorizonDays * 24 * 60 * 60 * 1000;
+  if (startMs > nowMs + horizonMs) {
+    return fail(`Session cannot be scheduled more than ${SESSION_SCHEDULE.maxHorizonDays} days ahead`);
+  }
+
+  return ok;
+}
+
+export function validateLocalScheduleFields(input: {
+  date: string;
+  time: string;
+  durationMinutes: number;
+  now?: string;
+}): ValidationResult {
+  const date = input.date.trim();
+  const time = input.time.trim();
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    return fail('Choose a valid date');
+  }
+  if (!/^\d{2}:\d{2}$/.test(time)) {
+    return fail('Choose a valid start time');
+  }
+
+  if (!SESSION_SCHEDULE_DURATION_OPTIONS.includes(input.durationMinutes as SessionScheduleDuration)) {
+    if (
+      input.durationMinutes < SESSION_SCHEDULE.minDurationMinutes ||
+      input.durationMinutes > SESSION_SCHEDULE.maxDurationMinutes
+    ) {
+      return fail(`Duration must be between ${SESSION_SCHEDULE.minDurationMinutes} and ${SESSION_SCHEDULE.maxDurationMinutes} minutes`);
+    }
+  }
+
+  const [year, month, day] = date.split('-').map(Number);
+  const [hour, minute] = time.split(':').map(Number);
+  const local = new Date(year, month - 1, day, hour, minute, 0, 0);
+  if (
+    local.getFullYear() !== year ||
+    local.getMonth() !== month - 1 ||
+    local.getDate() !== day ||
+    local.getHours() !== hour ||
+    local.getMinutes() !== minute
+  ) {
+    return fail('Choose a valid date and time');
+  }
+
+  const scheduledStart = local.toISOString();
+  const scheduledEnd = new Date(local.getTime() + input.durationMinutes * 60_000).toISOString();
+  const startMs = Date.parse(scheduledStart);
+  const endMs = Date.parse(scheduledEnd);
+  const nowMs = Date.parse(input.now ?? new Date().toISOString());
+
+  if (startMs < nowMs) return fail('Session must be scheduled in the future');
+  if (endMs <= startMs) return fail('End time must be after the start time');
 
   const durationMinutes = Math.round((endMs - startMs) / 60_000);
   if (durationMinutes < SESSION_SCHEDULE.minDurationMinutes) {

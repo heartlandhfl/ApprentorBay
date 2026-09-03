@@ -105,6 +105,14 @@ async function expectForbidden(promise: Promise<unknown>) {
   });
 }
 
+async function expectConflict(promise: Promise<unknown>) {
+  await assert.rejects(promise, (error: unknown) => {
+    assert.ok(error instanceof SessionServiceError);
+    assert.equal(error.code, 'conflict');
+    return true;
+  });
+}
+
 describe('sessionService', () => {
   it('creates a valid mentor session', async () => {
     const store = new MemorySessionStore();
@@ -235,7 +243,16 @@ describe('sessionService', () => {
   it('lists sessions only for authorized relationship members', async () => {
     const store = new MemorySessionStore();
     await createMentorshipSession(store, mentor, createBody({ title: 'First' }), NOW);
-    await createMentorshipSession(store, learner, createBody({ title: 'Second' }), NOW);
+    await createMentorshipSession(
+      store,
+      learner,
+      createBody({
+        title: 'Second',
+        scheduledStart: '2026-09-11T14:00:00.000Z',
+        scheduledEnd: '2026-09-11T15:00:00.000Z',
+      }),
+      NOW,
+    );
 
     const sessions = await listMentorshipSessions(store, learner, relationship().id);
     assert.equal(sessions.length, 2);
@@ -264,5 +281,22 @@ describe('sessionService', () => {
     const store = new MemorySessionStore();
     const created = await createMentorshipSession(store, mentor, createBody(), NOW);
     await expectForbidden(joinMentorshipSession(store, learner, created.id, NOW));
+  });
+
+  it('rejects overlapping scheduled sessions', async () => {
+    const store = new MemorySessionStore();
+    await createMentorshipSession(store, mentor, createBody({ title: 'First' }), NOW);
+    await expectConflict(
+      createMentorshipSession(
+        store,
+        learner,
+        createBody({
+          title: 'Overlap',
+          scheduledStart: '2026-09-10T14:30:00.000Z',
+          scheduledEnd: '2026-09-10T15:30:00.000Z',
+        }),
+        NOW,
+      ),
+    );
   });
 });

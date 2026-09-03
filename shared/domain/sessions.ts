@@ -180,3 +180,39 @@ export function isPastSession(
   }
   return session.status === SESSION_STATUS.scheduled && Date.parse(session.scheduledEnd) < Date.parse(now);
 }
+
+/** Common scheduling durations shown in the workspace UI. */
+export const SESSION_SCHEDULE_DURATION_OPTIONS = [30, 60, 90] as const;
+
+export type SessionScheduleDuration =
+  (typeof SESSION_SCHEDULE_DURATION_OPTIONS)[number];
+
+export function sessionsOverlap(
+  aStart: IsoDateString,
+  aEnd: IsoDateString,
+  bStart: IsoDateString,
+  bEnd: IsoDateString,
+): boolean {
+  const a0 = Date.parse(aStart);
+  const a1 = Date.parse(aEnd);
+  const b0 = Date.parse(bStart);
+  const b1 = Date.parse(bEnd);
+  if (![a0, a1, b0, b1].every(Number.isFinite)) return false;
+  return a0 < b1 && b0 < a1;
+}
+
+export function findSchedulingConflict(
+  scheduledStart: IsoDateString,
+  scheduledEnd: IsoDateString,
+  sessions: Pick<MentorshipSession, 'id' | 'status' | 'scheduledStart' | 'scheduledEnd' | 'title'>[],
+  excludeSessionId?: string,
+): Pick<MentorshipSession, 'id' | 'title' | 'scheduledStart' | 'scheduledEnd'> | null {
+  for (const session of sessions) {
+    if (excludeSessionId && session.id === excludeSessionId) continue;
+    if (session.status !== SESSION_STATUS.scheduled) continue;
+    if (sessionsOverlap(scheduledStart, scheduledEnd, session.scheduledStart, session.scheduledEnd)) {
+      return session;
+    }
+  }
+  return null;
+}

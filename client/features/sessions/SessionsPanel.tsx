@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   SESSION_STATUS,
   SESSION_STATUS_LABEL,
+  USER_ROLE,
   canCancelSession,
   canJoinSession,
   canScheduleSession,
@@ -19,8 +20,10 @@ import {
   formatDuration,
   formatSessionDate,
   formatSessionTime,
+  formatTimezoneCaption,
   sessionStatusTone,
 } from './format';
+import { PastSessionCard, UpcomingSessionCard } from './SessionListCards';
 import { ScheduleSessionModal } from './ScheduleSessionModal';
 
 type SessionsPanelProps = {
@@ -45,6 +48,7 @@ export function SessionsPanel({
   const learnerName = learner?.displayName || 'Learner';
   const mentorName = mentor?.displayName || 'Mentor';
   const pairingLabel = `${mentorName} & ${learnerName}`;
+  const canSchedule = canScheduleSession(account, relationship);
 
   const loadSessions = useCallback(async () => {
     setError(null);
@@ -144,7 +148,7 @@ export function SessionsPanel({
                 size="sm"
                 to={`/dashboard/mentorships/${relationship.id}/sessions/${session.id}`}
               >
-                Join
+                Join session
               </Button>
             ) : null}
             {cancellable ? (
@@ -154,7 +158,7 @@ export function SessionsPanel({
                 loading={busyId === session.id}
                 onClick={() => void onCancel(session.id)}
               >
-                Cancel
+                Cancel session
               </Button>
             ) : null}
           </Cluster>
@@ -187,14 +191,24 @@ export function SessionsPanel({
 
   return (
     <Stack gap={16}>
-      <Cluster gap={12}>
-        <Text variant="h2">Sessions</Text>
-        {canScheduleSession(account, relationship) ? (
-          <Button size="sm" onClick={() => setScheduleOpen(true)}>
-            Schedule a session
-          </Button>
+      <Stack gap={8}>
+        <Cluster gap={12}>
+          <Text variant="h2">Sessions</Text>
+          {canSchedule ? (
+            <Button size="sm" onClick={() => setScheduleOpen(true)} className="w-full sm:w-auto">
+              Schedule a mentorship session
+            </Button>
+          ) : null}
+        </Cluster>
+        <Text variant="caption">{formatTimezoneCaption()}</Text>
+        {!canSchedule ? (
+          <Text variant="muted">
+            {relationship.status !== 'active'
+              ? 'Sessions can only be scheduled while this mentorship is active.'
+              : 'This account cannot schedule sessions right now.'}
+          </Text>
         ) : null}
-      </Cluster>
+      </Stack>
 
       <Card padding="lg">
         <Stack gap={16}>
@@ -205,10 +219,39 @@ export function SessionsPanel({
             ) : upcoming.length === 0 ? (
               <EmptyState
                 title="No upcoming sessions"
-                description="Schedule a video session when you are ready to meet."
+                description={
+                  canSchedule
+                    ? 'Schedule a mentorship session when you are ready to meet.'
+                    : 'Upcoming sessions will appear here.'
+                }
               />
             ) : (
-              <Table columns={upcomingColumns} rows={upcoming} rowKey={(row) => row.id} />
+              <>
+                <div className="grid gap-4 md:hidden">
+                  {upcoming.map((session) => {
+                    const joinable =
+                      session.status === SESSION_STATUS.scheduled &&
+                      canJoinSession(account, session, relationship, now);
+                    const cancellable = canCancelSession(account, session);
+                    return (
+                      <UpcomingSessionCard
+                        key={session.id}
+                        session={session}
+                        relationship={relationship}
+                        account={account}
+                        pairingLabel={pairingLabel}
+                        joinable={joinable}
+                        cancellable={cancellable}
+                        busy={busyId === session.id}
+                        onCancel={() => void onCancel(session.id)}
+                      />
+                    );
+                  })}
+                </div>
+                <div className="hidden md:block">
+                  <Table columns={upcomingColumns} rows={upcoming} rowKey={(row) => row.id} />
+                </div>
+              </>
             )}
           </Stack>
 
@@ -217,9 +260,21 @@ export function SessionsPanel({
             {loading ? (
               <Text variant="muted">Loading sessions…</Text>
             ) : past.length === 0 ? (
-              <EmptyState title="No past sessions" description="Completed and cancelled sessions appear here." />
+              <EmptyState
+                title="No past sessions"
+                description="Completed and cancelled sessions appear here."
+              />
             ) : (
-              <Table columns={pastColumns} rows={past} rowKey={(row) => row.id} />
+              <>
+                <div className="grid gap-4 md:hidden">
+                  {past.map((session) => (
+                    <PastSessionCard key={session.id} session={session} />
+                  ))}
+                </div>
+                <div className="hidden md:block">
+                  <Table columns={pastColumns} rows={past} rowKey={(row) => row.id} />
+                </div>
+              </>
             )}
           </Stack>
 
@@ -230,6 +285,12 @@ export function SessionsPanel({
       <ScheduleSessionModal
         open={scheduleOpen}
         relationshipId={relationship.id}
+        accountRole={
+          account.role === USER_ROLE.mentor || account.role === USER_ROLE.learner
+            ? account.role
+            : USER_ROLE.learner
+        }
+        existingSessions={sessions}
         onClose={() => setScheduleOpen(false)}
         onScheduled={() => void loadSessions()}
       />

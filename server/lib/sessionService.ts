@@ -8,6 +8,7 @@ import {
   canReadSession,
   canScheduleSession,
   canTransitionSession,
+  findSchedulingConflict,
   normalizeRelationship,
   normalizeSession,
   validateSessionScheduleInput,
@@ -107,6 +108,16 @@ export async function createMentorshipSession(
   });
   if (!schedule.ok) {
     throw new SessionServiceError('invalid', schedule.error, 400);
+  }
+
+  const existing = await store.listSessions(relationshipId);
+  const conflict = findSchedulingConflict(body.scheduledStart, body.scheduledEnd, existing);
+  if (conflict) {
+    throw new SessionServiceError(
+      'conflict',
+      'This time overlaps another scheduled session for this mentorship',
+      409,
+    );
   }
 
   const sessionId = store.newSessionId();
