@@ -19,6 +19,7 @@ import { MessagesInboxPage } from './routes/MessagesInboxPage';
 import { MessagesPage } from './routes/MessagesPage';
 import { MentorshipsPage } from './routes/MentorshipsPage';
 import { RelationshipWorkspacePage } from './routes/RelationshipWorkspacePage';
+import { SessionRoomPage } from './routes/SessionRoomPage';
 import { RequireAdmin } from './routes/RequireAdmin';
 import { RequireAuth } from './routes/RequireAuth';
 import { SignupPage } from './routes/SignupPage';
@@ -89,6 +90,14 @@ export function App() {
             element={
               <RequireAuth>
                 <RelationshipWorkspacePage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/dashboard/mentorships/:relationshipId/sessions/:sessionId"
+            element={
+              <RequireAuth>
+                <SessionRoomPage />
               </RequireAuth>
             }
           />

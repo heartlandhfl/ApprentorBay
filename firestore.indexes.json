@@ -50,6 +50,14 @@
       ]
     },
     {
+      "collectionGroup": "mentorshipSessions",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "relationshipId", "order": "ASCENDING" },
+        { "fieldPath": "scheduledStart", "order": "ASCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "mentorProfiles",
       "queryScope": "COLLECTION",
       "fields": [

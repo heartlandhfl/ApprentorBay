@@ -16,11 +16,13 @@ import {
   validateCreateBookingBody,
   type MentorshipBooking,
   type MentorshipRelationship,
+  type MentorshipSession,
 } from '@apprentorbay/shared';
 import { platformFeeBpsFromEnv } from '../lib/bookingConfig.js';
 import { recordAudit } from '../lib/audit.js';
 import { adminDb } from '../lib/firebase.js';
 import { loadPrivateProfile } from '../lib/profiles.js';
+import { getSessionById, saveSession } from '../lib/sessionsRepository.js';
 import { requireAccount, sendApiError, type AccountRequest } from '../middleware/requireAccount.js';
 
 export const bookingsRouter = Router();
@@ -98,6 +100,19 @@ bookingsRouter.post('/', async (req: AccountRequest, res, next) => {
       return;
     }
 
+    let linkedSession: MentorshipSession | null = null;
+    if (parsed.sessionId) {
+      linkedSession = await getSessionById(parsed.sessionId);
+      if (!linkedSession || linkedSession.relationshipId !== relationship.id) {
+        sendApiError(res, 400, 'invalid', 'Session not found for this relationship');
+        return;
+      }
+      if (linkedSession.bookingId) {
+        sendApiError(res, 409, 'conflict', 'This session already has a booking');
+        return;
+      }
+    }
+
     const now = new Date().toISOString();
     const ref = adminDb().collection(COLLECTIONS.bookings).doc();
     const booking = buildMentorshipBooking({
@@ -105,9 +120,17 @@ bookingsRouter.post('/', async (req: AccountRequest, res, next) => {
       relationship,
       snapshot: snapshotResult.snapshot!,
       now,
+      sessionId: parsed.sessionId ?? null,
     });
 
     await ref.set(booking);
+    if (linkedSession) {
+      await saveSession({
+        ...linkedSession,
+        bookingId: booking.id,
+        updatedAt: now,
+      });
+    }
     await recordAudit({
       actorId: account.uid,
       action: AUDIT_EVENT.bookingCreated,
@@ -218,6 +241,16 @@ bookingsRouter.post('/:id/cancel', async (req: AccountRequest, res, next) => {
     const now = new Date().toISOString();
     const booking = cancelMentorshipBooking(current, now);
     await adminDb().collection(COLLECTIONS.bookings).doc(booking.id).set(booking);
+    if (booking.sessionId) {
+      const session = await getSessionById(booking.sessionId);
+      if (session && session.bookingId === booking.id) {
+        await saveSession({
+          ...session,
+          bookingId: null,
+          updatedAt: now,
+        });
+      }
+    }
     await recordAudit({
       actorId: account.uid,
       action: AUDIT_EVENT.bookingCancelled,

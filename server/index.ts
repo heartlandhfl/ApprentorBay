@@ -18,6 +18,7 @@ import { bookingsRouter } from './routes/bookings.js';
 import { paymentsRouter } from './routes/payments.js';
 import { paymentWebhooksRouter } from './routes/paymentWebhooks.js';
 import { refundsRouter } from './routes/refunds.js';
+import { sessionsRouter } from './routes/sessions.js';
 import { supportRouter } from './routes/support.js';
 
 function thisDir(): string {
@@ -108,6 +109,7 @@ app.use('/api/bookings', bookingsRouter);
 app.use('/api/payments', paymentsRouter);
 app.use('/api/refunds', refundsRouter);
 app.use('/api/contracts', contractsRouter);
+app.use('/api/sessions', sessionsRouter);
 app.use('/api/support', supportRouter);
 app.use('/api', notFound);
 

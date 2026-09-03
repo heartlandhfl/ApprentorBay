@@ -123,6 +123,7 @@ describe('domain identities', () => {
     assert.equal(COLLECTIONS.applications, 'mentorshipApplications');
     assert.equal(COLLECTIONS.relationships, 'mentorshipRelationships');
     assert.equal(COLLECTIONS.contracts, 'learningContracts');
+    assert.equal(COLLECTIONS.sessions, 'mentorshipSessions');
     assert.equal(COLLECTIONS.showcases, 'showcases');
     assert.equal(COLLECTIONS.publicProfiles, 'publicProfiles');
     assert.equal(COLLECTIONS.profileSlugs, 'profileSlugs');

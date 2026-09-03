@@ -9,11 +9,13 @@ import {
   LEARNING_CONTRACT_STATUS,
   MILESTONE_STATUS,
   RELATIONSHIP_STATUS,
+  SESSION_STATUS,
   VERIFICATION_STATUS,
   type ApplicationStatus,
   type LearningContractStatus,
   type MilestoneStatus,
   type RelationshipStatus,
+  type SessionStatus,
   type VerificationStatus,
 } from './statuses.js';
 
@@ -119,6 +121,12 @@ export const LEARNING_CONTRACT_TRANSITIONS: TransitionMap<LearningContractStatus
   [LEARNING_CONTRACT_STATUS.completed]: [],
 };
 
+export const SESSION_TRANSITIONS: TransitionMap<SessionStatus> = {
+  [SESSION_STATUS.scheduled]: [SESSION_STATUS.cancelled, SESSION_STATUS.completed],
+  [SESSION_STATUS.cancelled]: [],
+  [SESSION_STATUS.completed]: [],
+};
+
 export const MILESTONE_TRANSITIONS: TransitionMap<MilestoneStatus> = {
   [MILESTONE_STATUS.locked]: [MILESTONE_STATUS.active],
   [MILESTONE_STATUS.active]: [MILESTONE_STATUS.submitted],
@@ -200,4 +208,8 @@ export function canTransitionBookingPaymentStatus(
   to: BookingPaymentStatus,
 ): boolean {
   return canTransition(BOOKING_PAYMENT_STATUS_TRANSITIONS, from, to);
+}
+
+export function canTransitionSession(from: SessionStatus, to: SessionStatus): boolean {
+  return canTransition(SESSION_TRANSITIONS, from, to);
 }

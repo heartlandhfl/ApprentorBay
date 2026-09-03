@@ -11,6 +11,7 @@ export const COLLECTIONS = {
   relationships: 'mentorshipRelationships',
   messages: 'messages',
   contracts: 'learningContracts',
+  sessions: 'mentorshipSessions',
   showcases: 'showcases',
   publicProfiles: 'publicProfiles',
   profileSlugs: 'profileSlugs',

@@ -56,8 +56,8 @@ const BOOKING_STATUS_VALUES = new Set<string>(Object.values(BOOKING_STATUS));
 const BOOKING_SERVICE_TYPE_VALUES = new Set<string>(Object.values(BOOKING_SERVICE_TYPE));
 const BOOKING_CURRENCY_VALUES = new Set<string>(Object.values(BOOKING_CURRENCY));
 
-/** Only `relationshipId` may be supplied by the client when creating a booking. */
-export const CLIENT_BOOKING_CREATE_FIELDS = ['relationshipId'] as const;
+/** Only `relationshipId` and optional `sessionId` may be supplied by the client when creating a booking. */
+export const CLIENT_BOOKING_CREATE_FIELDS = ['relationshipId', 'sessionId'] as const;
 
 /** Fields the server derives — rejected if present on create requests. */
 export const FORBIDDEN_CLIENT_BOOKING_FIELDS = [
@@ -230,7 +230,7 @@ export function validateBookingRelationship(
 
 export function validateCreateBookingBody(
   body: unknown,
-): ValidationResult & { relationshipId?: string } {
+): ValidationResult & { relationshipId?: string; sessionId?: string | null } {
   if (!body || typeof body !== 'object' || Array.isArray(body)) {
     return { ok: false, error: 'Invalid request body' };
   }
@@ -251,7 +251,17 @@ export function validateCreateBookingBody(
     return { ok: false, error: 'relationshipId is required' };
   }
 
-  return { ok: true, relationshipId };
+  const sessionId =
+    record.sessionId === undefined
+      ? null
+      : typeof record.sessionId === 'string'
+        ? record.sessionId.trim() || null
+        : null;
+  if (record.sessionId !== undefined && record.sessionId !== null && !sessionId) {
+    return { ok: false, error: 'sessionId must be a non-empty string when provided' };
+  }
+
+  return { ok: true, relationshipId, sessionId };
 }
 
 export function detectClientBookingFieldTampering(body: unknown): string[] {
@@ -265,6 +275,7 @@ export function buildMentorshipBooking(input: {
   relationship: Pick<MentorshipRelationship, 'id' | 'learnerId' | 'mentorId'>;
   snapshot: BookingFinancialSnapshot;
   now: IsoDateString;
+  sessionId?: string | null;
 }): MentorshipBooking {
   const { snapshot } = input;
   return {
@@ -282,7 +293,7 @@ export function buildMentorshipBooking(input: {
     platformFeeBps: snapshot.platformFeeBps,
     paymentStatus: BOOKING_PAYMENT_STATUS.pendingPayment,
     bookingStatus: BOOKING_STATUS.pendingPayment,
-    sessionId: null,
+    sessionId: input.sessionId ?? null,
     createdAt: input.now,
     updatedAt: input.now,
   };

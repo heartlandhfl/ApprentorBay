@@ -26,6 +26,7 @@ import {
   TextArea,
 } from '../components';
 import { JourneyEntry } from '../features/learning-contracts';
+import { SessionsPanel } from '../features/sessions';
 import {
   firestoreDenied,
   sendMessage,
@@ -258,6 +259,13 @@ export function RelationshipWorkspacePage() {
           relationship={relationship}
           account={account}
           otherName={otherName}
+        />
+
+        <SessionsPanel
+          relationship={relationship}
+          account={account}
+          learner={learner}
+          mentor={mentor}
         />
 
         <Stack gap={12}>

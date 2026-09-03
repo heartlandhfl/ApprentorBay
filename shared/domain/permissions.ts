@@ -2,6 +2,7 @@ import {
   APPLICATION_STATUS,
   LEARNING_CONTRACT_STATUS,
   RELATIONSHIP_STATUS,
+  SESSION_STATUS,
   VERIFICATION_STATUS,
 } from './statuses.js';
 import { USER_ROLE } from './identities.js';
@@ -25,6 +26,12 @@ import {
   type MentorshipRelationship,
   type PairingMemberIds,
 } from './relationships.js';
+import {
+  isTerminalSessionStatus,
+  sessionJoinWindow,
+  sessionPaymentAccessGranted,
+  type MentorshipSession,
+} from './sessions.js';
 import type { LearningContract } from './learningContracts.js';
 import { validateApplicationMessage, validateMessageText } from './validation.js';
 
@@ -301,4 +308,60 @@ export function canRequestRefund(
 ): boolean {
   if (!canAdminister(actor)) return false;
   return intent.status === PAYMENT_STATUS.paid || intent.status === PAYMENT_STATUS.partiallyRefunded;
+}
+
+export function canReadSession(
+  actor: PermissionActor | null | undefined,
+  session: Pick<MentorshipSession, 'learnerId' | 'mentorId'>,
+): boolean {
+  return canReadPairing(actor, session);
+}
+
+export function canScheduleSession(
+  actor: PermissionActor | null | undefined,
+  relationship: MentorshipRelationship,
+): boolean {
+  if (!actor || !canParticipate(actor)) return false;
+  if (actor.role === USER_ROLE.admin) return true;
+  if (!isPairingMember(actor.uid, relationship)) return false;
+  return relationship.status === RELATIONSHIP_STATUS.active;
+}
+
+export function canCancelSession(
+  actor: PermissionActor | null | undefined,
+  session: MentorshipSession,
+): boolean {
+  if (!actor || !isAccountActive(actor)) return false;
+  if (session.status !== SESSION_STATUS.scheduled) return false;
+  if (actor.role === USER_ROLE.admin) return true;
+  return isPairingMember(actor.uid, session);
+}
+
+export function canCompleteSession(
+  actor: PermissionActor | null | undefined,
+  session: MentorshipSession,
+): boolean {
+  if (!actor || !isAccountActive(actor)) return false;
+  if (session.status !== SESSION_STATUS.scheduled) return false;
+  if (isTerminalSessionStatus(session.status)) return false;
+  if (actor.role === USER_ROLE.admin) return true;
+  return isPairingMember(actor.uid, session);
+}
+
+export function canJoinSession(
+  actor: PermissionActor | null | undefined,
+  session: MentorshipSession,
+  relationship: MentorshipRelationship,
+  booking: Pick<MentorshipBooking, 'id' | 'paymentStatus' | 'bookingStatus' | 'sessionId'> | null | undefined,
+  now?: string,
+): boolean {
+  if (!actor || !canParticipate(actor)) return false;
+  if (!canReadSession(actor, session)) return false;
+  if (session.relationshipId !== relationship.id) return false;
+  if (session.status !== SESSION_STATUS.scheduled) return false;
+  if (relationship.status !== RELATIONSHIP_STATUS.active) return false;
+  if (actor.role === USER_ROLE.admin) return true;
+  if (!isPairingMember(actor.uid, session)) return false;
+  if (!sessionPaymentAccessGranted(session, booking, relationship)) return false;
+  return sessionJoinWindow(session, now).joinable;
 }

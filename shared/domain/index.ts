@@ -24,6 +24,7 @@ export {
   MILESTONE_STATUS_LABEL,
   NOTIFICATION_STATUS,
   RELATIONSHIP_STATUS,
+  SESSION_STATUS,
   STEP_OWNER,
   SUPPORT_ISSUE_STATUS,
   VERIFICATION_CASE_STATUS,
@@ -41,6 +42,7 @@ export {
   isReviewableMilestoneStatus,
   isOperationalContractStatus,
   isRelationshipStatus,
+  isSessionStatus,
   isStepOwner,
   isAccountStatus,
   isVerificationCaseStatus,
@@ -55,6 +57,7 @@ export type {
   MilestoneStatus,
   NotificationStatus,
   RelationshipStatus,
+  SessionStatus,
   StepOwner,
   SupportIssueStatus,
   VerificationCaseStatus,
@@ -281,6 +284,29 @@ export type {
   PaymentIntentAction,
   RefundAction,
 } from './paymentMachine.js';
+
+export {
+  SESSION_SCHEDULE,
+  SESSION_STATUS_LABEL,
+  assertSessionOwnership,
+  buildMentorshipSession,
+  buildSessionRoomName,
+  durationMinutesBetween,
+  isLiveSession,
+  findSchedulingConflict,
+  isPastSession,
+  isSessionMember,
+  isTerminalSessionStatus,
+  isUpcomingSession,
+  normalizeSession,
+  pairingMatchesSession,
+  relationshipRequiresPaidSessionAccess,
+  sessionJoinWindow,
+  sessionPaymentAccessGranted,
+  sessionsOverlap,
+  SESSION_SCHEDULE_DURATION_OPTIONS,
+} from './sessions.js';
+export type { MentorshipSession, SessionJoinPayload } from './sessions.js';
 
 export { MESSAGE_TEXT } from './messages.js';
 export type { Message } from './messages.js';
@@ -518,6 +544,11 @@ export {
   canStartCheckout,
   canReadPaymentIntent,
   canRequestRefund,
+  canReadSession,
+  canScheduleSession,
+  canCancelSession,
+  canCompleteSession,
+  canJoinSession,
 } from './permissions.js';
 export type { PermissionActor } from './permissions.js';
 
@@ -536,6 +567,8 @@ export {
   validateMilestoneFeedback,
   validateNewPassword,
   validatePasswordResetEmail,
+  validateSessionScheduleInput,
+  validateLocalScheduleFields,
 } from './validation.js';
 export type { EmailValidation, PasswordResetAction, ValidationResult } from './validation.js';
 
@@ -544,12 +577,14 @@ export {
   LEARNING_CONTRACT_TRANSITIONS,
   MILESTONE_TRANSITIONS,
   RELATIONSHIP_TRANSITIONS,
+  SESSION_TRANSITIONS,
   VERIFICATION_TRANSITIONS,
   canTransition,
   canTransitionApplication,
   canTransitionContract,
   canTransitionMilestone,
   canTransitionRelationship,
+  canTransitionSession,
   canTransitionVerification,
   canTransitionBookingStatus,
   canTransitionBookingPaymentStatus,
