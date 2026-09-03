@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   APPROVAL_DISCLAIMER,
+  COMMERCIAL_MODE,
+  formatMentorPriceDisplay,
+  mentorTypePublicTitle,
   VERIFIED_CLAIM_LABEL,
   type PublicProfile,
 } from '@apprentorbay/shared';
@@ -77,6 +80,11 @@ export function MentorsPage() {
 
 function MentorCard({ mentor }: { mentor: PublicProfile }) {
   const craft = mentor.areasOfExpertise[0] || mentor.professionalIdentity || 'Mentor';
+  const priceLabel = formatMentorPriceDisplay({
+    commercialMode: mentor.commercialMode ?? COMMERCIAL_MODE.givingBack,
+    sessionPriceUsd: mentor.sessionPriceUsd ?? null,
+    sessionDurationMinutes: mentor.sessionDurationMinutes,
+  });
 
   return (
     <Card>
@@ -92,6 +100,8 @@ function MentorCard({ mentor }: { mentor: PublicProfile }) {
             ))}
           <Text variant="h3">{mentor.displayName || 'Mentor'}</Text>
           <Text variant="small">{craft}</Text>
+          <Text variant="caption">{mentorTypePublicTitle(mentor.mentorType)}</Text>
+          <Text variant="small">{priceLabel}</Text>
         </Stack>
         {mentor.mentoredDeliverables.length > 0 ? (
           <Text variant="small">
@@ -113,6 +123,7 @@ function mentorMatches(mentor: PublicProfile, needle: string): boolean {
   const haystack = [
     mentor.displayName,
     mentor.professionalIdentity,
+    mentor.servicesDescription,
     ...mentor.areasOfExpertise,
     ...mentor.experience.map((item) => `${item.title} ${item.organization} ${item.summary}`),
     ...mentor.education.map((item) => `${item.credential} ${item.institution}`),

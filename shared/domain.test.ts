@@ -68,6 +68,8 @@ import {
   COMMERCIAL_MODE,
   MENTOR_TYPE,
   commercialModeAllowedForMentorType,
+  formatMentorPriceDisplay,
+  mentorPrimaryActionLabel,
   normalizeLearnerProfile,
   normalizeMentorProfile,
   ownPublicProfilePath,
@@ -1009,6 +1011,45 @@ describe('mentor offering', () => {
       }).ok,
       false,
     );
+  });
+});
+
+describe('mentor presentation', () => {
+  it('formats free and paid prices from configured mentor data only', () => {
+    assert.equal(
+      formatMentorPriceDisplay({
+        commercialMode: COMMERCIAL_MODE.givingBack,
+        sessionPriceUsd: null,
+      }),
+      'Free mentorship',
+    );
+    assert.equal(
+      formatMentorPriceDisplay({
+        commercialMode: COMMERCIAL_MODE.professional,
+        sessionPriceUsd: 75,
+      }),
+      '$75 / session',
+    );
+    assert.equal(
+      formatMentorPriceDisplay({
+        commercialMode: COMMERCIAL_MODE.premium,
+        sessionPriceUsd: 150,
+        sessionDurationMinutes: 60,
+      }),
+      '$150 / 60 min',
+    );
+    assert.equal(
+      formatMentorPriceDisplay({
+        commercialMode: COMMERCIAL_MODE.premium,
+        sessionPriceUsd: null,
+      }),
+      'Paid mentorship',
+    );
+  });
+
+  it('chooses primary actions by commercial mode', () => {
+    assert.equal(mentorPrimaryActionLabel(COMMERCIAL_MODE.givingBack), 'Request mentorship');
+    assert.equal(mentorPrimaryActionLabel(COMMERCIAL_MODE.premium), 'View mentorship options');
   });
 });
 
