@@ -17,6 +17,7 @@ import { watchRelationship } from '../features/mentorship';
 import {
   completeMentorshipSession,
   getMentorshipSession,
+  getSessionMeetingAccess,
   joinMentorshipSession,
 } from '../lib/api';
 import { useAuth } from '../lib/auth';
@@ -37,6 +38,7 @@ export function SessionRoomPage() {
   const [inMeeting, setInMeeting] = useState(false);
   const [leaving, setLeaving] = useState(false);
   const [joinConfig, setJoinConfig] = useState<SessionJoinPayload | null>(null);
+  const [accessRevoked, setAccessRevoked] = useState(false);
   const [session, setSession] = useState<MentorshipSession | null>(null);
   const [relationship, setRelationship] = useState<MentorshipRelationship | null | undefined>(
     undefined,
@@ -109,6 +111,32 @@ export function SessionRoomPage() {
     };
   }, [account, denied, missing, relationshipId, sessionId]);
 
+  useEffect(() => {
+    if (!inMeeting || !sessionId || accessRevoked) return;
+
+    const intervalMs = joinConfig?.meetingAccessPollIntervalMs ?? 15_000;
+    let cancelled = false;
+
+    async function pollAccess() {
+      try {
+        const access = await getSessionMeetingAccess(sessionId!);
+        if (!cancelled && !access.allowed) {
+          setAccessRevoked(true);
+          setError(access.reason ?? 'Meeting access was revoked.');
+        }
+      } catch {
+        // Ignore transient poll failures; the next poll will retry.
+      }
+    }
+
+    void pollAccess();
+    const timer = window.setInterval(() => void pollAccess(), intervalMs);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [accessRevoked, inMeeting, joinConfig?.meetingAccessPollIntervalMs, sessionId]);
+
   const leaveMeeting = useCallback(async () => {
     if (!sessionId || leaving) return;
     setLeaving(true);
@@ -122,6 +150,7 @@ export function SessionRoomPage() {
     } finally {
       setInMeeting(false);
       setJoinConfig(null);
+      setAccessRevoked(false);
       setLeaving(false);
       navigate(workspacePath);
     }
@@ -246,7 +275,11 @@ export function SessionRoomPage() {
               <Badge tone="accent">LIVE</Badge>
             </Cluster>
             {joinConfig ? (
-              <JitsiMeetingEmbed join={joinConfig} onLeave={() => void leaveMeeting()} />
+              <JitsiMeetingEmbed
+                join={joinConfig}
+                forceDisconnect={accessRevoked}
+                onLeave={() => void leaveMeeting()}
+              />
             ) : null}
             <Cluster gap={8}>
               <Button variant="danger" loading={leaving} onClick={() => void leaveMeeting()}>

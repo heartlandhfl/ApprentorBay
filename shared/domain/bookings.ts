@@ -113,6 +113,8 @@ export interface MentorshipBooking {
   paymentStatus: BookingPaymentStatus;
   bookingStatus: BookingStatus;
   sessionId: string | null;
+  /** Server-set idempotency key for create retries. */
+  idempotencyKey?: string | null;
   createdAt: IsoDateString;
   updatedAt: IsoDateString;
 }
@@ -336,6 +338,7 @@ export function normalizeMentorshipBooking(
     paymentStatus,
     bookingStatus,
     sessionId: typeof raw.sessionId === 'string' ? raw.sessionId : null,
+    idempotencyKey: typeof raw.idempotencyKey === 'string' ? raw.idempotencyKey : null,
     createdAt: raw.createdAt ?? '',
     updatedAt: raw.updatedAt ?? raw.createdAt ?? '',
   };

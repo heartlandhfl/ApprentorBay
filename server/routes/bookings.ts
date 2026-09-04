@@ -6,7 +6,6 @@ import {
   COLLECTIONS,
   USER_ROLE,
   buildBookingFinancialSnapshot,
-  buildMentorshipBooking,
   canCancelBooking,
   canCreateBooking,
   canReadBooking,
@@ -19,10 +18,14 @@ import {
   type MentorshipSession,
 } from '@apprentorbay/shared';
 import { platformFeeBpsFromEnv } from '../lib/bookingConfig.js';
+import {
+  createMentorshipBookingAtomically,
+  releaseBookingPendingLock,
+} from '../lib/bookingsRepository.js';
 import { recordAudit } from '../lib/audit.js';
 import { adminDb } from '../lib/firebase.js';
 import { loadPrivateProfile } from '../lib/profiles.js';
-import { getSessionById, saveSession } from '../lib/sessionsRepository.js';
+import { getSessionById } from '../lib/sessionsRepository.js';
 import { requireAccount, sendApiError, type AccountRequest } from '../middleware/requireAccount.js';
 
 export const bookingsRouter = Router();
@@ -57,6 +60,12 @@ async function listOpenBookingsForRelationship(relationshipId: string) {
   return snap.docs.map((doc) =>
     normalizeMentorshipBooking({ ...(doc.data() as MentorshipBooking), id: doc.id }),
   );
+}
+
+function bookingIdempotencyKeyFromRequest(req: AccountRequest): string | null {
+  const header = req.header('Idempotency-Key')?.trim();
+  if (!header) return null;
+  return header.slice(0, 128);
 }
 
 bookingsRouter.post('/', async (req: AccountRequest, res, next) => {
@@ -114,36 +123,34 @@ bookingsRouter.post('/', async (req: AccountRequest, res, next) => {
     }
 
     const now = new Date().toISOString();
-    const ref = adminDb().collection(COLLECTIONS.bookings).doc();
-    const booking = buildMentorshipBooking({
-      id: ref.id,
+    const idempotencyKey =
+      bookingIdempotencyKeyFromRequest(req) ??
+      `booking-${account.uid}-${relationship.id}-${parsed.sessionId ?? 'none'}`;
+
+    const { booking, created } = await createMentorshipBookingAtomically({
       relationship,
       snapshot: snapshotResult.snapshot!,
       now,
       sessionId: parsed.sessionId ?? null,
+      linkedSession,
+      idempotencyKey,
     });
 
-    await ref.set(booking);
-    if (linkedSession) {
-      await saveSession({
-        ...linkedSession,
-        bookingId: booking.id,
-        updatedAt: now,
+    if (created) {
+      await recordAudit({
+        actorId: account.uid,
+        action: AUDIT_EVENT.bookingCreated,
+        targetUserId: relationship.mentorId,
+        metadata: {
+          bookingId: booking.id,
+          relationshipId: relationship.id,
+          unitPriceCents: String(booking.unitPriceCents),
+          currency: booking.currency,
+        },
       });
     }
-    await recordAudit({
-      actorId: account.uid,
-      action: AUDIT_EVENT.bookingCreated,
-      targetUserId: relationship.mentorId,
-      metadata: {
-        bookingId: booking.id,
-        relationshipId: relationship.id,
-        unitPriceCents: String(booking.unitPriceCents),
-        currency: booking.currency,
-      },
-    });
 
-    res.status(201).json({ booking });
+    res.status(created ? 201 : 200).json({ booking });
   } catch (error) {
     next(error);
   }
@@ -241,14 +248,21 @@ bookingsRouter.post('/:id/cancel', async (req: AccountRequest, res, next) => {
     const now = new Date().toISOString();
     const booking = cancelMentorshipBooking(current, now);
     await adminDb().collection(COLLECTIONS.bookings).doc(booking.id).set(booking);
+    await releaseBookingPendingLock(booking.relationshipId, booking.id);
     if (booking.sessionId) {
       const session = await getSessionById(booking.sessionId);
       if (session && session.bookingId === booking.id) {
-        await saveSession({
-          ...session,
-          bookingId: null,
-          updatedAt: now,
-        });
+        await adminDb()
+          .collection(COLLECTIONS.sessions)
+          .doc(session.id)
+          .set(
+            {
+              ...session,
+              bookingId: null,
+              updatedAt: now,
+            },
+            { merge: true },
+          );
       }
     }
     await recordAudit({

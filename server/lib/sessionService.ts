@@ -1,11 +1,15 @@
 import {
+  BOOKING_PAYMENT_STATUS,
+  BOOKING_STATUS,
   SESSION_STATUS,
+  USER_ROLE,
   assertSessionOwnership,
   buildMentorshipSession,
   canJoinSession,
+  canReadSession,
+  canRemainInSessionMeeting,
   canCancelSession,
   canCompleteSession,
-  canReadSession,
   canScheduleSession,
   canTransitionSession,
   findSchedulingConflict,
@@ -16,8 +20,10 @@ import {
   type MentorshipRelationship,
   type MentorshipSession,
   type SessionJoinPayload,
+  type SessionMeetingAccess,
   type User,
 } from '@apprentorbay/shared';
+import { readJitsiJwtConfig, signJitsiMeetingJwt } from './jitsiJwt.js';
 
 export type SessionServiceErrorCode =
   | 'unauthenticated'
@@ -262,6 +268,48 @@ export function resolveJitsiDomain(): string {
   return process.env.JITSI_DOMAIN?.trim() || 'meet.jit.si';
 }
 
+const MEETING_ACCESS_POLL_INTERVAL_MS = 15_000;
+
+export async function getSessionMeetingAccess(
+  store: SessionStore,
+  account: User | undefined,
+  sessionId: string,
+  now: string = new Date().toISOString(),
+): Promise<SessionMeetingAccess> {
+  const actor = requireActor(account);
+  const current = await store.getSession(sessionId);
+  if (!current) {
+    throw new SessionServiceError('not_found', 'Session not found', 404);
+  }
+
+  const relationship = await store.getRelationship(current.relationshipId);
+  if (!relationship || !assertSessionOwnership(relationship, current)) {
+    throw new SessionServiceError('forbidden', 'Session does not match its relationship', 403);
+  }
+
+  if (!canReadSession(actor, current)) {
+    throw new SessionServiceError('forbidden', 'You cannot view this session', 403);
+  }
+
+  const booking = await store.getBookingForSession(sessionId);
+  const allowed = canRemainInSessionMeeting(current, booking, relationship);
+  if (allowed) {
+    return { allowed: true };
+  }
+
+  return {
+    allowed: false,
+    reason:
+      booking &&
+      (booking.paymentStatus === BOOKING_PAYMENT_STATUS.refunded ||
+        booking.paymentStatus === BOOKING_PAYMENT_STATUS.cancelled ||
+        booking.bookingStatus === BOOKING_STATUS.refunded ||
+        booking.bookingStatus === BOOKING_STATUS.cancelled)
+        ? 'Payment for this session was refunded or cancelled.'
+        : 'Meeting access is no longer available.',
+  };
+}
+
 export async function joinMentorshipSession(
   store: SessionStore,
   account: User | undefined,
@@ -293,6 +341,16 @@ export async function joinMentorshipSession(
     });
   }
 
+  const jwtConfig = readJitsiJwtConfig();
+  const signed = signJitsiMeetingJwt({
+    roomName: current.roomName,
+    userId: actor.uid,
+    displayName: actor.displayName?.trim() || 'Participant',
+    email: actor.email?.trim() || '',
+    isModerator: actor.uid === current.mentorId || actor.role === USER_ROLE.admin,
+    config: jwtConfig,
+  });
+
   return {
     domain: resolveJitsiDomain(),
     roomName: current.roomName,
@@ -300,6 +358,10 @@ export async function joinMentorshipSession(
       displayName: actor.displayName?.trim() || 'Participant',
       email: actor.email?.trim() || '',
     },
+    ...(signed
+      ? { jwt: signed.jwt, jwtExpiresAt: signed.expiresAt }
+      : {}),
+    meetingAccessPollIntervalMs: MEETING_ACCESS_POLL_INTERVAL_MS,
   };
 }
 

@@ -230,5 +230,11 @@ describe('payment request tampering', () => {
       split: { ...intent.split, grossAmountCents: booking.unitPriceCents },
     };
     assert.equal(validatePaymentMatchesBooking(tamperedCurrency, booking).ok, true);
+
+    const tamperedFeeBps = {
+      ...intent,
+      split: { ...intent.split, platformFeeBps: 1000 },
+    };
+    assert.equal(validatePaymentMatchesBooking(tamperedFeeBps, booking).ok, false);
   });
 });

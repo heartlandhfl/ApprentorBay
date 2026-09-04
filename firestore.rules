@@ -238,6 +238,10 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    match /bookingPendingLocks/{relationshipId} {
+      allow read, write: if false;
+    }
+
     match /messages/{messageId} {
       allow read: if isRelationshipMember(resource.data.relationshipId) || isAdmin();
       allow create: if accountParticipates()

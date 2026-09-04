@@ -14,6 +14,7 @@ import type {
   PendingMentorRow,
   RelationshipStatus,
   SessionJoinPayload,
+  SessionMeetingAccess,
   SupportIssue,
   User,
   VerificationStatus,
@@ -363,6 +364,17 @@ export async function joinMentorshipSession(sessionId: string): Promise<SessionJ
   });
   const body = await readJson<{ join: SessionJoinPayload }>(response);
   return body.join;
+}
+
+export async function getSessionMeetingAccess(
+  sessionId: string,
+): Promise<SessionMeetingAccess> {
+  const response = await fetch(
+    `/api/sessions/${encodeURIComponent(sessionId)}/meeting-access`,
+    { headers: await authHeaders() },
+  );
+  const body = await readJson<{ access: SessionMeetingAccess }>(response);
+  return body.access;
 }
 
 export async function createMentorshipBooking(input: {

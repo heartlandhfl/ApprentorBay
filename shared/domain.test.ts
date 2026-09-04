@@ -73,6 +73,7 @@ import {
   formatUsdCents,
   buildMentorshipOfferingView,
   mentorPrimaryActionLabel,
+  learnerMentorshipPrimaryActionLabel,
   parseUsdToCents,
   readSessionPriceCents,
   normalizeLearnerProfile,
@@ -1126,6 +1127,19 @@ describe('mentor presentation', () => {
   it('chooses primary actions by commercial mode', () => {
     assert.equal(mentorPrimaryActionLabel(COMMERCIAL_MODE.givingBack), 'Request mentorship');
     assert.equal(mentorPrimaryActionLabel(COMMERCIAL_MODE.premium), 'Book a session');
+    assert.equal(
+      learnerMentorshipPrimaryActionLabel({ commercialMode: COMMERCIAL_MODE.premium }),
+      'Request mentorship',
+    );
+    assert.equal(
+      learnerMentorshipPrimaryActionLabel({
+        commercialMode: COMMERCIAL_MODE.premium,
+        hasActiveRelationship: true,
+        paymentRequired: true,
+        paymentSatisfied: false,
+      }),
+      'Book and pay',
+    );
   });
 
   it('builds mentorship offering views with clear purchase details', () => {
@@ -1140,7 +1154,7 @@ describe('mentor presentation', () => {
     assert.equal(offering.durationLabel, '60 minutes');
     assert.equal(offering.priceAmountLabel, '$125');
     assert.equal(offering.currencyCode, 'USD');
-    assert.equal(offering.primaryActionLabel, 'Book a session');
+    assert.equal(offering.primaryActionLabel, 'Request mentorship');
     assert.ok(offering.nextSteps.length >= 3);
   });
 });

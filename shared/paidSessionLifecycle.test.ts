@@ -14,6 +14,7 @@ import {
   buildMentorshipBooking,
   buildMentorshipSession,
   canJoinSession,
+  canRemainInSessionMeeting,
   canStartLearningJourney,
   markMentorshipBookingPaid,
   normalizeMentorOfferingFields,
@@ -225,6 +226,46 @@ describe('paid session lifecycle', () => {
       canStartLearningJourney(actor('learner-1', USER_ROLE.learner), relationship),
       true,
     );
+  });
+
+  it('revokes in-meeting access when booking is refunded without re-checking join window', () => {
+    const relationship = paidRelationship({ paymentSatisfied: true });
+    const session = {
+      ...buildMentorshipSession({
+        id: 'session-1',
+        relationship,
+        title: 'Paid session',
+        scheduledStart: START,
+        scheduledEnd: END,
+        now: NOW,
+      }),
+      bookingId: 'booking-1',
+    };
+    const refunded = {
+      ...markMentorshipBookingPaid(paidBooking(session.id), NOW),
+      paymentStatus: BOOKING_PAYMENT_STATUS.refunded,
+      bookingStatus: BOOKING_STATUS.refunded,
+    };
+
+    assert.equal(canRemainInSessionMeeting(session, refunded, relationship), false);
+  });
+
+  it('allows in-meeting access while booking remains paid', () => {
+    const relationship = paidRelationship({ paymentSatisfied: true });
+    const session = {
+      ...buildMentorshipSession({
+        id: 'session-1',
+        relationship,
+        title: 'Paid session',
+        scheduledStart: START,
+        scheduledEnd: END,
+        now: NOW,
+      }),
+      bookingId: 'booking-1',
+    };
+    const paid = markMentorshipBookingPaid(paidBooking(session.id), NOW);
+
+    assert.equal(canRemainInSessionMeeting(session, paid, relationship), true);
   });
 
   it('keeps paid sessions unavailable after failed payment', () => {
