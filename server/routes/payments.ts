@@ -12,7 +12,8 @@ import {
   type PaymentIntent,
 } from '@apprentorbay/shared';
 import { adminDb } from '../lib/firebase.js';
-import { paymentService } from '../lib/payments/paymentService.js';
+import { getPaymentService } from '../lib/payments/paymentService.js';
+import { paymentsConfigured } from '../lib/payments/paymentConfig.js';
 import { requireAccount, sendApiError, type AccountRequest } from '../middleware/requireAccount.js';
 
 export const paymentsRouter = Router();
@@ -68,7 +69,17 @@ paymentsRouter.post('/checkout', async (req: AccountRequest, res, next) => {
       return;
     }
 
-    const result = await paymentService.createCheckout({
+    if (!paymentsConfigured()) {
+      sendApiError(
+        res,
+        503,
+        'payments_unavailable',
+        'Payments are not configured. Set STRIPE_SECRET_KEY on the server.',
+      );
+      return;
+    }
+
+    const result = await getPaymentService().createCheckout({
       booking,
       learnerId: account.uid,
       idempotencyKey: idempotencyKeyFromRequest(req),

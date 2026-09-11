@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { REFUND_REASON, canRequestRefund } from '@apprentorbay/shared';
-import { paymentService } from '../lib/payments/paymentService.js';
+import { getPaymentService } from '../lib/payments/paymentService.js';
+import { paymentsConfigured } from '../lib/payments/paymentConfig.js';
 import { requireAccount, sendApiError, type AccountRequest } from '../middleware/requireAccount.js';
 import { adminDb } from '../lib/firebase.js';
 import { COLLECTIONS, normalizePaymentIntent, type PaymentIntent } from '@apprentorbay/shared';
@@ -39,9 +40,19 @@ refundsRouter.post('/', async (req: AccountRequest, res, next) => {
       return;
     }
 
+    if (!paymentsConfigured()) {
+      sendApiError(
+        res,
+        503,
+        'payments_unavailable',
+        'Payments are not configured. Set STRIPE_SECRET_KEY on the server.',
+      );
+      return;
+    }
+
     const idempotencyKey =
       req.header('Idempotency-Key')?.trim() || `refund-${paymentIntentId}-${account.uid}`;
-    const refund = await paymentService.createRefund({
+    const refund = await getPaymentService().createRefund({
       paymentIntentId,
       requestedBy: account.uid,
       reason: REFUND_REASON.admin,

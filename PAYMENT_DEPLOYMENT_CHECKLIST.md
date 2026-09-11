@@ -10,7 +10,7 @@ Set these in your hosting provider (e.g. Hostinger hPanel → Environment variab
 |----------|----------|---------|
 | `PAYMENT_PROVIDER` | Yes | Must be `stripe` in production |
 | `STRIPE_SECRET_KEY` | Yes | Stripe secret API key (`sk_live_...`) |
-| `STRIPE_WEBHOOK_SECRET` | Yes | Signing secret from the production webhook endpoint (`whsec_...`) |
+| `STRIPE_WEBHOOK_SECRET` | Yes (before accepting live payments) | Signing secret from the production webhook endpoint (`whsec_...`). Checkout can start without this; webhooks fail until it is set. |
 | `PLATFORM_FEE_BPS` | Recommended | Marketplace commission in basis points (default `1500` = 15%) |
 | `CLIENT_ORIGIN` | Yes | Public site origin, e.g. `https://apprentorbay.com` (used for checkout return/cancel URLs) |
 | `VITE_STRIPE_PUBLISHABLE_KEY` | Optional | Publishable key (`pk_live_...`) if/when client checkout UI is added |

@@ -79,6 +79,12 @@ export interface HealthStatus {
     keyBodyPrefix?: string | null;
     keyBodyLength?: number | null;
   };
+  payments?: {
+    provider: string;
+    configured: boolean;
+    webhookConfigured: boolean;
+    publishableKeyConfigured: boolean;
+  };
 }
 
 export interface ApiError {

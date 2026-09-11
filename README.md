@@ -108,7 +108,7 @@ The site must be a **Node.js web app**, not a static / Vite website.
    | Framework | **Express** or **Other** — not Vite / React / static |
    | Node.js | **20** or **22** |
    | Build command | `npm run build` |
-   | Entry file | **`dist/server.js`** (or `app.js`) |
+   | Entry file | **`app.js`** (recommended) or `dist/server.js` |
    | Output directory | **`dist`** |
    | Package manager | npm |
 
@@ -134,6 +134,11 @@ The site must be a **Node.js web app**, not a static / Vite website.
    | `FIREBASE_CLIENT_EMAIL` | Admin SDK service account email (optional if using the JSON base64 var) |
    | `FIREBASE_SERVICE_ACCOUNT_BASE64` | **preferred on Hostinger** — one-line base64 of the downloaded service-account JSON (`node scripts/encode-firebase-key.mjs ./file.json`) |
    | `FIREBASE_PRIVATE_KEY` | avoid on Hostinger — the panel often turns PEM newlines into the letter `n` and OpenSSL then reports `DECODER routines::unsupported` |
+   | `PAYMENT_PROVIDER` | `stripe` |
+   | `STRIPE_SECRET_KEY` | Stripe secret key (`sk_test_...` for sandbox, `sk_live_...` for production) |
+   | `STRIPE_WEBHOOK_SECRET` | Stripe webhook signing secret (`whsec_...`) from Dashboard → Developers → Webhooks → endpoint `https://apprentorbay.com/api/webhooks/payments` |
+   | `VITE_STRIPE_PUBLISHABLE_KEY` | Stripe publishable key (`pk_test_...` / `pk_live_...`) — baked in at build time |
+   | `PLATFORM_FEE_BPS` | `1500` (15% marketplace fee; optional) |
 
    Hostinger assigns `PORT`. The app already listens on `process.env.PORT` and `0.0.0.0`.
 
@@ -145,7 +150,7 @@ The site must be a **Node.js web app**, not a static / Vite website.
 
    If you still get Hostinger’s HTML “This Page Does Not Exist”, the domain is still on the static site. Runtime logs should show `ApprentorBay API listening` and `Serving client from .../dist/public`.
 
-   If you get **503 Service Unavailable**, the Node process is crashing. Redeploy with Entry `dist/server.js` and Output `dist`, then check Runtime Logs. Common causes: build never produced `dist/server.js`, a bad `FIREBASE_PRIVATE_KEY`, or the panel still using the Vite preset.
+   A 503 with Hostinger’s “temporarily busy” page means Node started and then crashed. Use entry file **`app.js`**, redeploy with Output `dist`, then check Runtime Logs. Common causes: build never produced `dist/server.js`, a bad `FIREBASE_PRIVATE_KEY`, or the panel still using the Vite preset. Missing `STRIPE_SECRET_KEY` no longer crashes boot — `/api/health` reports `payments.configured`.
 
 6. Create the first production admin (signup cannot grant `admin`):
 
