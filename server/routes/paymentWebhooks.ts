@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { paymentService } from '../lib/payments/paymentService.js';
+import { getPaymentService } from '../lib/payments/paymentService.js';
 import { getPaymentProvider } from '../lib/payments/registry.js';
 
 export const paymentWebhooksRouter = Router();
@@ -14,7 +14,7 @@ paymentWebhooksRouter.post('/', async (req, res, next) => {
 
     const provider = getPaymentProvider();
     const events = await provider.verifyAndParseWebhook(req.headers, rawBody);
-    await paymentService.handleWebhookEvents(events);
+    await getPaymentService().handleWebhookEvents(events);
     res.json({ received: true, processed: events.length });
   } catch (error) {
     const status = typeof (error as { status?: number }).status === 'number'

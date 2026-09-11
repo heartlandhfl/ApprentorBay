@@ -38,3 +38,26 @@ export function paymentsConfigured(): boolean {
   }
   return false;
 }
+
+export function stripeWebhookConfigured(): boolean {
+  return Boolean(stripeWebhookSecretFromEnv());
+}
+
+export function stripePublishableKeyFromEnv(): string | null {
+  const value = process.env.VITE_STRIPE_PUBLISHABLE_KEY?.trim();
+  return value ? value : null;
+}
+
+export function paymentsHealthSnapshot(): {
+  provider: string;
+  configured: boolean;
+  webhookConfigured: boolean;
+  publishableKeyConfigured: boolean;
+} {
+  return {
+    provider: paymentProviderIdFromEnv(),
+    configured: paymentsConfigured(),
+    webhookConfigured: stripeWebhookConfigured(),
+    publishableKeyConfigured: Boolean(stripePublishableKeyFromEnv()),
+  };
+}

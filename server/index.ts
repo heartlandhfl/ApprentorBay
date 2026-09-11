@@ -5,6 +5,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import express from 'express';
 import { getAdminFirebase } from './lib/firebase.js';
+import { paymentsHealthSnapshot } from './lib/payments/paymentConfig.js';
 import { seedAdmin } from './lib/seedAdmin.js';
 import { errorHandler, notFound } from './middleware/errorHandler.js';
 import { accountRouter } from './routes/account.js';
@@ -82,6 +83,7 @@ const clientOrigin =
   (process.env.NODE_ENV === 'production' ? true : 'http://localhost:5173');
 
 const firebase = getAdminFirebase();
+const payments = paymentsHealthSnapshot();
 
 const app = express();
 
@@ -136,6 +138,15 @@ const server = app.listen(port, '0.0.0.0', () => {
         : firebase.configured
           ? 'configured but not initialized'
           : 'not configured (placeholders only)'
+    }`,
+  );
+  console.log(
+    `Payments (${payments.provider}): ${
+      payments.configured
+        ? payments.webhookConfigured
+          ? 'configured'
+          : 'configured (webhook secret missing — checkout works; webhooks will fail until STRIPE_WEBHOOK_SECRET is set)'
+        : 'not configured (set STRIPE_SECRET_KEY or PAYMENT_PROVIDER=mock)'
     }`,
   );
   void seedAdmin();

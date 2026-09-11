@@ -35,7 +35,11 @@ import { getPaymentProvider } from './registry.js';
 import type { PaymentProvider, ProviderWebhookEvent } from './types.js';
 
 export class PaymentService {
-  constructor(private readonly provider: PaymentProvider = getPaymentProvider()) {}
+  constructor(private readonly provider?: PaymentProvider) {}
+
+  private providerInstance(): PaymentProvider {
+    return this.provider ?? getPaymentProvider();
+  }
 
   async createCheckout(input: {
     booking: MentorshipBooking;
@@ -54,7 +58,7 @@ export class PaymentService {
     const intent = buildPaymentIntentFromBooking({
       id: intentRef.id,
       booking: input.booking,
-      provider: this.provider.id,
+      provider: this.providerInstance().id,
       idempotencyKey: input.idempotencyKey,
       now,
     });
@@ -63,7 +67,7 @@ export class PaymentService {
       throw Object.assign(new Error(match.error), { status: 400 });
     }
 
-    const providerResult = await this.provider.createCheckoutSession({
+    const providerResult = await this.providerInstance().createCheckoutSession({
       paymentIntentId: intent.id,
       bookingId: input.booking.id,
       amountCents: input.booking.unitPriceCents,
@@ -96,7 +100,7 @@ export class PaymentService {
       bookingId: input.booking.id,
       learnerId: input.learnerId,
       status: CHECKOUT_SESSION_STATUS.open,
-      provider: this.provider.id,
+      provider: this.providerInstance().id,
       providerCheckoutSessionId: providerResult.providerCheckoutSessionId,
       checkoutUrl: providerResult.checkoutUrl,
       expiresAt: providerResult.expiresAt,
@@ -149,7 +153,7 @@ export class PaymentService {
 
   async handleWebhookEvents(events: ProviderWebhookEvent[]): Promise<void> {
     for (const event of events) {
-      const dedupId = `${this.provider.id}_${event.providerEventId}`;
+      const dedupId = `${this.providerInstance().id}_${event.providerEventId}`;
       const dedupRef = adminDb().collection(COLLECTIONS.paymentWebhookDedup).doc(dedupId);
       const dedupSnap = await dedupRef.get();
       if (dedupSnap.exists) continue;
@@ -189,7 +193,7 @@ export class PaymentService {
         }
 
         tx.set(dedupRef, {
-          provider: this.provider.id,
+          provider: this.providerInstance().id,
           providerEventId: event.providerEventId,
           processedAt: now,
         });
@@ -210,7 +214,7 @@ export class PaymentService {
     for (const doc of snap.docs) {
       const intent = normalizePaymentIntent({ ...(doc.data() as PaymentIntent), id: doc.id });
       if (!intent.providerPaymentIntentId) continue;
-      const providerStatus = await this.provider.getPaymentStatus(intent.providerPaymentIntentId);
+      const providerStatus = await this.providerInstance().getPaymentStatus(intent.providerPaymentIntentId);
       if (providerStatus === 'paid' && intent.status !== PAYMENT_STATUS.paid) {
         await adminDb().runTransaction(async (tx) => {
           await this.applyPaymentSucceeded(
@@ -269,7 +273,7 @@ export class PaymentService {
       amountCents: intent.amount.amountCents,
       reason: input.reason,
       idempotencyKey: input.idempotencyKey,
-      provider: this.provider.id,
+      provider: this.providerInstance().id,
       providerRefundId: null,
       requestedBy: input.requestedBy,
       createdAt: now,
@@ -277,7 +281,7 @@ export class PaymentService {
       succeededAt: null,
     };
 
-    const providerRefund = await this.provider.createRefund({
+    const providerRefund = await this.providerInstance().createRefund({
       providerPaymentIntentId: intent.providerPaymentIntentId,
       amountCents: intent.amount.amountCents,
       idempotencyKey: input.idempotencyKey,
@@ -682,4 +686,15 @@ export class PaymentService {
   }
 }
 
-export const paymentService = new PaymentService();
+let cachedPaymentService: PaymentService | null = null;
+
+export function getPaymentService(): PaymentService {
+  if (!cachedPaymentService) {
+    cachedPaymentService = new PaymentService();
+  }
+  return cachedPaymentService;
+}
+
+export function resetPaymentServiceForTests(): void {
+  cachedPaymentService = null;
+}
